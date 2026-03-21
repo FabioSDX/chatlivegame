@@ -359,6 +359,7 @@
     canvas.width = COLS * TILE;
     canvas.height = VIS * TILE;
 
+
     // ── Mobile detection & performance scaling ──
     var isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
     var MAX_PARTS = isMobile ? 40 : 120;
@@ -638,7 +639,14 @@
           if (!cell || cell.t === E || cell.t === BEDROCK) continue;
           var bPts = BDEF[cell.t].pts || 0;
           pts += bPts;
-          if (ITEM_DEFS[cell.t]) spawnItem(c * TILE + TILE / 2, r * TILE + TILE / 2, cell.t);
+          if (ITEM_DEFS[cell.t]) {
+            var tntSource = null;
+            if (b.userName) {
+              if (ownerName && b.userName === ownerName) tntSource = pick;
+              else tntSource = userPicks.find(function(u) { return u.userName === b.userName; });
+            }
+            spawnItem(c * TILE + TILE / 2, r * TILE + TILE / 2, cell.t, tntSource || pick);
+          }
           destroyedBlocks.push({ t: cell.t, wx: c * TILE + TILE / 2, wy: r * TILE + TILE / 2 });
           cell.t = E; cell.hp = 0; cell.cr = 0;
         }
@@ -854,21 +862,17 @@
       if (_audioStarted) sfxPickaxeChange();
     }
 
-    fetch('get_config.php')
-      .then(function (r) { return r.json(); })
-      .then(function (cfg) {
-        pickaxeChangeInterval = cfg.pickaxe_change_interval || 10;
-        if (cfg.owner_name) {
-          ownerName = cfg.owner_name.replace(/^@@+/, '@');
-          if (ownerName && ownerName[0] !== '@') ownerName = '@' + ownerName;
-          pick.userName = ownerName;
-        }
-      })
-      .catch(function () { })
-      .finally(function () {
-        changePickaxe();
-        setInterval(changePickaxe, pickaxeChangeInterval * 1000);
-      });
+    // ── Config from localStorage (no PHP needed) ──
+    (function() {
+      var cfg = JSON.parse(localStorage.getItem('pd_config') || '{}');
+      pickaxeChangeInterval = cfg.pickaxe_change_interval || 10;
+      if (cfg.owner_name) {
+        ownerName = cfg.owner_name.replace(/^@@+/, '@');
+        if (ownerName && ownerName[0] !== '@') ownerName = '@' + ownerName;
+      }
+      changePickaxe();
+      setInterval(changePickaxe, pickaxeChangeInterval * 1000);
+    })();
 
     // ── Mapa infinito ──────────────────────────────────────────────────────────────────
     var worldMap = {};
@@ -1283,6 +1287,7 @@
 
     var ownerName = ''; // loaded from config
     var pick = { x: 540, y: 100, vx: 0, vy: 0, ang: 0, spin: 0, stuck: false, stuckTimer: 0, userName: '', userAvatarUrl: '' };
+    if (ownerName) pick.userName = ownerName;
 
     function spawnPick() {
       var savedUser = pick.userName;
@@ -1449,7 +1454,7 @@
         }
       }
 
-      function spawnItem(x, y, blockType) {
+      function spawnItem(x, y, blockType, source) {
         if (!ITEM_DEFS[blockType]) return;
         items.push({
           x: x, y: y,
@@ -1457,7 +1462,8 @@
           vy: -4 - Math.random() * 6,
           t: blockType, wait: 25,
           ang: Math.random() * Math.PI * 2,
-          spin: (Math.random() - 0.5) * 0.2
+          spin: (Math.random() - 0.5) * 0.2,
+          owner: source || pick
         });
       }
 
@@ -1465,15 +1471,18 @@
         for (var i = items.length - 1; i >= 0; i--) {
           var it = items[i];
           if (it.wait > 0) { it.wait--; it.vx *= 0.96; it.vy += 0.3; it.x += it.vx; it.y += it.vy; continue; }
-          var dx = pick.x - it.x, dy = pick.y - it.y;
+          var target = it.owner || pick;
+          var dx = target.x - it.x, dy = target.y - it.y;
           var dist = Math.sqrt(dx * dx + dy * dy);
           if (dist < 45) {
             var pts = BDEF[it.t].pts || 0;
             score += pts;
             spawnText(it.x, it.y, '+' + pts, BDEF[it.t].glow);
-            if (pick.userName) {
-              if (!persistentScores[pick.userName]) persistentScores[pick.userName] = { score: 0, avatar: pick.userAvatarUrl || '' };
-              persistentScores[pick.userName].score += pts;
+            var tName = target.userName;
+            if (tName) {
+              if (!persistentScores[tName]) persistentScores[tName] = { score: 0, avatar: target.userAvatarUrl || '' };
+              persistentScores[tName].score += pts;
+              if (target !== pick) target.score = (target.score || 0) + pts;
             }
             if (_audioStarted) sfxSkillActivate();
             items.splice(i, 1); continue;
@@ -1495,12 +1504,13 @@
         }
       }
 
-      function spawnDebris(bx, by, blockType) {
+      function spawnDebris(bx, by, blockType, source) {
         if (debris.length > MAX_DEBRIS) return;
+        var target = source || pick;
         var n = isMobile ? 1 : 2 + Math.floor(Math.random() * 3);
         for (var i = 0; i < n; i++) {
           var ox = (Math.random() - 0.5) * TILE * 0.6, oy = (Math.random() - 0.5) * TILE * 0.6;
-          var dx = (pick ? pick.x : bx) - (bx + ox), dy = (pick ? pick.y : by) - (by + oy);
+          var dx = (target ? target.x : bx) - (bx + ox), dy = (target ? target.y : by) - (by + oy);
           var dist = Math.sqrt(dx * dx + dy * dy) || 1, spd = 1.5 + Math.random() * 2.5;
           debris.push({
             x: bx + ox, y: by + oy,
@@ -1508,7 +1518,8 @@
             vy: (dy / dist) * spd + (Math.random() - 0.5) * 2,
             t: blockType, size: 10 + Math.random() * 8,
             life: 1, age: 0, followFrames: 20 + Math.floor(Math.random() * 30),
-            ang: Math.random() * Math.PI * 2, spin: (Math.random() - 0.5) * 0.2
+            ang: Math.random() * Math.PI * 2, spin: (Math.random() - 0.5) * 0.2,
+            owner: target
           });
         }
       }
@@ -1526,13 +1537,13 @@
         cell.hp -= force;
         cell.cr = Math.min(1, 1 - cell.hp / def.hp);
         spawnParts(col * TILE + TILE / 2, row * TILE + TILE / 2, def.glow, 6);
-        spawnDebris(col * TILE + TILE / 2, row * TILE + TILE / 2, cell.t);
+        spawnDebris(col * TILE + TILE / 2, row * TILE + TILE / 2, cell.t, source);
         if (Math.random() < 0.18) sfxHit(cell.t);
         if (cell.hp <= 0) {
           var pts = def.pts || 0;
           score += pts;
           if (ITEM_DEFS[cell.t]) {
-            spawnItem(col * TILE + TILE / 2, row * TILE + TILE / 2, cell.t);
+            spawnItem(col * TILE + TILE / 2, row * TILE + TILE / 2, cell.t, source);
           } else {
             spawnText(col * TILE + TILE / 2, row * TILE + TILE / 2, '+' + pts, def.glow);
           }
@@ -1626,7 +1637,8 @@
           var db = debris[d];
           db.age++; db.ang += db.spin;
           if (db.age < db.followFrames) {
-            var dx = (pick ? pick.x : db.x) - db.x, dy = (pick ? pick.y : db.y) - db.y;
+            var dTarget = db.owner || pick;
+            var dx = (dTarget ? dTarget.x : db.x) - db.x, dy = (dTarget ? dTarget.y : db.y) - db.y;
             var dist = Math.sqrt(dx * dx + dy * dy) || 1;
             db.vx += (dx / dist) * 0.18; db.vy += (dy / dist) * 0.18;
             var spd = Math.sqrt(db.vx * db.vx + db.vy * db.vy);
@@ -3517,26 +3529,13 @@
     // Atalhos de teclado (Skills e Reset)
     window.addEventListener('keydown', function (e) {
       if (e.key === 'r' || e.key === 'R') {
-        fetch('clear_comments.php?channel_id=' + encodeURIComponent(_userChannelId))
-          .then(r => r.json())
-          .then(data => {
-            console.log(data.message);
-            processedComments.clear();
-            _firstFetchDone = false;
-            restart();
-            spawnText(canvas.width / 2, canvas.height / 2, 'MATCH RESET!', '#00ffff');
-            // Re-check API connection on restart
-            _gameStarted = false; // allow inline setup on restart
-            if (_apiCheckInterval) clearInterval(_apiCheckInterval);
-            tryLoadActiveKey(function(success, errorMsg) {
-              if (success) {
-                hideApiSetup();
-                startApiPolling();
-              } else {
-                showApiSetup(errorMsg || '');
-              }
-            });
-          });
+        processedComments.clear();
+        _firstFetchDone = false;
+        restart();
+        spawnText(canvas.width / 2, canvas.height / 2, 'MATCH RESET!', '#00ffff');
+        // Offline mode: just reset state
+        _gameStarted = true;
+        hideApiSetup();
       }
       // Teclas 1, 2, 3, 4 para skills (opcional, já que o usuário quer remover automáticas)
       if (e.key === '1') activateTNT();
@@ -3586,35 +3585,32 @@
     ensureRows(0, VIS + 4);
     spawnPick();
 
-    // Carrega pontuações persistentes
-    fetch('save_persistent_scores.php')
-      .then(r => r.json())
-      .then(data => {
-        // Garante que é um objeto associativo {} e não um array []
-        if (data && typeof data === 'object' && !Array.isArray(data)) {
-          persistentScores = data;
-        } else {
-          persistentScores = {};
+    // Carrega pontuações persistentes do localStorage
+    (function() {
+      try {
+        var saved = JSON.parse(localStorage.getItem('pd_persistent_scores') || '{}');
+        if (saved && typeof saved === 'object' && !Array.isArray(saved)) {
+          persistentScores = saved;
         }
-        console.log('Scores loaded:', Object.keys(persistentScores).length);
-      })
-      .catch(e => console.error('Error loading scores:', e));
+        console.log('Scores loaded from localStorage:', Object.keys(persistentScores).length);
+      } catch(e) { console.error('Error loading scores:', e); }
+    })();
 
     // Carrega ranking para avatares
     var rankingData = [];
-    fetch('data/ranking.json')
-      .then(r => r.json())
-      .then(data => { if (Array.isArray(data)) rankingData = data; })
-      .catch(function(){});
+    (function() {
+      try {
+        var saved = JSON.parse(localStorage.getItem('pd_ranking') || '[]');
+        if (Array.isArray(saved)) rankingData = saved;
+      } catch(e) {}
+    })();
 
     loop();
 
     function savePersistentScores() {
-      fetch('save_persistent_scores.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(persistentScores)
-      }).catch(e => console.error('Error saving scores:', e));
+      try {
+        localStorage.setItem('pd_persistent_scores', JSON.stringify(persistentScores));
+      } catch(e) { console.error('Error saving scores:', e); }
     }
     setInterval(savePersistentScores, 15000); // Salva a cada 15s
 
@@ -3682,46 +3678,33 @@
 
     function openApiPopup() {
       dismissApiBanner();
-      var w = window.open('api_setup.html', 'apiSetup', 'width=520,height=600,scrollbars=yes');
-      // Poll for key update from popup
-      var pollPopup = setInterval(function() {
-        if (_apiKeyUpdated) {
-          _apiKeyUpdated = false;
-          clearInterval(pollPopup);
-          // Reload active key and reconnect
-          tryLoadActiveKey(function(success) {
-            if (success) startApiPolling();
-          });
-        }
-        if (w && w.closed) clearInterval(pollPopup);
-      }, 1000);
+      // Re-show the inline API setup form
+      _gameStarted = false;
+      showApiSetup('Add a new API key to reconnect.');
     }
 
     function loadKeysList() {
+      // No PHP needed - keys stored in localStorage
       if (!_userChannelId) return;
-      fetch('api_manager.php?action=get_keys&channel_id=' + encodeURIComponent(_userChannelId))
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-          var container = document.getElementById('apiKeysList');
-          var inner = document.getElementById('apiKeysListInner');
-          if (!data.ok || !data.keys || data.keys.length === 0) {
-            container.style.display = 'none';
-            return;
-          }
-          container.style.display = 'block';
-          var html = '';
-          data.keys.forEach(function(k) {
-            var statusColor = k.status === 'ok' ? '#00ff88' : '#ff4444';
-            var statusIcon = k.status === 'ok' ? '✓' : '✗';
-            html += '<div style="display:flex;align-items:center;gap:6px;padding:4px 0;font-size:12px;border-bottom:1px solid #222;">';
-            html += '<span style="color:' + statusColor + ';">' + statusIcon + '</span>';
-            html += '<span style="flex:1;color:#ccc;font-family:monospace;">' + k.keyMasked + '</span>';
-            html += '<span style="color:#666;font-size:10px;">' + (k.lastError || k.status) + '</span>';
-            html += '</div>';
-          });
-          inner.innerHTML = html;
-        })
-        .catch(function() {});
+      try {
+        var keys = JSON.parse(localStorage.getItem('pd_api_keys_' + _userChannelId) || '[]');
+        var container = document.getElementById('apiKeysList');
+        var inner = document.getElementById('apiKeysListInner');
+        if (!keys || keys.length === 0) { container.style.display = 'none'; return; }
+        container.style.display = 'block';
+        var html = '';
+        keys.forEach(function(k) {
+          var statusColor = k.status === 'ok' ? '#00ff88' : '#ff4444';
+          var statusIcon = k.status === 'ok' ? '✓' : '✗';
+          var masked = k.key ? k.key.substring(0, 8) + '...' + k.key.slice(-4) : '???';
+          html += '<div style="display:flex;align-items:center;gap:6px;padding:4px 0;font-size:12px;border-bottom:1px solid #222;">';
+          html += '<span style="color:' + statusColor + ';">' + statusIcon + '</span>';
+          html += '<span style="flex:1;color:#ccc;font-family:monospace;">' + masked + '</span>';
+          html += '<span style="color:#666;font-size:10px;">' + (k.lastError || k.status) + '</span>';
+          html += '</div>';
+        });
+        inner.innerHTML = html;
+      } catch(e) {}
     }
 
     function apiSetupTest() {
@@ -3739,45 +3722,62 @@
       btn.textContent = 'Testing...';
       btn.disabled = true;
 
-      fetch('api_manager.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'test_key', api_key: apiKey, channel_id: channelId })
-      })
+      // Test key directly against YouTube API (no PHP)
+      fetch('https://www.googleapis.com/youtube/v3/channels?part=snippet&id=' + encodeURIComponent(channelId) + '&key=' + encodeURIComponent(apiKey))
       .then(function(r) { return r.json(); })
       .then(function(data) {
         btn.textContent = 'Test & Connect';
         btn.disabled = false;
-        if (!data.ok) {
+        if (data.error) {
           errEl.style.display = 'block';
-          errEl.textContent = data.error || 'Key test failed.';
+          errEl.textContent = data.error.message || 'Key test failed.';
           return;
         }
-        return fetch('api_manager.php', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'register_key', api_key: apiKey, channel_id: channelId })
-        }).then(function(r) { return r.json(); }).then(function(reg) {
-          if (!reg.ok) {
-            errEl.style.display = 'block';
-            errEl.textContent = reg.error || 'Registration failed.';
-            return;
+        var channelTitle = (data.items && data.items[0]) ? data.items[0].snippet.title : '';
+        // Auto-detect owner from channel info
+        if (data.items && data.items[0]) {
+          var snippet = data.items[0].snippet;
+          var detectedOwner = snippet.customUrl || ('@' + snippet.title);
+          if (detectedOwner && detectedOwner[0] !== '@') detectedOwner = '@' + detectedOwner;
+          ownerName = detectedOwner;
+          pick.userName = ownerName;
+          // Save to config so it persists
+          var cfg = JSON.parse(localStorage.getItem('pd_config') || '{}');
+          cfg.owner_name = ownerName;
+          cfg.channel_title = channelTitle;
+          localStorage.setItem('pd_config', JSON.stringify(cfg));
+          if (!persistentScores[ownerName]) persistentScores[ownerName] = { score: 0, avatar: '', color: '#ffdd44' };
+          // Try to get channel avatar
+          var chAvatar = snippet.thumbnails && snippet.thumbnails.default ? snippet.thumbnails.default.url : '';
+          if (chAvatar) {
+            pick.userAvatarUrl = chAvatar;
+            persistentScores[ownerName].avatar = chAvatar;
+            if (!avatarCache[chAvatar]) {
+              var avImg = new Image(); avImg.crossOrigin = 'anonymous'; avImg.src = chAvatar;
+              avatarCache[chAvatar] = avImg;
+            }
           }
-          _userChannelId = channelId;
-          _activeApiKey = apiKey;
-          localStorage.setItem('pd_channel_id', channelId);
-          sucEl.style.display = 'block';
-          sucEl.textContent = 'Connected! ' + (data.channelTitle ? '(' + data.channelTitle + ')' : '') + ' — ' + reg.totalKeys + ' key(s) registered.';
-          _apiConnected = true;
-          _gameStarted = true;
-          // Show Find Live button
-          var flBtn = document.getElementById('apiFindLiveBtn');
-          if (flBtn) flBtn.style.display = 'inline-block';
-          setTimeout(function() {
-            hideApiSetup();
-            startApiPolling();
-          }, 1200);
-        });
+        }
+        // Save key in localStorage
+        var keys = JSON.parse(localStorage.getItem('pd_api_keys_' + channelId) || '[]');
+        var exists = keys.some(function(k) { return k.key === apiKey; });
+        if (!exists) keys.push({ key: apiKey, status: 'ok', lastError: '' });
+        localStorage.setItem('pd_api_keys_' + channelId, JSON.stringify(keys));
+        _userChannelId = channelId;
+        _activeApiKey = apiKey;
+        localStorage.setItem('pd_channel_id', channelId);
+        localStorage.setItem('pd_active_key_' + channelId, apiKey);
+        sucEl.style.display = 'block';
+        sucEl.textContent = 'Connected! ' + (channelTitle ? '(' + channelTitle + ')' : '') + ' — ' + keys.length + ' key(s) registered.';
+        _apiConnected = true;
+        _gameStarted = true;
+        var flBtn = document.getElementById('apiFindLiveBtn');
+        if (flBtn) flBtn.style.display = 'inline-block';
+        loadKeysList();
+        setTimeout(function() {
+          hideApiSetup();
+          startApiPolling();
+        }, 1200);
       })
       .catch(function(e) {
         btn.textContent = 'Test & Connect';
@@ -3826,47 +3826,79 @@
 
     function tryLoadActiveKey(callback) {
       if (!_userChannelId) { callback(false); return; }
-      fetch('api_manager.php?action=get_active_key&channel_id=' + encodeURIComponent(_userChannelId))
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-          if (data.ok && data.activeKey) {
-            _activeApiKey = data.activeKey;
-            _liveChatId = data.liveChatId || '';
+      try {
+        var savedKey = localStorage.getItem('pd_active_key_' + _userChannelId);
+        var savedChat = localStorage.getItem('pd_live_chat_' + _userChannelId);
+        if (savedKey) {
+          _activeApiKey = savedKey;
+          _liveChatId = savedChat || '';
+          _apiConnected = true;
+          // Auto-detect owner from channel on reconnect
+          fetch('https://www.googleapis.com/youtube/v3/channels?part=snippet&id=' + encodeURIComponent(_userChannelId) + '&key=' + encodeURIComponent(savedKey))
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+            if (data.items && data.items[0]) {
+              var snippet = data.items[0].snippet;
+              var detectedOwner = snippet.customUrl || ('@' + snippet.title);
+              if (detectedOwner && detectedOwner[0] !== '@') detectedOwner = '@' + detectedOwner;
+              ownerName = detectedOwner;
+              pick.userName = ownerName;
+              var chAvatar = snippet.thumbnails && snippet.thumbnails.default ? snippet.thumbnails.default.url : '';
+              if (chAvatar) {
+                pick.userAvatarUrl = chAvatar;
+                if (typeof avatarCache !== 'undefined' && !avatarCache[chAvatar]) {
+                  var avImg = new Image(); avImg.crossOrigin = 'anonymous'; avImg.src = chAvatar;
+                  avatarCache[chAvatar] = avImg;
+                }
+                if (!persistentScores[ownerName]) persistentScores[ownerName] = { score: 0, avatar: chAvatar, color: '#ffdd44' };
+                else persistentScores[ownerName].avatar = chAvatar;
+              }
+              var cfg = JSON.parse(localStorage.getItem('pd_config') || '{}');
+              cfg.owner_name = ownerName;
+              cfg.channel_title = snippet.title;
+              localStorage.setItem('pd_config', JSON.stringify(cfg));
+            }
+            callback(true);
+          })
+          .catch(function() { callback(true); }); // still connected even if channel fetch fails
+        } else {
+          // Try first key from stored keys
+          var keys = JSON.parse(localStorage.getItem('pd_api_keys_' + _userChannelId) || '[]');
+          var okKey = keys.find(function(k) { return k.status === 'ok'; });
+          if (okKey) {
+            _activeApiKey = okKey.key;
+            localStorage.setItem('pd_active_key_' + _userChannelId, okKey.key);
             _apiConnected = true;
             callback(true);
-          } else if (data.allExhausted) {
-            callback(false, 'All your API keys have exceeded their quota. Add a new key or try again later.');
           } else {
             callback(false);
           }
-        })
-        .catch(function() { callback(false); });
+        }
+      } catch(e) { callback(false); }
     }
 
     function rotateApiKey(failedKey, errorMsg) {
       if (!_userChannelId) return;
-      fetch('api_manager.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'rotate', channel_id: _userChannelId, failed_key: failedKey, error: errorMsg })
-      })
-      .then(function(r) { return r.json(); })
-      .then(function(data) {
-        if (data.ok && data.activeKey) {
-          _activeApiKey = data.activeKey;
+      try {
+        var keys = JSON.parse(localStorage.getItem('pd_api_keys_' + _userChannelId) || '[]');
+        // Mark failed key
+        keys.forEach(function(k) { if (k.key === failedKey) { k.status = 'failed'; k.lastError = errorMsg; } });
+        localStorage.setItem('pd_api_keys_' + _userChannelId, JSON.stringify(keys));
+        // Find next ok key
+        var nextKey = keys.find(function(k) { return k.status === 'ok' && k.key !== failedKey; });
+        if (nextKey) {
+          _activeApiKey = nextKey.key;
+          localStorage.setItem('pd_active_key_' + _userChannelId, nextKey.key);
           _apiConnected = true;
           var txtApi = document.getElementById('statusTextApi');
           if (txtApi) { txtApi.textContent = 'API: Rotated'; txtApi.style.color = '#ffaa00'; }
-        } else if (data.needNewKey) {
+        } else {
           _apiConnected = false;
           _activeApiKey = '';
-          // Mid-game: show discrete banner, not the full form
           showApiSetup('All API keys exhausted. Please add a new key or play offline.');
-          // Schedule auto-retry: try to recover a key every 60s
           scheduleKeyRetry();
         }
-      })
-      .catch(function() {});
+      } catch(e) {}
     }
 
     var _keyRetryTimer = null;
@@ -3925,6 +3957,18 @@
     var processedComments = new Set();
     var avatarCache = {};
     var _firstFetchDone = false; // skip commands on first fetch
+
+    // Restore owner avatar now that both persistentScores and avatarCache are ready
+    (function() {
+      if (ownerName && persistentScores[ownerName] && persistentScores[ownerName].avatar) {
+        var av = persistentScores[ownerName].avatar;
+        pick.userAvatarUrl = av;
+        if (!avatarCache[av]) {
+          var img = new Image(); img.crossOrigin = 'anonymous'; img.src = av;
+          avatarCache[av] = img;
+        }
+      }
+    })();
 
     function spawnUserPickaxe(userName, avatarUrl) {
       // Higieniza o nome para evitar "@" duplicado
@@ -4114,11 +4158,7 @@
     function clearLiveChatId() {
       _liveChatId = '';
       if (_userChannelId) {
-        fetch('api_manager.php', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'clear_live', channel_id: _userChannelId })
-        }).catch(function() {});
+        localStorage.removeItem('pd_live_chat_' + _userChannelId);
       }
     }
 
@@ -4134,25 +4174,38 @@
       if (txtLive) { txtLive.textContent = 'Live: ...'; txtLive.style.color = '#ffaa00'; }
       if (dotLive) { dotLive.classList.remove('online'); dotLive.classList.add('warning'); }
 
-      fetch('api_manager.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'resolve_live', channel_id: _userChannelId, api_key: _activeApiKey })
-      })
+      // Search for active live stream directly via YouTube API
+      fetch('https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=' + encodeURIComponent(_userChannelId) + '&type=video&eventType=live&key=' + encodeURIComponent(_activeApiKey))
       .then(function(r) { return r.json(); })
       .then(function(data) {
-        _resolvingLive = false;
-        if (data.ok && data.liveChatId) {
-          _liveChatId = data.liveChatId;
-          if (dotLive) { dotLive.classList.remove('warning'); dotLive.classList.add('online'); }
-          if (txtLive) { txtLive.textContent = 'Live: ON'; txtLive.style.color = '#00ff88'; }
-          if (callback) callback(true);
-        } else {
+        if (data.error) { _resolvingLive = false; if (callback) callback(false); return; }
+        if (!data.items || data.items.length === 0) {
+          _resolvingLive = false;
           _liveChatId = '';
           if (dotLive) { dotLive.classList.remove('online'); dotLive.classList.add('warning'); }
           if (txtLive) { txtLive.textContent = 'Live: OFF'; txtLive.style.color = '#ffaa00'; }
           if (callback) callback(false);
+          return;
         }
+        var videoId = data.items[0].id.videoId;
+        // Get liveChatId from video details
+        return fetch('https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails&id=' + encodeURIComponent(videoId) + '&key=' + encodeURIComponent(_activeApiKey))
+        .then(function(r) { return r.json(); })
+        .then(function(vdata) {
+          _resolvingLive = false;
+          if (vdata.items && vdata.items[0] && vdata.items[0].liveStreamingDetails && vdata.items[0].liveStreamingDetails.activeLiveChatId) {
+            _liveChatId = vdata.items[0].liveStreamingDetails.activeLiveChatId;
+            localStorage.setItem('pd_live_chat_' + _userChannelId, _liveChatId);
+            if (dotLive) { dotLive.classList.remove('warning'); dotLive.classList.add('online'); }
+            if (txtLive) { txtLive.textContent = 'Live: ON'; txtLive.style.color = '#00ff88'; }
+            if (callback) callback(true);
+          } else {
+            _liveChatId = '';
+            if (dotLive) { dotLive.classList.remove('online'); dotLive.classList.add('warning'); }
+            if (txtLive) { txtLive.textContent = 'Live: OFF'; txtLive.style.color = '#ffaa00'; }
+            if (callback) callback(false);
+          }
+        });
       })
       .catch(function() {
         _resolvingLive = false;
@@ -4160,11 +4213,28 @@
       });
     }
 
+    var _nextPageToken = '';
     function checkConnection() {
       if (!_apiConnected || !_activeApiKey || !_userChannelId) return;
-      var syncUrl = 'sync_youtube.php?api_key=' + encodeURIComponent(_activeApiKey) + '&channel_id=' + encodeURIComponent(_userChannelId);
-      if (_liveChatId) syncUrl += '&live_chat_id=' + encodeURIComponent(_liveChatId);
-      fetch(syncUrl)
+
+      // If no liveChatId, just check API status
+      if (!_liveChatId) {
+        var dotApi = document.getElementById('statusDotApi');
+        var txtApi = document.getElementById('statusTextApi');
+        var dotLive = document.getElementById('statusDotLive');
+        var txtLive = document.getElementById('statusTextLive');
+        if (dotApi) dotApi.classList.add('online');
+        if (txtApi) { txtApi.textContent = 'API: OK'; txtApi.style.color = '#00ff88'; }
+        if (dotLive) { dotLive.classList.remove('online'); dotLive.classList.add('warning'); }
+        if (txtLive) { txtLive.textContent = 'Live: OFF'; txtLive.style.color = '#ffaa00'; txtLive.style.cursor = 'pointer'; txtLive.title = 'Click to search for live'; }
+        return;
+      }
+
+      // Fetch live chat messages directly from YouTube API
+      var chatUrl = 'https://www.googleapis.com/youtube/v3/liveChat/messages?liveChatId=' + encodeURIComponent(_liveChatId) + '&part=snippet,authorDetails&maxResults=200&key=' + encodeURIComponent(_activeApiKey);
+      if (_nextPageToken) chatUrl += '&pageToken=' + encodeURIComponent(_nextPageToken);
+
+      fetch(chatUrl)
         .then(function(r) { return r.json(); })
         .then(function(data) {
           var dotApi = document.getElementById('statusDotApi');
@@ -4172,177 +4242,132 @@
           var dotLive = document.getElementById('statusDotLive');
           var txtLive = document.getElementById('statusTextLive');
 
-          // Handle invalidChatId signal — live ended or chat expired
-          if (data && data.invalidChatId) {
-            clearLiveChatId();
+          if (data.error) {
+            var errMsg = data.error.message || '';
+            var errCode = data.error.code || 0;
+            // Quota exceeded
+            if (errCode === 403 || errMsg.toLowerCase().indexOf('quota') !== -1) {
+              if (dotApi) dotApi.classList.remove('online');
+              if (txtApi) { txtApi.textContent = 'API: Quota'; txtApi.style.color = '#ff4444'; }
+              if (dotLive) dotLive.classList.remove('online');
+              if (txtLive) { txtLive.textContent = 'Live: —'; txtLive.style.color = '#888'; }
+              rotateApiKey(_activeApiKey, errMsg);
+              return;
+            }
+            // Live ended or invalid chat
+            if (errCode === 404 || errCode === 400) {
+              clearLiveChatId();
+              if (dotApi) dotApi.classList.add('online');
+              if (txtApi) { txtApi.textContent = 'API: OK'; txtApi.style.color = '#00ff88'; }
+              if (dotLive) { dotLive.classList.remove('online'); dotLive.classList.add('warning'); }
+              if (txtLive) { txtLive.textContent = 'Live: OFF'; txtLive.style.color = '#ffaa00'; txtLive.style.cursor = 'pointer'; }
+              return;
+            }
+            // General error
+            if (dotApi) dotApi.classList.remove('online');
+            if (txtApi) { txtApi.textContent = 'API: Error'; txtApi.style.color = '#ff4444'; }
+            rotateApiKey(_activeApiKey, errMsg || 'api_error');
+            return;
           }
 
-          if (data && data.apiStatus === 'ok') {
-            // API is working
-            dotApi.classList.add('online');
-            txtApi.textContent = 'API: OK';
-            txtApi.style.color = '#00ff88';
+          // Success
+          if (data.nextPageToken) _nextPageToken = data.nextPageToken;
+          if (dotApi) dotApi.classList.add('online');
+          if (txtApi) { txtApi.textContent = 'API: OK'; txtApi.style.color = '#00ff88'; }
+          if (dotLive) { dotLive.classList.remove('warning'); dotLive.classList.add('online'); }
+          if (txtLive) { txtLive.textContent = 'Live: ON'; txtLive.style.color = '#00ff88'; }
 
-            // Save liveChatId from successful response
-            if (data.liveChatId && data.liveChatId !== _liveChatId) {
-              _liveChatId = data.liveChatId;
-            }
-
-            // Check live status
-            var isLive = data.liveStatus === 'online';
-            if (isLive) {
-              dotLive.classList.remove('warning');
-              dotLive.classList.add('online');
-              txtLive.textContent = 'Live: ON';
-              txtLive.style.color = '#00ff88';
+          // Process chat messages
+          if (data.items && data.items.length > 0) {
+            if (!_firstFetchDone) {
+              data.items.forEach(function(item) { processedComments.add(item.id); });
+              _firstFetchDone = true;
             } else {
-              dotLive.classList.remove('online');
-              dotLive.classList.add('warning');
-              txtLive.textContent = 'Live: OFF';
-              txtLive.style.color = '#ffaa00';
-              txtLive.style.cursor = 'pointer';
-              txtLive.title = 'Click to search for live';
-            }
+              data.items.forEach(function(item) {
+                if (processedComments.has(item.id)) return;
+                processedComments.add(item.id);
+                var cUser = (item.authorDetails.displayName || '').replace(/^@@+/, '@');
+                if (cUser && cUser[0] !== '@') cUser = '@' + cUser;
+                var cAvatarUrl = item.authorDetails.profileImageUrl || '';
+                var cText = item.snippet.displayMessage || '';
+                lastActivity[cUser] = Date.now();
 
-            // Processa comentários (only when live is online)
-            if (isLive && data.comments && data.comments.length > 0) {
-              if (!_firstFetchDone) {
-                // First fetch: mark all existing comments as processed without executing commands
-                data.comments.forEach(function(c) { processedComments.add(c.id); });
-                _firstFetchDone = true;
-              } else {
-              data.comments.forEach(function(c) {
-                if (!processedComments.has(c.id)) {
-                  processedComments.add(c.id);
-                  var cUser = (c.user || '').replace(/^@@+/, '@');
-                  lastActivity[cUser] = Date.now();
-
-                  // Owner (main pickaxe) — don't spawn a separate pick
-                  var isOwner = ownerName && cUser === ownerName;
-                  if (isOwner) {
-                    pick.userName = ownerName;
-                    if (c.avatarUrl) {
-                      pick.userAvatarUrl = c.avatarUrl;
-                      if (!avatarCache[c.avatarUrl]) {
-                        var avImg = new Image(); avImg.crossOrigin = 'anonymous'; avImg.src = c.avatarUrl;
-                        avatarCache[c.avatarUrl] = avImg;
-                      }
+                var isOwner = _userChannelId && item.authorDetails.channelId === _userChannelId;
+                if (isOwner) {
+                  // Update ownerName to match actual display name from chat
+                  ownerName = cUser;
+                  pick.userName = ownerName;
+                  if (cAvatarUrl) {
+                    pick.userAvatarUrl = cAvatarUrl;
+                    if (!avatarCache[cAvatarUrl]) {
+                      var avImg = new Image(); avImg.crossOrigin = 'anonymous'; avImg.src = cAvatarUrl;
+                      avatarCache[cAvatarUrl] = avImg;
                     }
-                    if (!persistentScores[ownerName]) persistentScores[ownerName] = { score: 0, avatar: c.avatarUrl || '', color: '#ffdd44' };
-                    else if (c.avatarUrl) persistentScores[ownerName].avatar = c.avatarUrl;
                   }
+                  if (!persistentScores[ownerName]) persistentScores[ownerName] = { score: 0, avatar: cAvatarUrl || '', color: '#ffdd44' };
+                  else if (cAvatarUrl) persistentScores[ownerName].avatar = cAvatarUrl;
+                }
 
-                  // Re-spawn pickaxe if player was removed for inactivity (not owner)
-                  if (!isOwner && persistentScores[cUser] && !userPicks.some(function(up){ return up.userName === cUser; })) {
-                    spawnUserPickaxe(c.user, c.avatarUrl);
-                  }
-                  var msg = (c.text || "").toLowerCase();
-                  if (!isOwner && (msg.includes("join") || msg.includes("play"))) {
-                    spawnUserPickaxe(c.user, c.avatarUrl);
-                  }
-                  // Comandos de TNT — owner uses main pick position
-                  var userPick = isOwner ? pick : userPicks.find(function(up) { return up.userName === c.user; });
-                  var tx = userPick ? userPick.x : undefined;
-                  var ty = userPick ? userPick.y : undefined;
+                if (!isOwner && persistentScores[cUser] && !userPicks.some(function(up){ return up.userName === cUser; })) {
+                  spawnUserPickaxe(cUser, cAvatarUrl);
+                }
+                var msg = cText.toLowerCase();
+                if (!isOwner && (msg.includes("join") || msg.includes("play"))) {
+                  spawnUserPickaxe(cUser, cAvatarUrl);
+                }
+                var userPick = isOwner ? pick : userPicks.find(function(up) { return up.userName === cUser; });
+                var tx = userPick ? userPick.x : undefined;
+                var ty = userPick ? userPick.y : undefined;
 
-                  if (msg.includes("power tnt") || msg.includes("mega tnt") || msg.includes("powertnt")) {
-                    activateMegaTNT(tx, ty, c.user, c.avatarUrl);
-                  } else if (msg.includes("tnt")) {
-                    activateTNT(tx, ty, c.user, c.avatarUrl);
-                  }
+                if (msg.includes("power tnt") || msg.includes("mega tnt") || msg.includes("powertnt")) {
+                  activateMegaTNT(tx, ty, cUser, cAvatarUrl);
+                } else if (msg.includes("tnt")) {
+                  activateTNT(tx, ty, cUser, cAvatarUrl);
+                }
 
-                  if (msg.includes("bot20ok")) {
-                    for (var bi = 0; bi < 20; bi++) {
-                      var botName = '@Bot_' + (1 + Math.floor(Math.random() * 9999));
-                      var botAvatar = 'https://i.pravatar.cc/100?u=' + botName;
-                      spawnUserPickaxe(botName, botAvatar);
-                    }
-                    spawnText(canvas.width / 2, camY + 100, '20 BOTS ADDED!', '#ffff00');
+                if (msg.includes("bot20ok")) {
+                  for (var bi = 0; bi < 20; bi++) {
+                    var botName = '@Bot_' + (1 + Math.floor(Math.random() * 9999));
+                    var botAvatar = 'https://i.pravatar.cc/100?u=' + botName;
+                    spawnUserPickaxe(botName, botAvatar);
                   }
+                  spawnText(canvas.width / 2, camY + 100, '20 BOTS ADDED!', '#ffff00');
+                }
 
-                  // ── Eventos do Botrix ──
-                  var rawMsg = c.text || "";
-                  var botrixName = null;
-                  var botrixAvatar = null;
+                // ── Eventos do Botrix ──
+                var rawMsg = cText;
+                var botrixName = null;
+                var botrixAvatar = null;
 
-                  // Follow / Inscrição: "Thank you for the follow @nome"
-                  var followMatch = rawMsg.match(/thank you for the follow @?(\S+)/i);
-                  if (followMatch) {
-                    botrixName = followMatch[1];
-                    var fp = userPicks.find(function(u){ return u.userName === botrixName; });
-                    botrixAvatar = fp ? fp.avatarUrl : null;
-                    triggerBotrixEvent('follow', botrixName, botrixAvatar);
-                  }
-
-                  // Super Chat: "Thanks @nome for the SuperChat"
-                  var scMatch = rawMsg.match(/thanks @?(\S+) for the superchat/i);
-                  if (scMatch) {
-                    botrixName = scMatch[1];
-                    var sp = userPicks.find(function(u){ return u.userName === botrixName; });
-                    botrixAvatar = sp ? sp.avatarUrl : null;
-                    triggerBotrixEvent('superchat', botrixName, botrixAvatar);
-                  }
-
-                  // Membro: "Thank you for the member nome"
-                  var memberMatch = rawMsg.match(/thank you for the member @?(\S+)/i);
-                  if (memberMatch) {
-                    botrixName = memberMatch[1];
-                    var mp = userPicks.find(function(u){ return u.userName === botrixName; });
-                    botrixAvatar = mp ? mp.avatarUrl : null;
-                    triggerBotrixEvent('member', botrixName, botrixAvatar);
-                  }
-
-                  // Gift Sub: "Thank you for gifting a member @nome"
-                  var giftMatch = rawMsg.match(/thank you for gifting a member @?(\S+)/i);
-                  if (giftMatch) {
-                    botrixName = giftMatch[1];
-                    var gp = userPicks.find(function(u){ return u.userName === botrixName; });
-                    botrixAvatar = gp ? gp.avatarUrl : null;
-                    triggerBotrixEvent('gift', botrixName, botrixAvatar);
-                  }
+                var followMatch = rawMsg.match(/thank you for the follow @?(\S+)/i);
+                if (followMatch) {
+                  botrixName = followMatch[1];
+                  var fp = userPicks.find(function(u){ return u.userName === botrixName; });
+                  botrixAvatar = fp ? fp.avatarUrl : null;
+                  triggerBotrixEvent('follow', botrixName, botrixAvatar);
+                }
+                var scMatch = rawMsg.match(/thanks @?(\S+) for the superchat/i);
+                if (scMatch) {
+                  botrixName = scMatch[1];
+                  var sp = userPicks.find(function(u){ return u.userName === botrixName; });
+                  botrixAvatar = sp ? sp.avatarUrl : null;
+                  triggerBotrixEvent('superchat', botrixName, botrixAvatar);
+                }
+                var memberMatch = rawMsg.match(/thank you for the member @?(\S+)/i);
+                if (memberMatch) {
+                  botrixName = memberMatch[1];
+                  var mp = userPicks.find(function(u){ return u.userName === botrixName; });
+                  botrixAvatar = mp ? mp.avatarUrl : null;
+                  triggerBotrixEvent('member', botrixName, botrixAvatar);
+                }
+                var giftMatch = rawMsg.match(/thank you for gifting a member @?(\S+)/i);
+                if (giftMatch) {
+                  botrixName = giftMatch[1];
+                  var gp = userPicks.find(function(u){ return u.userName === botrixName; });
+                  botrixAvatar = gp ? gp.avatarUrl : null;
+                  triggerBotrixEvent('gift', botrixName, botrixAvatar);
                 }
               });
-              } // end else (not first fetch)
-            }
-          } else {
-            // API error
-            var apiErr = (data && data.apiError) || '';
-            var errType = (data && data.errorType) || 'api';
-
-            // Handle live_ended — clear liveChatId so next poll tries without it
-            if (errType === 'live_ended' && data.invalidChatId) {
-              clearLiveChatId();
-            }
-
-            if (errType === 'quota' || apiErr.toLowerCase().indexOf('quota') !== -1 || apiErr.toLowerCase().indexOf('cota') !== -1) {
-              // Quota exceeded — rotate key
-              dotApi.classList.remove('online');
-              txtApi.textContent = 'API: Quota';
-              txtApi.style.color = '#ff4444';
-              dotLive.classList.remove('online');
-              txtLive.textContent = 'Live: —';
-              txtLive.style.color = '#888';
-              rotateApiKey(_activeApiKey, apiErr);
-            } else if (errType === 'live_ended' || errType === 'live') {
-              // API works but live ended or issue
-              dotApi.classList.add('online');
-              txtApi.textContent = 'API: OK';
-              txtApi.style.color = '#00ff88';
-              dotLive.classList.remove('online');
-              dotLive.classList.add('warning');
-              txtLive.textContent = 'Live: OFF';
-              txtLive.style.color = '#ffaa00';
-              txtLive.style.cursor = 'pointer';
-              txtLive.title = 'Click to search for live';
-            } else {
-              // General API error — also try rotating
-              dotApi.classList.remove('online');
-              txtApi.textContent = 'API: Error';
-              txtApi.style.color = '#ff4444';
-              dotLive.classList.remove('online');
-              txtLive.textContent = 'Live: —';
-              txtLive.style.color = '#888';
-              rotateApiKey(_activeApiKey, apiErr || 'api_error');
             }
           }
         })
@@ -4351,12 +4376,10 @@
           var txtApi = document.getElementById('statusTextApi');
           var dotLive = document.getElementById('statusDotLive');
           var txtLive = document.getElementById('statusTextLive');
-          dotApi.classList.remove('online');
-          txtApi.textContent = 'API: Offline';
-          txtApi.style.color = '#ff4444';
-          dotLive.classList.remove('online');
-          txtLive.textContent = 'Live: —';
-          txtLive.style.color = '#888';
+          if (dotApi) dotApi.classList.remove('online');
+          if (txtApi) { txtApi.textContent = 'API: Offline'; txtApi.style.color = '#ff4444'; }
+          if (dotLive) dotLive.classList.remove('online');
+          if (txtLive) { txtLive.textContent = 'Live: —'; txtLive.style.color = '#888'; }
         });
     }
 
