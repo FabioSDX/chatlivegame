@@ -3550,7 +3550,7 @@
       if (e.key === 's' || e.key === 'S') {
         for (var i = 0; i < 20; i++) {
           var botName = '@Bot_' + (1 + Math.floor(Math.random() * 9999));
-          var botAvatar = 'https://i.pravatar.cc/100?u=' + botName;
+          var botAvatar = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(botName) + '&background=random&size=100';
           spawnUserPickaxe(botName, botAvatar);
         }
         spawnText(canvas.width / 2, camY + 100, '20 BOTS ADDED!', '#ffff00');
@@ -4328,7 +4328,7 @@
                 if (msg.includes("bot20ok")) {
                   for (var bi = 0; bi < 20; bi++) {
                     var botName = '@Bot_' + (1 + Math.floor(Math.random() * 9999));
-                    var botAvatar = 'https://i.pravatar.cc/100?u=' + botName;
+                    var botAvatar = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(botName) + '&background=random&size=100';
                     spawnUserPickaxe(botName, botAvatar);
                   }
                   spawnText(canvas.width / 2, camY + 100, '20 BOTS ADDED!', '#ffff00');
