@@ -1575,7 +1575,7 @@
         var depth = Math.floor(pick.y / TILE);
         if (depth > maxDepth) { maxDepth = depth; document.getElementById('depthDisplay').textContent = 'Depth: ' + maxDepth + 'm'; }
         document.getElementById('scoreDisplay').textContent = '⛏ ' + score;
-        var targetCamY = pick.y - canvas.height * 0.70;
+        var targetCamY = pick.y - canvas.height * 0.50;
         if (targetCamY < 0) targetCamY = 0;
         if (targetCamY > camY) { camY += (targetCamY - camY) * 0.08; }
         var visBot = Math.ceil((camY + canvas.height) / TILE) + 4;
