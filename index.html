@@ -934,7 +934,7 @@
     var MEGA_CLEARING_HEIGHT = 200;
     var MEGA_CLEARING_FIRST = 200;    // first mega-clearing starts at row 200
     var megaClearedZones = {};
-    var MAX_BATS_MEGA = 40;
+    var MAX_BATS_MEGA = 60;
 
     // ── Crystal types for clearings ──
     var CRYSTAL_TYPES = [
@@ -1682,17 +1682,31 @@
           var pickRow = Math.floor(pick.y / TILE);
           if (isMegaClearingRow(pickRow)) {
             var mz = getMegaZone(pickRow);
+            var mStart = getMegaStart(mz >= 0 ? mz : 0);
+            // Initial big spawn
             if (mz >= 0 && !megaClearedZones[mz]) {
               megaClearedZones[mz] = true;
-              var mStart = getMegaStart(mz);
-              var megaNum = Math.min(MAX_BATS_MEGA - bats.length, 20 + Math.floor(mz * 5));
+              megaClearedZones[mz + '_tick'] = 0;
+              var megaNum = Math.min(MAX_BATS_MEGA, 35 + Math.floor(mz * 5));
               for (var mi = 0; mi < megaNum; mi++) {
                 var mx = (1 + Math.floor(seededRand(mz * 500 + mi * 11) * (COLS - 2))) * TILE + TILE / 2;
-                var myRow = mStart + 10 + Math.floor(seededRand(mz * 600 + mi * 19) * (MEGA_CLEARING_HEIGHT - 20));
+                var myRow = mStart + 5 + Math.floor(seededRand(mz * 600 + mi * 19) * (MEGA_CLEARING_HEIGHT - 10));
                 var my = myRow * TILE + TILE / 2;
-                spawnBat(mx, my, mz, mi % 5 === 0);
+                spawnBat(mx, my, mz, mi % 4 === 0);
               }
               spawnText(pick.x, pick.y - 60, '⚠️ MEGA ZONE!', '#ff4444');
+            }
+            // Continuous reinforcement every 90 frames (~1.5s)
+            if (mz >= 0 && megaClearedZones[mz]) {
+              megaClearedZones[mz + '_tick'] = (megaClearedZones[mz + '_tick'] || 0) + 1;
+              if (megaClearedZones[mz + '_tick'] % 90 === 0 && bats.length < MAX_BATS_MEGA) {
+                var rx = (1 + Math.floor(Math.random() * (COLS - 2))) * TILE + TILE / 2;
+                var ry = pick.y + 200 + Math.random() * 400;
+                var ryRow = Math.floor(ry / TILE);
+                if (isMegaClearingRow(ryRow)) {
+                  spawnBat(rx, ry, mz, Math.random() < 0.2);
+                }
+              }
             }
           }
         }
