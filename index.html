@@ -3984,7 +3984,40 @@
     // ── Initial API setup flow ──
     // Click on "Live: OFF" to manually search for live
     document.getElementById('statusTextLive').addEventListener('click', function() {
-      if (_apiConnected && !_liveChatId) resolveLive();
+      if (_apiConnected && !_liveChatId) {
+        var url = prompt('Live not found automatically.\nPaste your live URL or video ID (or leave empty to search again):');
+        if (url === null) return; // cancelled
+        if (url.trim()) {
+          // Extract video ID
+          var videoId = url.trim();
+          var urlMatch = videoId.match(/[?&]v=([a-zA-Z0-9_-]{11})/) || videoId.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/) || videoId.match(/\/live\/([a-zA-Z0-9_-]{11})/);
+          if (urlMatch) videoId = urlMatch[1];
+          videoId = videoId.replace(/[^a-zA-Z0-9_-]/g, '');
+          if (videoId.length >= 8) {
+            var txtLive = document.getElementById('statusTextLive');
+            if (txtLive) { txtLive.textContent = 'Live: ...'; txtLive.style.color = '#ffaa00'; }
+            fetch('https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails&id=' + encodeURIComponent(videoId) + '&key=' + encodeURIComponent(_activeApiKey))
+            .then(function(r) { return r.json().catch(function() { throw new Error('Network error'); }); })
+            .then(function(data) {
+              if (data.items && data.items[0] && data.items[0].liveStreamingDetails && data.items[0].liveStreamingDetails.activeLiveChatId) {
+                _liveChatId = data.items[0].liveStreamingDetails.activeLiveChatId;
+                localStorage.setItem('pd_live_chat_' + _userChannelId, _liveChatId);
+                var dotLive = document.getElementById('statusDotLive');
+                if (dotLive) { dotLive.classList.remove('warning'); dotLive.classList.add('online'); }
+                if (txtLive) { txtLive.textContent = 'Live: ON'; txtLive.style.color = '#00ff88'; }
+                _nextPageToken = '';
+                _firstFetchDone = false;
+                checkConnection();
+              } else {
+                if (txtLive) { txtLive.textContent = 'Live: no chat found'; txtLive.style.color = '#ff4444'; }
+              }
+            })
+            .catch(function() { if (txtLive) { txtLive.textContent = 'Live: error'; txtLive.style.color = '#ff4444'; } });
+          }
+        } else {
+          resolveLive();
+        }
+      }
     });
     document.getElementById('statusDotLive').addEventListener('click', function() {
       if (_apiConnected && !_liveChatId) resolveLive();
@@ -4225,16 +4258,26 @@
       fetch('https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=' + encodeURIComponent(_userChannelId) + '&type=video&eventType=live&key=' + encodeURIComponent(_activeApiKey))
       .then(function(r) { return r.json().catch(function() { throw new Error('Network error: ' + r.status); }); })
       .then(function(data) {
-        if (data.error) { _resolvingLive = false; if (callback) callback(false); return; }
+        console.log('[resolveLive] search response:', JSON.stringify(data).substring(0, 300));
+        if (data.error) {
+          console.warn('[resolveLive] API error:', data.error.message, 'code:', data.error.code);
+          _resolvingLive = false;
+          if (dotLive) { dotLive.classList.remove('online'); dotLive.classList.add('warning'); }
+          if (txtLive) { txtLive.textContent = 'Live: Error ' + (data.error.code || ''); txtLive.style.color = '#ff4444'; }
+          if (callback) callback(false);
+          return;
+        }
         if (!data.items || data.items.length === 0) {
+          console.log('[resolveLive] No active live found for channel', _userChannelId);
           _resolvingLive = false;
           _liveChatId = '';
           if (dotLive) { dotLive.classList.remove('online'); dotLive.classList.add('warning'); }
-          if (txtLive) { txtLive.textContent = 'Live: OFF'; txtLive.style.color = '#ffaa00'; }
+          if (txtLive) { txtLive.textContent = 'Live: OFF (not found)'; txtLive.style.color = '#ffaa00'; }
           if (callback) callback(false);
           return;
         }
         var videoId = data.items[0].id.videoId;
+        console.log('[resolveLive] Found live video:', videoId);
         // Get liveChatId from video details
         return fetch('https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails&id=' + encodeURIComponent(videoId) + '&key=' + encodeURIComponent(_activeApiKey))
         .then(function(r) { return r.json().catch(function() { throw new Error('Network error: ' + r.status); }); })
