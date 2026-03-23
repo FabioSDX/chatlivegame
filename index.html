@@ -480,7 +480,7 @@
     var BOUNCE = 0.82;
     var FRICTION = 0.995;
     var SPIN_DAMP = 0.99;
-    var GRAVITY = 0.12;
+    var GRAVITY = 0.15;
 
     // ── Swept AABB para TNT ──
     function sweptAABB(bx, by, vx, vy, hs, tileCol, tileRow) {
@@ -1475,11 +1475,8 @@
             var cell = getCell(row, col);
             if (cell && cell.t !== E) {
               hitBlock(col, row, Math.max(1, Math.floor(speed * dmgBase)), p);
-              var bf = Math.max(2.5, speed * 0.5);
-              if (p.vx > 0) { p.x = col * TILE - r - 1; p.vx = -bf; }
-              else { p.x = (col + 1) * TILE + r + 1; p.vx = bf; }
-              p.vy = -Math.abs(p.vy) * 0.3 - 1.5;
-              p.spin += (Math.random() - 0.5) * 0.2;
+              if (p.vx > 0) { p.x = col * TILE - r - 1; p.vx = -p.vx * BOUNCE * FRICTION; }
+              else { p.x = (col + 1) * TILE + r + 1; p.vx = -p.vx * BOUNCE * FRICTION; }
               hitAny = true; break;
             }
           }
@@ -1496,14 +1493,10 @@
             var cell = getCell(row, col);
             if (cell && cell.t !== E) {
               hitBlock(col, row, Math.max(1, Math.floor(speed * dmgBase)), p);
-              var bf2 = Math.max(2.5, speed * 0.5);
               if (p.vy > 0) {
-                p.y = row * TILE - r - 1; p.vy = -bf2;
-                p.vx += (Math.random() - 0.5) * bf2 * 0.6;
-              } else {
-                p.y = (row + 1) * TILE + r + 1; p.vy = bf2;
-              }
-              p.spin += (Math.random() - 0.5) * 0.2;
+                p.y = row * TILE - r - 1; p.vy = -p.vy * BOUNCE;
+                if (Math.abs(p.vy) > 0.8) p.vx += (Math.random() - 0.5) * 6; else p.vx *= FRICTION;
+              } else { p.y = (row + 1) * TILE + r + 1; p.vy = -p.vy * BOUNCE; }
               hitAny = true; hitY = true; break;
             }
           }
