@@ -1475,8 +1475,10 @@
             var cell = getCell(row, col);
             if (cell && cell.t !== E) {
               hitBlock(col, row, Math.max(1, Math.floor(speed * dmgBase)), p);
-              if (p.vx > 0) { p.x = col * TILE - r - 1; p.vx = -p.vx * BOUNCE * FRICTION; }
-              else { p.x = (col + 1) * TILE + r + 1; p.vx = -p.vx * BOUNCE * FRICTION; }
+              var bfX = Math.max(2, speed * 0.4);
+              if (p.vx > 0) { p.x = col * TILE - r - 1; p.vx = -bfX; }
+              else { p.x = (col + 1) * TILE + r + 1; p.vx = bfX; }
+              p.vy += (Math.random() - 0.5) * bfX * 0.3;
               hitAny = true; break;
             }
           }
@@ -1493,12 +1495,13 @@
             var cell = getCell(row, col);
             if (cell && cell.t !== E) {
               hitBlock(col, row, Math.max(1, Math.floor(speed * dmgBase)), p);
+              var bfY = Math.max(2.5, speed * 0.45);
               if (p.vy > 0) {
-                p.y = row * TILE - r - 1; p.vy = -p.vy * BOUNCE;
-                if (Math.abs(p.vy) > 0.8) p.vx += (Math.random() - 0.5) * 6; else p.vx *= FRICTION;
+                p.y = row * TILE - r - 1; p.vy = -bfY;
+                p.vx += (Math.random() - 0.5) * bfY * 0.5;
               } else {
                 p.y = (row + 1) * TILE + r + 1;
-                p.vy = -p.vy * BOUNCE;
+                p.vy = bfY;
               }
               hitAny = true; hitY = true; break;
             }
