@@ -3730,14 +3730,24 @@
       btn.disabled = true;
 
       // Test key directly against YouTube API (no PHP)
-      fetch('https://www.googleapis.com/youtube/v3/channels?part=snippet&id=' + encodeURIComponent(channelId) + '&key=' + encodeURIComponent(apiKey))
-      .then(function(r) { return r.json().catch(function() { throw new Error('Network error: ' + r.status); }); })
-      .then(function(data) {
+      var testUrl = 'https://www.googleapis.com/youtube/v3/channels?part=snippet&id=' + encodeURIComponent(channelId) + '&key=' + encodeURIComponent(apiKey);
+      console.log('[apiSetupTest] Fetching:', testUrl);
+      fetch(testUrl)
+      .then(function(r) {
+        console.log('[apiSetupTest] Response status:', r.status, r.statusText);
+        return r.text();
+      })
+      .then(function(text) {
+        console.log('[apiSetupTest] Response body:', text.substring(0, 500));
+        var data;
+        try { data = JSON.parse(text); } catch(e) {
+          throw new Error('Invalid response (not JSON): ' + text.substring(0, 100));
+        }
         btn.textContent = 'Test & Connect';
         btn.disabled = false;
         if (data.error) {
           errEl.style.display = 'block';
-          errEl.textContent = data.error.message || 'Key test failed.';
+          errEl.textContent = 'API Error ' + (data.error.code || '') + ': ' + (data.error.message || 'Key test failed.');
           return;
         }
         var channelTitle = (data.items && data.items[0]) ? data.items[0].snippet.title : '';
@@ -3787,10 +3797,11 @@
         }, 1200);
       })
       .catch(function(e) {
+        console.error('[apiSetupTest] Error:', e);
         btn.textContent = 'Test & Connect';
         btn.disabled = false;
         errEl.style.display = 'block';
-        errEl.textContent = 'Network error: ' + e.message;
+        errEl.textContent = 'Error: ' + e.message + ' — Check console (F12) for details.';
       });
     }
 
