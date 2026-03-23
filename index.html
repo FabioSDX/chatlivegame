@@ -322,6 +322,9 @@
         <div style="font-size:12px; color:#888; margin-bottom:6px;">Your registered API keys:</div>
         <div id="apiKeysListInner"></div>
       </div>
+      <div style="margin-top:12px; text-align:center;">
+        <button onclick="apiResetAll()" style="padding:6px 14px; border:1px solid #ff4444; border-radius:8px; background:transparent; color:#ff4444; font-size:11px; cursor:pointer; opacity:0.7;">🗑 Reset all saved data</button>
+      </div>
     </div>
   </div>
 
@@ -3782,8 +3785,10 @@
         localStorage.setItem('pd_api_keys_' + channelId, JSON.stringify(keys));
         _userChannelId = channelId;
         _activeApiKey = apiKey;
+        _liveChatId = ''; // Clear stale liveChatId from previous sessions
         localStorage.setItem('pd_channel_id', channelId);
         localStorage.setItem('pd_active_key_' + channelId, apiKey);
+        localStorage.removeItem('pd_live_chat_' + channelId);
         sucEl.style.display = 'block';
         sucEl.textContent = 'Connected! ' + (channelTitle ? '(' + channelTitle + ')' : '') + ' — ' + keys.length + ' key(s) registered.';
         _apiConnected = true;
@@ -3817,6 +3822,40 @@
       if (txtApi) { txtApi.textContent = 'API: Off'; txtApi.style.color = '#ffaa00'; }
       if (dotLive) dotLive.classList.remove('online');
       if (txtLive) { txtLive.textContent = 'Live: Off'; txtLive.style.color = '#888'; }
+    }
+
+    function apiResetAll() {
+      if (!confirm('Clear all saved API keys, channel data and live chat? You will need to reconfigure.')) return;
+      if (_apiCheckInterval) { clearInterval(_apiCheckInterval); _apiCheckInterval = null; }
+      var chId = _userChannelId || localStorage.getItem('pd_channel_id') || '';
+      if (chId) {
+        localStorage.removeItem('pd_api_keys_' + chId);
+        localStorage.removeItem('pd_active_key_' + chId);
+        localStorage.removeItem('pd_live_chat_' + chId);
+      }
+      localStorage.removeItem('pd_channel_id');
+      localStorage.removeItem('pd_config');
+      _userChannelId = '';
+      _activeApiKey = '';
+      _liveChatId = '';
+      _apiConnected = false;
+      _nextPageToken = '';
+      _firstFetchDone = false;
+      ownerName = '';
+      pick.userName = '';
+      pick.userAvatarUrl = '';
+      document.getElementById('apiChannelInput').value = '';
+      document.getElementById('apiKeyInput').value = '';
+      document.getElementById('apiLiveIdInput').value = '';
+      var sucEl = document.getElementById('apiSetupSuccess');
+      var errEl = document.getElementById('apiSetupError');
+      if (sucEl) sucEl.style.display = 'none';
+      if (errEl) { errEl.style.display = 'none'; }
+      var flBtn = document.getElementById('apiFindLiveBtn');
+      if (flBtn) flBtn.style.display = 'none';
+      var kl = document.getElementById('apiKeysList');
+      if (kl) kl.style.display = 'none';
+      showApiSetup('Data cleared. Enter your API key and Channel ID.');
     }
 
     function apiSetupFindLive() {
@@ -4352,12 +4391,15 @@
           if (data.error) {
             var errMsg = data.error.message || '';
             var errCode = data.error.code || 0;
-            // Quota exceeded
+            // Quota exceeded or forbidden
             if (errCode === 403 || errMsg.toLowerCase().indexOf('quota') !== -1) {
+              console.warn('[checkConnection] Quota exceeded or 403:', errMsg);
               if (dotApi) dotApi.classList.remove('online');
-              if (txtApi) { txtApi.textContent = 'API: Quota'; txtApi.style.color = '#ff4444'; }
+              if (txtApi) { txtApi.textContent = 'API: Quota exceeded'; txtApi.style.color = '#ff4444'; }
               if (dotLive) dotLive.classList.remove('online');
-              if (txtLive) { txtLive.textContent = 'Live: —'; txtLive.style.color = '#888'; }
+              if (txtLive) { txtLive.textContent = 'Live: paused (quota)'; txtLive.style.color = '#888'; }
+              // Stop polling to avoid wasting more quota
+              if (_apiCheckInterval) { clearInterval(_apiCheckInterval); _apiCheckInterval = null; }
               rotateApiKey(_activeApiKey, errMsg);
               return;
             }
