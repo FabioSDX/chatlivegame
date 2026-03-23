@@ -929,6 +929,12 @@
     var clearedZones = {};      // track which clearings already spawned zombies
     var clearingShapes = {};    // cached organic shapes per zone
 
+    // ── Mega Clearings (every 200m, 200 rows tall, wall-to-wall) ──
+    var MEGA_CLEARING_INTERVAL = 200;
+    var MEGA_CLEARING_HEIGHT = 200;
+    var megaClearedZones = {};  // track which mega-clearings already spawned flyers
+    var MAX_BATS_MEGA = 40;    // allow more bats during mega-clearing
+
     // ── Crystal types for clearings ──
     var CRYSTAL_TYPES = [
       'Black_crystal', 'Blue_crystal', 'Dark_red_ crystal', 'Green_crystal',
@@ -1048,6 +1054,7 @@
     }
 
     function isTunnelCell(r, c) {
+      if (isMegaClearingRow(r)) return false; // mega-clearing takes priority
       if (r < CLEARING_INTERVAL + CLEARING_HEIGHT) return false;
       // Determine which zone's tunnel this row could belong to
       // Tunnel from zone N spans rows [N*25+8, (N+1)*25-1]
@@ -1067,6 +1074,8 @@
     }
 
     function isClearingCell(r, c) {
+      // Skip if inside a mega-clearing (mega takes priority)
+      if (isMegaClearingRow(r)) return false;
       if (r < CLEARING_INTERVAL) return false;
       var zone = Math.floor(r / CLEARING_INTERVAL);
       var zoneStart = zone * CLEARING_INTERVAL;
@@ -1076,6 +1085,18 @@
       var bounds = shape[localRow];
       if (!bounds) return false;
       return c >= bounds.left && c <= bounds.right;
+    }
+
+    function isMegaClearingRow(r) {
+      if (r < MEGA_CLEARING_INTERVAL) return false;
+      var megaZone = Math.floor(r / MEGA_CLEARING_INTERVAL);
+      var megaStart = megaZone * MEGA_CLEARING_INTERVAL;
+      return r >= megaStart && r < megaStart + MEGA_CLEARING_HEIGHT;
+    }
+
+    function isMegaClearingCell(r, c) {
+      if (c === 0 || c === COLS - 1) return false; // keep bedrock walls
+      return isMegaClearingRow(r);
     }
 
     function genRow(r) {
@@ -1092,6 +1113,7 @@
         }
         var t;
         if (depth < 2) { t = E; }
+        else if (isMegaClearingCell(r, c)) { t = E; }
         else if (isClearingCell(r, c)) { t = E; }
         else if (isTunnelCell(r, c)) { t = E; }
         else { t = pickBlock(depth); }
@@ -1239,6 +1261,28 @@
           }
         }
       }
+
+      // ── Mega-clearing: spawn waves of flyers at the top row ──
+      if (isMegaClearingRow(r)) {
+        var megaZone = Math.floor(r / MEGA_CLEARING_INTERVAL);
+        var megaStart = megaZone * MEGA_CLEARING_INTERVAL;
+        // Spawn flyers when we hit the first row of the mega-clearing
+        if (r === megaStart && !megaClearedZones[megaZone]) {
+          megaClearedZones[megaZone] = true;
+          if (typeof bats !== 'undefined' && bats) {
+            var megaNum = Math.min(MAX_BATS_MEGA - bats.length, 20 + Math.floor(megaZone * 5));
+            for (var mi = 0; mi < megaNum; mi++) {
+              var mx = (1 + Math.floor(seededRand(megaZone * 500 + mi * 11) * (COLS - 2))) * TILE + TILE / 2;
+              var myRow = megaStart + Math.floor(seededRand(megaZone * 600 + mi * 19) * MEGA_CLEARING_HEIGHT);
+              var my = myRow * TILE + TILE / 2;
+              // Every 5th bat is a mother
+              spawnBat(mx, my, megaZone, mi % 5 === 0);
+            }
+            spawnText(pick.x, pick.y - 60, '⚠️ MEGA ZONE!', '#ff4444');
+          }
+        }
+      }
+
       return row;
     }
 
@@ -1388,7 +1432,7 @@
       stopBossMusic();
       score = 0; maxDepth = 0; parts = []; texts = []; debris = []; announcements = [];
       var ov = document.getElementById('announceOverlay'); if (ov) ov.innerHTML = '';
-      worldMap = {}; explosions = []; tntBlocks = []; items = []; zombies = []; bats = []; clearedZones = {}; clearingShapes = {}; tunnelShapes = {}; crystalDecoList = []; clearingCrystals = {};
+      worldMap = {}; explosions = []; tntBlocks = []; items = []; zombies = []; bats = []; clearedZones = {}; clearingShapes = {}; tunnelShapes = {}; crystalDecoList = []; clearingCrystals = {}; megaClearedZones = {};
       extraPicks = []; userPicks = []; lastActivity = {};
       doublePickActive = false; doublePickTimer = 0; updateDoublePickHUD();
       stormActive = false; stormTimer = 0; updateStormHUD();
@@ -2223,21 +2267,35 @@
     })();
 
     function spawnBat(wx, wy, zone, isMother) {
-      if (bats.length >= MAX_BATS) return;
+      // Use higher cap during mega-clearings
+      var megaZone = Math.floor(wy / (MEGA_CLEARING_INTERVAL * TILE));
+      var inMega = isMegaClearingRow(Math.floor(wy / TILE));
+      var cap = inMega ? MAX_BATS_MEGA : MAX_BATS;
+      if (bats.length >= cap) return;
       // Alternate: cycle bat → vesp → marimbondo per zone
       var flyType = FLYER_TYPES[zone % FLYER_TYPES.length];
-      var shape = getClearingShape(zone);
-      var zoneStart = zone * CLEARING_INTERVAL;
-      // Find clearing bounds in world coords
-      var minY = Infinity, maxY = -Infinity, minX = Infinity, maxX = -Infinity;
-      for (var lr = 0; lr < CLEARING_HEIGHT; lr++) {
-        var b = shape[lr];
-        if (!b) continue;
-        var ry = (zoneStart + lr) * TILE;
-        if (ry < minY) minY = ry;
-        if (ry + TILE > maxY) maxY = ry + TILE;
-        if (b.left * TILE < minX) minX = b.left * TILE;
-        if ((b.right + 1) * TILE > maxX) maxX = (b.right + 1) * TILE;
+
+      var minY, maxY, minX, maxX;
+      if (inMega) {
+        // Mega-clearing: wall-to-wall bounds
+        var megaStart = megaZone * MEGA_CLEARING_INTERVAL;
+        minX = TILE;
+        maxX = (COLS - 1) * TILE;
+        minY = megaStart * TILE;
+        maxY = (megaStart + MEGA_CLEARING_HEIGHT) * TILE;
+      } else {
+        var shape = getClearingShape(zone);
+        var zoneStart = zone * CLEARING_INTERVAL;
+        minY = Infinity; maxY = -Infinity; minX = Infinity; maxX = -Infinity;
+        for (var lr = 0; lr < CLEARING_HEIGHT; lr++) {
+          var b = shape[lr];
+          if (!b) continue;
+          var ry = (zoneStart + lr) * TILE;
+          if (ry < minY) minY = ry;
+          if (ry + TILE > maxY) maxY = ry + TILE;
+          if (b.left * TILE < minX) minX = b.left * TILE;
+          if ((b.right + 1) * TILE > maxX) maxX = (b.right + 1) * TILE;
+        }
       }
       var motherFlag = !!isMother;
       var hpVal = motherFlag ? 10 : 2;
