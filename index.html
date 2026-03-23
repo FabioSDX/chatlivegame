@@ -4008,7 +4008,13 @@
         loadKeysList();
         setTimeout(function() {
           hideApiSetup();
-          startApiPolling();
+          // Try to connect live from URL field first, then auto-resolve
+          var liveInput = document.getElementById('apiLiveIdInput').value.trim();
+          if (liveInput) {
+            apiConnectLiveById();
+          } else {
+            startApiPolling();
+          }
         }, 1200);
       })
       .catch(function(e) {
@@ -4101,14 +4107,16 @@
       if (!input) { errEl.style.display = 'block'; errEl.textContent = 'Enter a live video URL or ID.'; return; }
       // Extract video ID from various URL formats
       var videoId = input;
-      var urlMatch = input.match(/[?&]v=([a-zA-Z0-9_-]{11})/) || input.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/) || input.match(/\/live\/([a-zA-Z0-9_-]{11})/);
+      var urlMatch = input.match(/[?&]v=([a-zA-Z0-9_-]{11})/) || input.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/) || input.match(/\/live\/([a-zA-Z0-9_-]{11})/) || input.match(/^([a-zA-Z0-9_-]{11})$/);
       if (urlMatch) videoId = urlMatch[1];
       videoId = videoId.replace(/[^a-zA-Z0-9_-]/g, '');
+      console.log('[ConnectLive] Input:', input, '→ videoId:', videoId, 'apiKey:', _activeApiKey ? 'set' : 'EMPTY', 'channelId:', _userChannelId);
       if (!videoId || videoId.length < 8) { errEl.style.display = 'block'; errEl.textContent = 'Invalid video ID or URL.'; return; }
       btn.textContent = 'Connecting...'; btn.disabled = true;
       fetch('https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails&id=' + encodeURIComponent(videoId) + '&key=' + encodeURIComponent(_activeApiKey))
       .then(function(r) { return r.json().catch(function() { throw new Error('Network error: ' + r.status); }); })
       .then(function(data) {
+        console.log('[ConnectLive] API response:', JSON.stringify(data).substring(0, 300));
         btn.textContent = '▶ Connect Live'; btn.disabled = false;
         if (data.error) { errEl.style.display = 'block'; errEl.textContent = data.error.message || 'API error.'; return; }
         if (data.items && data.items[0] && data.items[0].liveStreamingDetails && data.items[0].liveStreamingDetails.activeLiveChatId) {
@@ -4122,7 +4130,9 @@
           _gameStarted = true;
           setTimeout(function() { hideApiSetup(); startApiPolling(); }, 1200);
         } else {
-          errEl.style.display = 'block'; errEl.textContent = 'This video has no active live chat. Make sure the stream is live.';
+          var details = (data.items && data.items[0]) ? JSON.stringify(data.items[0].liveStreamingDetails || {}) : 'no items';
+          console.log('[ConnectLive] No activeLiveChatId. Details:', details);
+          errEl.style.display = 'block'; errEl.textContent = 'This video has no active live chat. Make sure the stream is live NOW (not scheduled/ended).';
         }
       })
       .catch(function(e) {
