@@ -929,11 +929,12 @@
     var clearedZones = {};      // track which clearings already spawned zombies
     var clearingShapes = {};    // cached organic shapes per zone
 
-    // ── Mega Clearings (every 200m, 200 rows tall, wall-to-wall) ──
-    var MEGA_CLEARING_INTERVAL = 200;
+    // ── Mega Clearings (every 400 rows, 200 rows tall, wall-to-wall) ──
+    var MEGA_CLEARING_INTERVAL = 400; // space between mega-clearing starts
     var MEGA_CLEARING_HEIGHT = 200;
-    var megaClearedZones = {};  // track which mega-clearings already spawned flyers
-    var MAX_BATS_MEGA = 40;    // allow more bats during mega-clearing
+    var MEGA_CLEARING_FIRST = 200;    // first mega-clearing starts at row 200
+    var megaClearedZones = {};
+    var MAX_BATS_MEGA = 40;
 
     // ── Crystal types for clearings ──
     var CRYSTAL_TYPES = [
@@ -1088,10 +1089,19 @@
     }
 
     function isMegaClearingRow(r) {
-      if (r < MEGA_CLEARING_INTERVAL) return false;
-      var megaZone = Math.floor(r / MEGA_CLEARING_INTERVAL);
-      var megaStart = megaZone * MEGA_CLEARING_INTERVAL;
-      return r >= megaStart && r < megaStart + MEGA_CLEARING_HEIGHT;
+      if (r < MEGA_CLEARING_FIRST) return false;
+      var offset = r - MEGA_CLEARING_FIRST;
+      var pos = offset % MEGA_CLEARING_INTERVAL;
+      return pos >= 0 && pos < MEGA_CLEARING_HEIGHT;
+    }
+
+    function getMegaZone(r) {
+      if (r < MEGA_CLEARING_FIRST) return -1;
+      return Math.floor((r - MEGA_CLEARING_FIRST) / MEGA_CLEARING_INTERVAL);
+    }
+
+    function getMegaStart(megaZone) {
+      return MEGA_CLEARING_FIRST + megaZone * MEGA_CLEARING_INTERVAL;
     }
 
     function isMegaClearingCell(r, c) {
@@ -1262,26 +1272,8 @@
         }
       }
 
-      // ── Mega-clearing: spawn waves of flyers at the top row ──
-      if (isMegaClearingRow(r)) {
-        var megaZone = Math.floor(r / MEGA_CLEARING_INTERVAL);
-        var megaStart = megaZone * MEGA_CLEARING_INTERVAL;
-        // Spawn flyers when we hit the first row of the mega-clearing
-        if (r === megaStart && !megaClearedZones[megaZone]) {
-          megaClearedZones[megaZone] = true;
-          if (typeof bats !== 'undefined' && bats) {
-            var megaNum = Math.min(MAX_BATS_MEGA - bats.length, 20 + Math.floor(megaZone * 5));
-            for (var mi = 0; mi < megaNum; mi++) {
-              var mx = (1 + Math.floor(seededRand(megaZone * 500 + mi * 11) * (COLS - 2))) * TILE + TILE / 2;
-              var myRow = megaStart + Math.floor(seededRand(megaZone * 600 + mi * 19) * MEGA_CLEARING_HEIGHT);
-              var my = myRow * TILE + TILE / 2;
-              // Every 5th bat is a mother
-              spawnBat(mx, my, megaZone, mi % 5 === 0);
-            }
-            spawnText(pick.x, pick.y - 60, '⚠️ MEGA ZONE!', '#ff4444');
-          }
-        }
-      }
+      // ── Mega-clearing: spawn waves of flyers when player enters ──
+      // (spawning is handled in update loop, not here, to avoid premature spawn)
 
       return row;
     }
@@ -1685,6 +1677,25 @@
         updateZombies();
         checkPickZombieCollisions();
         updateBats();
+        // ── Mega-clearing: spawn flyers when pick enters the zone ──
+        if (pick) {
+          var pickRow = Math.floor(pick.y / TILE);
+          if (isMegaClearingRow(pickRow)) {
+            var mz = getMegaZone(pickRow);
+            if (mz >= 0 && !megaClearedZones[mz]) {
+              megaClearedZones[mz] = true;
+              var mStart = getMegaStart(mz);
+              var megaNum = Math.min(MAX_BATS_MEGA - bats.length, 20 + Math.floor(mz * 5));
+              for (var mi = 0; mi < megaNum; mi++) {
+                var mx = (1 + Math.floor(seededRand(mz * 500 + mi * 11) * (COLS - 2))) * TILE + TILE / 2;
+                var myRow = mStart + 10 + Math.floor(seededRand(mz * 600 + mi * 19) * (MEGA_CLEARING_HEIGHT - 20));
+                var my = myRow * TILE + TILE / 2;
+                spawnBat(mx, my, mz, mi % 5 === 0);
+              }
+              spawnText(pick.x, pick.y - 60, '⚠️ MEGA ZONE!', '#ff4444');
+            }
+          }
+        }
         checkPickBatCollisions();
         updateBoss();
         shakeAmt *= shakeDec;
@@ -2268,8 +2279,8 @@
 
     function spawnBat(wx, wy, zone, isMother) {
       // Use higher cap during mega-clearings
-      var megaZone = Math.floor(wy / (MEGA_CLEARING_INTERVAL * TILE));
-      var inMega = isMegaClearingRow(Math.floor(wy / TILE));
+      var batRow = Math.floor(wy / TILE);
+      var inMega = isMegaClearingRow(batRow);
       var cap = inMega ? MAX_BATS_MEGA : MAX_BATS;
       if (bats.length >= cap) return;
       // Alternate: cycle bat → vesp → marimbondo per zone
@@ -2278,7 +2289,8 @@
       var minY, maxY, minX, maxX;
       if (inMega) {
         // Mega-clearing: wall-to-wall bounds
-        var megaStart = megaZone * MEGA_CLEARING_INTERVAL;
+        var mz = getMegaZone(batRow);
+        var megaStart = getMegaStart(mz >= 0 ? mz : 0);
         minX = TILE;
         maxX = (COLS - 1) * TILE;
         minY = megaStart * TILE;
