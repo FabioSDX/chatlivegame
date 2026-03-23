@@ -160,9 +160,8 @@
       border-radius: 10px;
       border: 1px solid rgba(0, 255, 255, 0.2);
       color: #fff;
-      width: auto;
+      width: max-content;
       min-width: 155px;
-      max-width: 300px;
       backdrop-filter: blur(8px);
       box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
     }
@@ -266,12 +265,14 @@
     }
 
     .lb-rank {
+      flex-shrink: 0;
       width: 16px;
       font-weight: bold;
       color: #aaa;
     }
 
     .lb-avatar {
+      flex-shrink: 0;
       width: 22px;
       height: 22px;
       border-radius: 50%;
@@ -279,13 +280,13 @@
     }
 
     .lb-name {
-      flex: 1 1 auto;
+      flex: 0 0 auto;
       white-space: nowrap;
-      overflow: visible;
       font-weight: 500;
     }
 
     .lb-score {
+      flex-shrink: 0;
       font-weight: bold;
       color: #ffdd44;
       text-shadow: 0 0 3px rgba(255, 221, 68, 0.3);
@@ -4300,7 +4301,7 @@
         <div class="lb-rank">#${i + 1}</div>
         <img class="lb-avatar" src="${av}" onerror="this.src='pickaxe/wooden_pickaxe.png'">
         <div class="lb-name">${u.userName}</div>
-        <img src="${pickImg}" style="width:20px;height:20px;vertical-align:middle;margin:0 4px;" title="${pickName}">
+        <img src="${pickImg}" style="flex-shrink:0;width:20px;height:20px;vertical-align:middle;margin:0 4px;" title="${pickName}">
         <div class="lb-score" style="color:${pickColor}">${Math.floor(u.score || 0)}</div>
       </div>
     `;
