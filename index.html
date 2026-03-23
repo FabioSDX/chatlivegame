@@ -153,17 +153,18 @@
     #leaderboard {
       position: fixed;
       top: 120px;
-      left: 15px;
+      left: 2px;
       z-index: 100;
       background: rgba(0, 0, 0, 0.1);
-      padding: 10px;
-      border-radius: 10px;
+      padding: 4px 5px;
+      border-radius: 8px;
       border: 1px solid rgba(0, 255, 255, 0.2);
       color: #fff;
-      width: max-content;
-      min-width: 155px;
+      width: calc(100vw - 8px);
+      max-width: 260px;
       backdrop-filter: blur(8px);
       box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+      font-size: 10px;
     }
 
     #announceOverlay {
@@ -243,54 +244,76 @@
     }
 
     #leaderboard h3 {
-      font-size: 13px;
-      margin-bottom: 8px;
+      font-size: 10px;
+      margin-bottom: 4px;
       color: #00ff88;
       text-align: center;
       text-transform: uppercase;
       letter-spacing: 1px;
       border-bottom: 1px solid #00ff8844;
-      padding-bottom: 3px;
+      padding-bottom: 2px;
     }
 
     .lb-item {
       display: flex;
       flex-wrap: nowrap;
       align-items: center;
-      gap: 6px;
-      margin-bottom: 5px;
-      font-size: 11px;
+      gap: 3px;
+      margin-bottom: 3px;
+      font-size: 9px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-      padding-bottom: 3px;
+      padding-bottom: 2px;
     }
 
     .lb-rank {
-      flex-shrink: 0;
-      width: 16px;
+      flex: 0 0 auto;
       font-weight: bold;
       color: #aaa;
+      font-size: 8px;
     }
 
     .lb-avatar {
-      flex-shrink: 0;
-      width: 22px;
-      height: 22px;
+      flex: 0 0 14px;
+      width: 14px;
+      height: 14px;
       border-radius: 50%;
       border: 1px solid #fff;
     }
 
     .lb-name {
-      flex: 0 0 auto;
+      flex: 1 1 0;
+      min-width: 0;
       white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
       font-weight: 500;
+      font-size: 9px;
+    }
+
+    .lb-pickaxe {
+      flex: 0 0 12px;
+      width: 12px;
+      height: 12px;
     }
 
     .lb-score {
-      flex-shrink: 0;
+      flex: 0 0 auto;
       font-weight: bold;
       color: #ffdd44;
       text-shadow: 0 0 3px rgba(255, 221, 68, 0.3);
+      font-size: 9px;
       white-space: nowrap;
+    }
+
+    @media (min-width: 400px) {
+      #leaderboard { left: 15px; padding: 10px; max-width: 300px; font-size: 12px; }
+      #leaderboard h3 { font-size: 13px; margin-bottom: 8px; }
+      .lb-item { gap: 5px; font-size: 11px; margin-bottom: 5px; }
+      .lb-rank { font-size: 11px; }
+      .lb-avatar { flex: 0 0 22px; width: 22px; height: 22px; }
+      .lb-name { font-size: 11px; }
+      .lb-pickaxe { flex: 0 0 18px; width: 18px; height: 18px; }
+      .lb-score { font-size: 11px; }
     }
   </style>
 </head>
@@ -4296,7 +4319,7 @@
         var pickImg = u.pickaxe ? u.pickaxe.img : 'pickaxe/wooden_pickaxe.png';
         var pickName = u.pickaxe ? u.pickaxe.name : 'Wood';
         var pickColor = u.pickaxe ? u.pickaxe.color : '#c8a464';
-        html += `<div class="lb-item"><span class="lb-rank">#${i + 1}</span><img class="lb-avatar" src="${av}" onerror="this.src='pickaxe/wooden_pickaxe.png'"><span class="lb-name">${u.userName}</span><img src="${pickImg}" style="flex-shrink:0;width:20px;height:20px;margin:0 2px;" title="${pickName}"><span class="lb-score" style="color:${pickColor}">${Math.floor(u.score || 0)}</span></div>`;
+        html += `<div class="lb-item"><span class="lb-rank">#${i + 1}</span><img class="lb-avatar" src="${av}" onerror="this.src='pickaxe/wooden_pickaxe.png'"><span class="lb-name">${u.userName}</span><img class="lb-pickaxe" src="${pickImg}" title="${pickName}"><span class="lb-score" style="color:${pickColor}">${Math.floor(u.score || 0)}</span></div>`;
       });
       list.innerHTML = html;
     }
