@@ -160,7 +160,9 @@
       border-radius: 10px;
       border: 1px solid rgba(0, 255, 255, 0.2);
       color: #fff;
-      width: 155px;
+      width: auto;
+      min-width: 155px;
+      max-width: 300px;
       backdrop-filter: blur(8px);
       box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
     }
@@ -255,12 +257,12 @@
     .lb-item {
       display: flex;
       align-items: center;
-      flex-wrap: wrap;
       gap: 6px;
       margin-bottom: 5px;
       font-size: 11px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.05);
       padding-bottom: 3px;
+      white-space: nowrap;
     }
 
     .lb-rank {
@@ -278,8 +280,8 @@
 
     .lb-name {
       flex: 1 1 auto;
-      white-space: normal;
-      word-break: break-word;
+      white-space: nowrap;
+      overflow: visible;
       font-weight: 500;
     }
 
