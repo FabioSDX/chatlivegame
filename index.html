@@ -4261,10 +4261,11 @@
     }
 
     var _nextPageToken = '';
+    var _lastResolveTry = 0;
     function checkConnection() {
       if (!_apiConnected || !_activeApiKey || !_userChannelId) return;
 
-      // If no liveChatId, just check API status
+      // If no liveChatId, try to auto-resolve every 60s
       if (!_liveChatId) {
         var dotApi = document.getElementById('statusDotApi');
         var txtApi = document.getElementById('statusTextApi');
@@ -4274,6 +4275,11 @@
         if (txtApi) { txtApi.textContent = 'API: OK'; txtApi.style.color = '#00ff88'; }
         if (dotLive) { dotLive.classList.remove('online'); dotLive.classList.add('warning'); }
         if (txtLive) { txtLive.textContent = 'Live: OFF'; txtLive.style.color = '#ffaa00'; txtLive.style.cursor = 'pointer'; txtLive.title = 'Click to search for live'; }
+        var now = Date.now();
+        if (now - _lastResolveTry > 60000) {
+          _lastResolveTry = now;
+          resolveLive();
+        }
         return;
       }
 
@@ -4307,7 +4313,8 @@
               if (dotApi) dotApi.classList.add('online');
               if (txtApi) { txtApi.textContent = 'API: OK'; txtApi.style.color = '#00ff88'; }
               if (dotLive) { dotLive.classList.remove('online'); dotLive.classList.add('warning'); }
-              if (txtLive) { txtLive.textContent = 'Live: OFF'; txtLive.style.color = '#ffaa00'; txtLive.style.cursor = 'pointer'; }
+              if (txtLive) { txtLive.textContent = 'Live: reconnecting...'; txtLive.style.color = '#ffaa00'; txtLive.style.cursor = 'pointer'; }
+              resolveLive();
               return;
             }
             // General error
