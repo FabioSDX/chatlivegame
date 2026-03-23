@@ -311,6 +311,13 @@
         <button id="apiFindLiveBtn" onclick="apiSetupFindLive()" style="padding:10px 14px; border:1px solid #00aaff; border-radius:8px; background:transparent; color:#00aaff; font-size:13px; cursor:pointer; display:none;">🔍 Find Live</button>
         <button id="apiSkipBtn" onclick="apiSetupSkip()" style="padding:10px 16px; border:1px solid #555; border-radius:8px; background:transparent; color:#888; font-size:13px; cursor:pointer;">Play Offline</button>
       </div>
+      <div style="margin-top:12px; padding-top:12px; border-top:1px solid #333;">
+        <label style="font-size:12px; color:#888; display:block; margin-bottom:4px;">Live Video URL or ID (optional — saves API quota)</label>
+        <div style="display:flex; gap:8px;">
+          <input id="apiLiveIdInput" type="text" placeholder="https://youtube.com/watch?v=... or video ID" style="flex:1; padding:8px 12px; border-radius:8px; border:1px solid #333; background:#0d0d1a; color:#fff; font-size:13px; box-sizing:border-box; outline:none;" />
+          <button id="apiLiveIdBtn" onclick="apiConnectLiveById()" style="padding:8px 14px; border:1px solid #ff8800; border-radius:8px; background:transparent; color:#ff8800; font-size:13px; cursor:pointer; white-space:nowrap;">▶ Connect Live</button>
+        </div>
+      </div>
       <div id="apiKeysList" style="margin-top:16px; display:none;">
         <div style="font-size:12px; color:#888; margin-bottom:6px;">Your registered API keys:</div>
         <div id="apiKeysListInner"></div>
@@ -3821,6 +3828,46 @@
           if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'No active live found on this channel.'; }
           if (sucEl) sucEl.style.display = 'none';
         }
+      });
+    }
+
+    function apiConnectLiveById() {
+      var input = document.getElementById('apiLiveIdInput').value.trim();
+      var btn = document.getElementById('apiLiveIdBtn');
+      var sucEl = document.getElementById('apiSetupSuccess');
+      var errEl = document.getElementById('apiSetupError');
+      errEl.style.display = 'none'; sucEl.style.display = 'none';
+      if (!_activeApiKey) { errEl.style.display = 'block'; errEl.textContent = 'Connect an API key first (Test & Connect).'; return; }
+      if (!input) { errEl.style.display = 'block'; errEl.textContent = 'Enter a live video URL or ID.'; return; }
+      // Extract video ID from various URL formats
+      var videoId = input;
+      var urlMatch = input.match(/[?&]v=([a-zA-Z0-9_-]{11})/) || input.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/) || input.match(/\/live\/([a-zA-Z0-9_-]{11})/);
+      if (urlMatch) videoId = urlMatch[1];
+      videoId = videoId.replace(/[^a-zA-Z0-9_-]/g, '');
+      if (!videoId || videoId.length < 8) { errEl.style.display = 'block'; errEl.textContent = 'Invalid video ID or URL.'; return; }
+      btn.textContent = 'Connecting...'; btn.disabled = true;
+      fetch('https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails&id=' + encodeURIComponent(videoId) + '&key=' + encodeURIComponent(_activeApiKey))
+      .then(function(r) { if (!r.ok) throw new Error('Network error: ' + r.status); return r.json(); })
+      .then(function(data) {
+        btn.textContent = '▶ Connect Live'; btn.disabled = false;
+        if (data.error) { errEl.style.display = 'block'; errEl.textContent = data.error.message || 'API error.'; return; }
+        if (data.items && data.items[0] && data.items[0].liveStreamingDetails && data.items[0].liveStreamingDetails.activeLiveChatId) {
+          _liveChatId = data.items[0].liveStreamingDetails.activeLiveChatId;
+          localStorage.setItem('pd_live_chat_' + _userChannelId, _liveChatId);
+          var dotLive = document.getElementById('statusDotLive');
+          var txtLive = document.getElementById('statusTextLive');
+          if (dotLive) { dotLive.classList.remove('warning'); dotLive.classList.add('online'); }
+          if (txtLive) { txtLive.textContent = 'Live: ON'; txtLive.style.color = '#00ff88'; }
+          sucEl.style.display = 'block'; sucEl.textContent = 'Live connected! Chat ID obtained from video ' + videoId;
+          _gameStarted = true;
+          setTimeout(function() { hideApiSetup(); startApiPolling(); }, 1200);
+        } else {
+          errEl.style.display = 'block'; errEl.textContent = 'This video has no active live chat. Make sure the stream is live.';
+        }
+      })
+      .catch(function(e) {
+        btn.textContent = '▶ Connect Live'; btn.disabled = false;
+        errEl.style.display = 'block'; errEl.textContent = 'Error: ' + e.message;
       });
     }
 
