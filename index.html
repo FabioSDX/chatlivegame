@@ -242,6 +242,22 @@
       0%   { opacity: 1; transform: scale(1); }
       100% { opacity: 0; transform: scale(0.7) translateY(-20px); }
     }
+    @keyframes comboPopIn {
+      0%   { opacity: 0; transform: scale(0.3) rotate(-10deg); }
+      50%  { opacity: 1; transform: scale(1.3) rotate(3deg); }
+      100% { opacity: 1; transform: scale(1) rotate(0deg); }
+    }
+    @keyframes comboPopOut {
+      0%   { opacity: 1; transform: scale(1); }
+      100% { opacity: 0; transform: scale(1.8) translateY(-30px); }
+    }
+    @keyframes comboShake {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-4px) rotate(-1deg); }
+      40% { transform: translateX(4px) rotate(1deg); }
+      60% { transform: translateX(-3px) rotate(-0.5deg); }
+      80% { transform: translateX(3px) rotate(0.5deg); }
+    }
 
     #leaderboard h3 {
       font-size: 10px;
@@ -1412,6 +1428,14 @@
     var stormTimer = 0;
     var STORM_DURATION = 900;
 
+    // ── Tormenta (combo powerup) ──
+    var TORMENTA_COMBO_THRESHOLD = 25;
+    var TORMENTA_DURATION = 480;
+    var TORMENTA_RADIUS = 200;
+    var tormentaActive = false;
+    var tormentaTimer = 0;
+    var tormentaPick = null;
+
     var score = 0;
     var items = [];
     var explosions = [];
@@ -1428,6 +1452,7 @@
       extraPicks = []; userPicks = []; lastActivity = {};
       doublePickActive = false; doublePickTimer = 0; updateDoublePickHUD();
       stormActive = false; stormTimer = 0; updateStormHUD();
+      tormentaActive = false; tormentaTimer = 0; tormentaPick = null;
       bgChunks = {}; bgTick = 0;
       boss = null; bossIntr = null;
       document.getElementById('depthDisplay').textContent = 'Depth: 0m';
@@ -1510,6 +1535,7 @@
         if (p.y - r < 0) { p.y = r; p.vy = Math.abs(p.vy) * BOUNCE; }
         p.ang += p.spin;
         if (hitAny) p.spin = p.spin * 0.9 + (Math.random() - 0.5) * 0.12; else p.spin *= 0.995;
+        if (hitAny) resetCombo(p);
         return hitAny;
       }
 
@@ -1615,6 +1641,228 @@
         texts.push({ x: x, y: y, txt: txt, c: color, life: 1, vy: -1.4 });
       }
 
+      // ── Combo System ──────────────────────────────────────────────────────────
+      var COMBO_LABELS = [
+        '', '', '', '', '',
+        '🔥 COMBO x5!',
+        '', '', '', '',
+        '⚡ COMBO x10!',
+        '', '', '', '',
+        '💀 COMBO x15!',
+        '', '', '', '',
+        '🌟 COMBO x20!',
+        '', '', '', '',
+        '☠️ COMBO x25!'
+      ];
+      var COMBO_COLORS = {
+        5:  '#ff8800',
+        10: '#ff00ff',
+        15: '#ff2222',
+        20: '#ffdd00',
+        25: '#00ffff'
+      };
+
+      function getComboLabel(count) {
+        if (count >= 25 && count % 5 === 0) return '☠️ COMBO x' + count + '!';
+        if (count < COMBO_LABELS.length) return COMBO_LABELS[count];
+        if (count % 5 === 0) return '☠️ COMBO x' + count + '!';
+        return '';
+      }
+      function getComboColor(count) {
+        if (count >= 25) return '#00ffff';
+        var tier = Math.floor(count / 5) * 5;
+        return COMBO_COLORS[tier] || '#ff8800';
+      }
+      function getComboBonus(count) {
+        var tier = Math.floor(count / 5);
+        return tier * tier * 50;
+      }
+      function registerComboHit(p, enemyX, enemyY) {
+        if (!p) return;
+        p.combo = (p.combo || 0) + 1;
+        var c = p.combo;
+        if (c >= TORMENTA_COMBO_THRESHOLD && !tormentaActive) {
+          activateTormenta(p);
+          return;
+        }
+        if (c % 5 === 0 && c >= 5) {
+          var label = getComboLabel(c);
+          var color = getComboColor(c);
+          var bonus = getComboBonus(c);
+          score += bonus;
+          if (p.userName) {
+            if (!persistentScores[p.userName]) persistentScores[p.userName] = { score: 0, avatar: p.userAvatarUrl || '' };
+            persistentScores[p.userName].score += bonus;
+          }
+          spawnText(enemyX, enemyY - 40, label, color);
+          spawnText(enemyX, enemyY - 70, '+' + bonus, '#ffffff');
+          showComboPopup(label, color, p.userName || '');
+          sfxCombo(c);
+        }
+      }
+      function resetCombo(p) {
+        if (p && p.combo > 0) p.combo = 0;
+      }
+      function showComboPopup(label, color, userName) {
+        var el = document.createElement('div');
+        el.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9998;' +
+          'font-size:48px;font-weight:900;color:' + color + ';text-shadow:0 0 20px ' + color + ',0 0 40px ' + color + ',0 2px 4px #000;' +
+          'pointer-events:none;animation:comboPopIn 0.35s ease-out forwards;font-family:Arial,sans-serif;text-align:center;white-space:nowrap;';
+        el.textContent = label;
+        if (userName) {
+          var sub = document.createElement('div');
+          sub.style.cssText = 'font-size:18px;color:#fff;opacity:0.8;margin-top:4px;animation:comboShake 0.4s ease;';
+          sub.textContent = userName;
+          el.appendChild(sub);
+        }
+        document.body.appendChild(el);
+        setTimeout(function() {
+          el.style.animation = 'comboPopOut 0.5s ease-in forwards';
+          setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 500);
+        }, 1200);
+      }
+      function sfxCombo(count) {
+        var ac = getAC(); if (!ac) return;
+        var t = ac.currentTime;
+        var tier = Math.min(Math.floor(count / 5), 5);
+        var baseFreq = 440 + tier * 110;
+        for (var i = 0; i <= tier; i++) {
+          playNote(baseFreq * Math.pow(1.25, i), 'sine', 0.12 - i * 0.01, 0.01, 0.15, t + i * 0.06);
+        }
+        playNote(baseFreq * 0.5, 'triangle', 0.15, 0.005, 0.1, t);
+      }
+
+      // ── Tormenta Powerup ────────────────────────────────────────────────────
+      function activateTormenta(p) {
+        if (tormentaActive) return;
+        tormentaActive = true;
+        tormentaTimer = TORMENTA_DURATION;
+        tormentaPick = p;
+        p.combo = 0;
+        showTormentaPopup();
+        sfxTormenta();
+      }
+      function showTormentaPopup() {
+        var el = document.createElement('div');
+        el.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;' +
+          'font-size:64px;font-weight:900;color:#ff4400;' +
+          'text-shadow:0 0 30px #ff4400,0 0 60px #ff8800,0 0 90px #ffcc00,0 4px 8px #000;' +
+          'pointer-events:none;animation:comboPopIn 0.4s ease-out forwards;font-family:Arial,sans-serif;text-align:center;white-space:nowrap;';
+        el.innerHTML = '🔥 TORMENTA 🔥';
+        var sub = document.createElement('div');
+        sub.style.cssText = 'font-size:22px;color:#ffcc00;margin-top:8px;animation:comboShake 0.5s ease infinite;text-shadow:0 0 10px #ff8800;';
+        sub.textContent = 'DESTRUIÇÃO TOTAL';
+        el.appendChild(sub);
+        document.body.appendChild(el);
+        setTimeout(function() {
+          el.style.animation = 'comboPopOut 0.6s ease-in forwards';
+          setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 600);
+        }, 2000);
+      }
+      function sfxTormenta() {
+        var ac = getAC(); if (!ac) return;
+        var t = ac.currentTime;
+        var sub = ac.createOscillator(), subG = ac.createGain();
+        sub.type = 'sine'; sub.frequency.setValueAtTime(40, t);
+        sub.frequency.exponentialRampToValueAtTime(20, t + 1.5);
+        subG.gain.setValueAtTime(0.0001, t);
+        subG.gain.linearRampToValueAtTime(0.6, t + 0.05);
+        subG.gain.exponentialRampToValueAtTime(0.0001, t + 1.5);
+        sub.connect(subG); subG.connect(ac.destination); sub.start(t); sub.stop(t + 1.6);
+        for (var i = 0; i < 6; i++) {
+          playNote(220 * Math.pow(1.5, i), 'sawtooth', 0.08, 0.01, 0.2, t + i * 0.08);
+        }
+        var nLen = Math.ceil(ac.sampleRate * 0.8);
+        var buf = ac.createBuffer(1, nLen, ac.sampleRate);
+        var d = buf.getChannelData(0);
+        for (var j = 0; j < nLen; j++) d[j] = (Math.random() * 2 - 1) * Math.pow(1 - j / nLen, 1.2);
+        var src = ac.createBufferSource(); src.buffer = buf;
+        var filt = ac.createBiquadFilter(); filt.type = 'lowpass'; filt.frequency.value = 600;
+        var ng = ac.createGain(); ng.gain.setValueAtTime(0.4, t);
+        ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.8);
+        src.connect(filt); filt.connect(ng); ng.connect(ac.destination); src.start(t);
+      }
+      function updateTormenta() {
+        if (!tormentaActive) return;
+        tormentaTimer--;
+        if (tormentaTimer <= 0) { tormentaActive = false; tormentaPick = null; return; }
+        var p = tormentaPick;
+        if (!p) { tormentaActive = false; return; }
+        if (tormentaTimer % 2 === 0) {
+          for (var fi = 0; fi < 3; fi++) {
+            var angle = Math.random() * Math.PI * 2;
+            var dist = Math.random() * 30;
+            parts.push({
+              x: p.x + Math.cos(angle) * dist,
+              y: p.y + Math.sin(angle) * dist,
+              vx: (Math.random() - 0.5) * 3,
+              vy: -2 - Math.random() * 3,
+              life: 1, dec: 0.04,
+              c: Math.random() < 0.5 ? '#ff4400' : (Math.random() < 0.5 ? '#ff8800' : '#ffcc00'),
+              r: 3 + Math.random() * 4
+            });
+          }
+        }
+        if (tormentaTimer % 6 === 0) {
+          var killR = TORMENTA_RADIUS;
+          for (var bi = bats.length - 1; bi >= 0; bi--) {
+            var b = bats[bi];
+            if (b.state === 'dead') continue;
+            var dx = p.x - b.x, dy = p.y - b.y;
+            if (dx * dx + dy * dy < killR * killR) {
+              b.hp = 0; b.state = 'dead'; b.anim = 0; b.deadTimer = 0;
+              score += b.pts;
+              if (p.userName) {
+                if (!persistentScores[p.userName]) persistentScores[p.userName] = { score: 0, avatar: p.userAvatarUrl || '' };
+                persistentScores[p.userName].score += b.pts;
+              }
+              spawnText(b.x, b.y - 20, '+' + b.pts, '#ff8800');
+              sfxBatDeath();
+              for (var k = 0; k < 5; k++) {
+                parts.push({ x: b.x, y: b.y, vx: (Math.random() - 0.5) * 6, vy: (Math.random() - 0.5) * 6, life: 1, dec: 0.06, c: '#ff4400', r: 4 + Math.random() * 3 });
+              }
+            }
+          }
+          for (var zi = zombies.length - 1; zi >= 0; zi--) {
+            var z = zombies[zi];
+            if (z.state === 'dead') continue;
+            var zdx = p.x - z.x, zdy = p.y - z.y;
+            if (zdx * zdx + zdy * zdy < killR * killR) {
+              z.hp = 0; z.state = 'dead'; z.animTimer = 0; z.deadTimer = 0;
+              score += z.pts;
+              if (p.userName) {
+                if (!persistentScores[p.userName]) persistentScores[p.userName] = { score: 0, avatar: p.userAvatarUrl || '' };
+                persistentScores[p.userName].score += z.pts;
+              }
+              spawnText(z.x, z.y - 20, '+' + z.pts, '#ff8800');
+              sfxZombieDeath();
+              for (var k2 = 0; k2 < 5; k2++) {
+                parts.push({ x: z.x, y: z.y, vx: (Math.random() - 0.5) * 6, vy: (Math.random() - 0.5) * 6, life: 1, dec: 0.06, c: '#ff4400', r: 4 + Math.random() * 3 });
+              }
+            }
+          }
+        }
+      }
+      function drawTormentaAura(p) {
+        if (!tormentaActive || !p) return;
+        ctx.save();
+        var pulse = 0.8 + Math.sin(tormentaTimer * 0.15) * 0.2;
+        var r = TORMENTA_RADIUS * pulse;
+        var grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
+        grad.addColorStop(0, 'rgba(255, 68, 0, 0.15)');
+        grad.addColorStop(0.5, 'rgba(255, 136, 0, 0.08)');
+        grad.addColorStop(0.8, 'rgba(255, 204, 0, 0.03)');
+        grad.addColorStop(1, 'rgba(255, 68, 0, 0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
+        ctx.shadowBlur = 25 + Math.sin(tormentaTimer * 0.3) * 10;
+        ctx.shadowColor = '#ff4400';
+        ctx.fillStyle = 'rgba(255, 68, 0, 0.3)';
+        ctx.beginPath(); ctx.arc(p.x, p.y, 35, 0, Math.PI * 2); ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.restore();
+      }
+
       function hitBlock(col, row, force, source) {
         var cell = getCell(row, col);
         if (!cell || cell.t === E) return false;
@@ -1678,6 +1926,7 @@
         updateItems();
         updateExplosions();
         updateStorm();
+        updateTormenta();
         updateZombies();
         checkPickZombieCollisions();
         updateBats();
@@ -2125,6 +2374,7 @@
 
       // picareta principal - sprite
       if (pick) {
+        drawTormentaAura(pick);
         ctx.save();
         ctx.translate(pick.x, pick.y);
         ctx.rotate(pick.ang);
@@ -2182,6 +2432,7 @@
       // picaretas de outros usuários (permanentes com avatar)
       for (var ui = 0; ui < userPicks.length; ui++) {
         var up = userPicks[ui];
+        drawTormentaAura(tormentaPick === up ? up : null);
         ctx.save();
         ctx.translate(up.x, up.y);
         ctx.rotate(up.ang);
@@ -2532,6 +2783,7 @@
             b.vy -= 1;
             sfxBatHurt();
             spawnText(b.x, b.y - BAT_SIZE * 0.4, '-1', '#ff88cc');
+            registerComboHit(p, b.x, b.y);
             if (b.hp <= 0) {
               b.state = 'dead'; b.anim = 0; b.deadTimer = 0;
               score += b.pts;
@@ -2701,6 +2953,7 @@
             z.vy -= 1;
             sfxZombieHurt();
             spawnText(z.x, z.y - ZOMBIE_SIZE * 0.5, '-1', '#ff8844');
+            registerComboHit(p, z.x, z.y);
             if (z.hp <= 0) {
               z.state = 'dead'; z.animTimer = 0; z.deadTimer = 0;
               score += z.pts;
