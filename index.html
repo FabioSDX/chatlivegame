@@ -1461,6 +1461,10 @@
     function applyPhysics(p, r) {
         if (!p) return false;
         p.vy += GRAVITY;
+        // Clamp velocidade para evitar tunneling (max ~1 tile por frame)
+        var maxV = TILE * 0.8;
+        if (p.vx > maxV) p.vx = maxV; else if (p.vx < -maxV) p.vx = -maxV;
+        if (p.vy > maxV) p.vy = maxV; else if (p.vy < -maxV) p.vy = -maxV;
         var speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
         var pPickaxe = p.pickaxe || currentPickaxe;
         var dmgBase = 0.35 * (pPickaxe ? pPickaxe.damage : 1);
