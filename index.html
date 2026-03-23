@@ -477,11 +477,11 @@
     var TNT_RADIUS = 3;
     var MEGA_TNT_RADIUS = 6;
 
-    var BOUNCE = 0.95;
-    var FRICTION = 0.97;
+    var BOUNCE = 0.78;
+    var FRICTION = 0.985;
     var SPIN_DAMP = 0.99;
-    var GRAVITY = 0.22;
-    var MAX_BOUNCE_VY = 30; // max upward velocity after bounce (~5 blocks height)
+    var GRAVITY = 0.18;
+    var MAX_BOUNCE_VY = 12; // cap upward bounce velocity
 
     // ── Swept AABB para TNT ──
     function sweptAABB(bx, by, vx, vy, hs, tileCol, tileRow) {
@@ -1476,8 +1476,8 @@
             var cell = getCell(row, col);
             if (cell && cell.t !== E) {
               hitBlock(col, row, Math.max(1, Math.floor(speed * dmgBase)), p);
-              if (p.vx > 0) { p.x = col * TILE - r - 1; p.vx = -p.vx * BOUNCE * FRICTION; }
-              else { p.x = (col + 1) * TILE + r + 1; p.vx = -p.vx * BOUNCE * FRICTION; }
+              if (p.vx > 0) { p.x = col * TILE - r - 1; p.vx = -p.vx * BOUNCE; }
+              else { p.x = (col + 1) * TILE + r + 1; p.vx = -p.vx * BOUNCE; }
               hitAny = true; break;
             }
           }
@@ -1495,17 +1495,24 @@
             if (cell && cell.t !== E) {
               hitBlock(col, row, Math.max(1, Math.floor(speed * dmgBase)), p);
               if (p.vy > 0) {
-                p.y = row * TILE - r - 1; p.vy = -p.vy * BOUNCE;
+                p.y = row * TILE - r - 1;
+                p.vy = -p.vy * BOUNCE;
+                // Minimum bounce so pick always hops
+                if (p.vy > -2.5) p.vy = -2.5;
                 if (p.vy < -MAX_BOUNCE_VY) p.vy = -MAX_BOUNCE_VY;
-                if (Math.abs(p.vy) > 0.8) p.vx += (Math.random() - 0.5) * 3; else p.vx *= FRICTION;
-              } else { p.y = (row + 1) * TILE + r + 1; p.vy = -p.vy * BOUNCE; if (p.vy > MAX_BOUNCE_VY) p.vy = MAX_BOUNCE_VY; }
+                if (Math.abs(p.vy) > 1.5) p.vx += (Math.random() - 0.5) * 4; else p.vx *= FRICTION;
+              } else {
+                p.y = (row + 1) * TILE + r + 1;
+                p.vy = -p.vy * BOUNCE;
+                if (p.vy > MAX_BOUNCE_VY) p.vy = MAX_BOUNCE_VY;
+              }
               hitAny = true; hitY = true; break;
             }
           }
           if (hitY) break;
         }
 
-        if (p.y - r < 0) { p.y = r; p.vy = Math.abs(p.vy) * BOUNCE; if (p.vy > MAX_BOUNCE_VY) p.vy = MAX_BOUNCE_VY; }
+        if (p.y - r < 0) { p.y = r; p.vy = Math.abs(p.vy) * BOUNCE; }
         p.ang += p.spin;
         if (hitAny) p.spin = p.spin * 0.9 + (Math.random() - 0.5) * 0.12; else p.spin *= 0.995;
         return hitAny;
@@ -2517,9 +2524,9 @@
           if (dist < PICK_R + BR) {
             var nx = dist > 0 ? dx / dist : 0;
             var ny = dist > 0 ? dy / dist : -1;
-            var bounceForce = Math.max(2.5, pSpeed * 0.5);
+            var bounceForce = Math.max(3, pSpeed * 0.5);
             p.vx = nx * bounceForce;
-            p.vy = ny * bounceForce - 1.5;
+            p.vy = ny * bounceForce - 2;
             if (p.vy < -MAX_BOUNCE_VY) p.vy = -MAX_BOUNCE_VY;
             p.spin += (Math.random() - 0.5) * 0.2;
             p.x = b.x + nx * (PICK_R + BR + 1);
@@ -2685,9 +2692,9 @@
             // Bounce the pickaxe off the zombie
             var nx = dist > 0 ? dx / dist : 0;
             var ny = dist > 0 ? dy / dist : -1;
-            var bounceForce = Math.max(3, pSpeed * 0.6);
+            var bounceForce = Math.max(3.5, pSpeed * 0.55);
             p.vx = nx * bounceForce;
-            p.vy = ny * bounceForce - 2; // kick upward
+            p.vy = ny * bounceForce - 2.5; // kick upward
             if (p.vy < -MAX_BOUNCE_VY) p.vy = -MAX_BOUNCE_VY;
             p.spin += (Math.random() - 0.5) * 0.3;
             // Push pick out of zombie
