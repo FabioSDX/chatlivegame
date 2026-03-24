@@ -2039,21 +2039,28 @@
               megaClearedZones[mz + '_type'] = isZombieGate ? 'zombie' : 'queen';
 
               if (isZombieGate) {
-                // ── ZOMBIE GATE: spawn bats (flying) + zombie bosses on flat floor ──
-                // Spawn flying enemies throughout the clearing (same as queen gate)
+                // ── ZOMBIE GATE: spawn bats (flying) + zombie bosses on brick floor ──
+                // Spawn flying enemies in upper portion of clearing (above the floor)
+                var zbRow = mStart + MEGA_CLEARING_HEIGHT - 10;
                 var megaNum = Math.min(MAX_BATS_MEGA, 100 + Math.floor(mz * 10));
                 for (var mi = 0; mi < megaNum; mi++) {
                   var mx = (1 + Math.floor(seededRand(mz * 500 + mi * 11) * (COLS - 2))) * TILE + TILE / 2;
-                  var myRow = mStart + 5 + Math.floor(seededRand(mz * 600 + mi * 19) * (MEGA_CLEARING_HEIGHT - 20));
+                  var myRow = mStart + 10 + Math.floor(seededRand(mz * 600 + mi * 19) * (MEGA_CLEARING_HEIGHT - 40));
                   var my = myRow * TILE + TILE / 2;
                   spawnBat(mx, my, mz, mi % 4 === 0);
                 }
-                // Spawn Zombie Boss Gate: 4 bosses on invisible flat floor
-                var zbRow = mStart + MEGA_CLEARING_HEIGHT - 10;
-                var zbFloorY = zbRow * TILE; // top of the invisible floor row
-                // Store the floor row for the invisible barrier
+                // Place cobblestone floor (2 rows thick, wall-to-wall)
+                ensureRows(zbRow, zbRow + 2);
+                for (var fr = zbRow; fr < zbRow + 2; fr++) {
+                  if (!worldMap[fr]) worldMap[fr] = genRow(fr);
+                  for (var fc = 0; fc < COLS; fc++) {
+                    var brickType = (fr + fc) % 3 === 0 ? MOSSY : COBBLE;
+                    worldMap[fr][fc] = { t: brickType, hp: 9999, cr: 0 };
+                  }
+                }
+                var zbFloorY = zbRow * TILE;
                 megaClearedZones[mz + '_zbFloorRow'] = zbRow;
-                var zbY = zbFloorY - ZOMBIE_SIZE * ZBOSS_SCALE * 0.5; // feet on floor
+                var zbY = zbFloorY - ZOMBIE_SIZE * ZBOSS_SCALE * 0.5;
                 var zbSpacing = ((COLS - 2) * TILE) / (ZBOSS_COUNT + 1);
                 for (var zbi = 0; zbi < ZBOSS_COUNT; zbi++) {
                   var zbX = TILE + zbSpacing * (zbi + 1);
@@ -2065,7 +2072,7 @@
                 var megaNum = Math.min(MAX_BATS_MEGA, 100 + Math.floor(mz * 10));
                 for (var mi = 0; mi < megaNum; mi++) {
                   var mx = (1 + Math.floor(seededRand(mz * 500 + mi * 11) * (COLS - 2))) * TILE + TILE / 2;
-                  var myRow = mStart + 5 + Math.floor(seededRand(mz * 600 + mi * 19) * (MEGA_CLEARING_HEIGHT - 10));
+                  var myRow = mStart + 10 + Math.floor(seededRand(mz * 600 + mi * 19) * (MEGA_CLEARING_HEIGHT - 30));
                   var my = myRow * TILE + TILE / 2;
                   spawnBat(mx, my, mz, mi % 4 === 0);
                 }
@@ -2762,8 +2769,8 @@
         var megaStart = getMegaStart(mz >= 0 ? mz : 0);
         minX = TILE;
         maxX = (COLS - 1) * TILE;
-        minY = megaStart * TILE;
-        maxY = (megaStart + MEGA_CLEARING_HEIGHT) * TILE;
+        minY = megaStart * TILE + TILE * 8;
+        maxY = (megaStart + MEGA_CLEARING_HEIGHT - 8) * TILE;
       } else {
         var shape = getClearingShape(zone);
         var zoneStart = zone * CLEARING_INTERVAL;
@@ -3269,11 +3276,6 @@
       var floorY = bosses[0].y + ZOMBIE_SIZE * ZBOSS_SCALE * 0.5;
       var wallLeft = TILE, wallRight = (COLS - 1) * TILE;
       ctx.save();
-      // Draw invisible floor as subtle glow line
-      var fPulse = 0.3 + Math.sin(t * 1.5) * 0.15;
-      ctx.strokeStyle = 'rgba(0, 255, 80, ' + (0.15 * fPulse) + ')';
-      ctx.lineWidth = 4;
-      ctx.beginPath(); ctx.moveTo(wallLeft, floorY); ctx.lineTo(wallRight, floorY); ctx.stroke();
       // Energy barrier between bosses (at body center height)
       if (bosses.length >= 2) {
         for (var qi = 0; qi < bosses.length - 1; qi++) {
@@ -3507,27 +3509,21 @@
           continue;
         }
 
-        // ── Zombie Boss: stay near home, just patrol slowly on flat floor ──
+        // ── Zombie Boss: patrol left-right on brick floor ──
         if (z.isZBoss) {
           z.animTimer += ZOMBIE_ANIMS.walk.speed;
           if (z.animTimer >= ZOMBIE_ANIMS.walk.count) z.animTimer = 0;
-          // Slow patrol near home
-          if (!z._bossPhase) z._bossPhase = Math.random() * Math.PI * 2;
-          z._bossPhase += 0.008;
-          var bossTargetX = z.homeX + Math.sin(z._bossPhase) * TILE * 1.5;
-          var bdx = bossTargetX - z.x;
-          z.vx += (bdx > 0 ? 0.02 : -0.02);
-          z.vx *= 0.95;
+          // Walk in current direction
+          z.vx = z.dir * z.speed * 1.2;
           z.x += z.vx;
-          z.dir = z.vx > 0 ? 1 : -1;
-          // Lock to flat floor Y (invisible platform)
+          // Reverse at patrol limits (2 tiles from walls)
+          var bwL = TILE * 2, bwR = (COLS - 2) * TILE;
+          if (z.x <= bwL) { z.x = bwL; z.dir = 1; }
+          if (z.x >= bwR) { z.x = bwR; z.dir = -1; }
+          // Lock to flat floor Y
           z.y = z.homeY;
           z.vy = 0;
           z.grounded = true;
-          // Wall clamp
-          var bwL = TILE + 1, bwR = (COLS - 1) * TILE - 1;
-          if (z.x < bwL + ZOMBIE_SIZE * ZBOSS_SCALE * 0.4) z.x = bwL + ZOMBIE_SIZE * ZBOSS_SCALE * 0.4;
-          if (z.x > bwR - ZOMBIE_SIZE * ZBOSS_SCALE * 0.4) z.x = bwR - ZOMBIE_SIZE * ZBOSS_SCALE * 0.4;
           continue;
         }
 

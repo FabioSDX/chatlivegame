@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 1280px; height: 720px;
+    overflow: hidden;
+    font-family: 'Arial Black', Arial, sans-serif;
+    background: linear-gradient(135deg, #0a0a2e 0%, #1a0a3e 30%, #0d1b2a 70%, #0a0a2e 100%);
+    position: relative;
+  }
+  /* Grid de blocos no fundo */
+  .bg-grid {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+    background-size: 72px 72px;
+  }
+  /* Brilho central */
+  .glow {
+    position: absolute;
+    width: 800px; height: 800px;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(circle, rgba(0,255,136,0.12) 0%, transparent 70%);
+    border-radius: 50%;
+  }
+  .glow2 {
+    position: absolute;
+    width: 500px; height: 500px;
+    top: 30%; left: 25%;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(circle, rgba(255,68,255,0.08) 0%, transparent 70%);
+    border-radius: 50%;
+  }
+  /* Blocos decorativos */
+  .block {
+    position: absolute;
+    width: 64px; height: 64px;
+    border-radius: 6px;
+    border: 2px solid rgba(255,255,255,0.1);
+    opacity: 0.6;
+  }
+  .block img { width: 100%; height: 100%; border-radius: 4px; }
+  .b1 { top: 80px; left: 40px; transform: rotate(-8deg); }
+  .b2 { top: 200px; left: 120px; transform: rotate(5deg); opacity: 0.4; }
+  .b3 { bottom: 100px; left: 60px; transform: rotate(12deg); }
+  .b4 { top: 100px; right: 80px; transform: rotate(-5deg); }
+  .b5 { bottom: 80px; right: 50px; transform: rotate(8deg); opacity: 0.5; }
+  .b6 { top: 300px; right: 40px; transform: rotate(-12deg); opacity: 0.35; }
+  .b7 { bottom: 200px; right: 140px; transform: rotate(3deg); opacity: 0.45; }
+  .b8 { bottom: 160px; left: 180px; transform: rotate(-6deg); opacity: 0.3; }
+  /* Picareta central */
+  .pickaxe-container {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -55%) rotate(-35deg);
+  }
+  .pickaxe-container img {
+    width: 180px; height: 180px;
+    filter: drop-shadow(0 0 30px rgba(0,255,136,0.6)) drop-shadow(0 0 60px rgba(0,255,136,0.3));
+  }
+</style>
+</head>
+<body>
+  <div class="bg-grid"></div>
+  <div class="glow"></div>
+  <div class="glow2"></div>
+
+  <!-- Blocos decorativos -->
+  <div class="block b1"><img src="block/diamond_ore.png"></div>
+  <div class="block b2"><img src="block/gold_ore.png"></div>
+  <div class="block b3"><img src="block/emerald_ore.png"></div>
+  <div class="block b4"><img src="block/iron_ore.png"></div>
+  <div class="block b5"><img src="block/redstone_ore.png"></div>
+  <div class="block b6"><img src="block/coal_ore.png"></div>
+  <div class="block b7"><img src="block/cobblestone.png"></div>
+  <div class="block b8"><img src="block/lapis_ore.png"></div>
+
+  <!-- Picareta central -->
+  <div class="pickaxe-container">
+    <img src="pickaxe/diamond_pickaxe.png">
+  </div>
+
+  <!-- Texto principal -->
+  <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center; z-index:10;">
+    <div style="font-size:82px; color:#fff; text-shadow: 0 0 20px rgba(0,255,136,0.8), 0 0 40px rgba(0,255,136,0.4), 0 4px 8px rgba(0,0,0,0.8); letter-spacing:3px; line-height:1;">
+      ⛏️ PICKAXE DROP
+    </div>
+    <div style="font-size:30px; color:#00ff88; margin-top:16px; text-shadow: 0 0 15px rgba(0,255,136,0.5), 0 2px 4px rgba(0,0,0,0.8); letter-spacing:6px; text-transform:uppercase;">
+      Interactive Chat Game
+    </div>
+    <div style="margin-top:28px; display:flex; gap:16px; justify-content:center; align-items:center;">
+      <div style="background:rgba(255,0,0,0.9); color:#fff; font-size:20px; padding:8px 20px; border-radius:8px; font-weight:bold; box-shadow: 0 0 20px rgba(255,0,0,0.4);">
+        ▶ YOUTUBE LIVE
+      </div>
+      <div style="background:rgba(0,255,136,0.15); border:2px solid #00ff88; color:#00ff88; font-size:20px; padding:8px 20px; border-radius:8px; font-weight:bold;">
+        100% FREE
+      </div>
+    </div>
+    <div style="margin-top:24px; font-size:22px; color:#aaa; text-shadow: 0 2px 4px rgba(0,0,0,0.8);">
+      chatlivegame.blogspot.com
+    </div>
+  </div>
+
+  <!-- Badge canto -->
+  <div style="position:absolute; bottom:20px; left:50%; transform:translateX(-50%); display:flex; gap:24px; align-items:center; opacity:0.7;">
+    <span style="color:#888; font-size:16px;">⛏ mine</span>
+    <span style="color:#888; font-size:16px;">⚔️ clone</span>
+    <span style="color:#888; font-size:16px;">🌀 spin</span>
+    <span style="color:#888; font-size:16px;">💣 tnt</span>
+    <span style="color:#888; font-size:16px;">🔥 firestorm</span>
+    <span style="color:#888; font-size:16px;">🏆 ranking</span>
+  </div>
+</body>
+</html>
