@@ -5401,7 +5401,10 @@
           }
         } else if (s.phase === 'dash') {
           p._spinLock = true;
-          p.spin = 3.0;
+          // Lock rotation to spin direction: right=0, down=PI/2, left=PI, up=-PI/2
+          var targetAng = Math.atan2(s.dir.y, s.dir.x);
+          p.ang = targetAng + (s.timer * 0.8); // fast spin around the direction axis
+          p.spin = 0; // we control ang directly
           p.stuck = false;
           p.stuckTimer = 0;
           var stepX = s.dir.x * SPIN_SPEED;
@@ -5430,14 +5433,27 @@
               }
             }
           }
-          if (s.timer % 4 === 0) {
+          if (s.timer % 2 === 0) {
+            // Afterimage ghost trail
             parts.push({
-              x: p.x + (Math.random() - 0.5) * 20,
-              y: p.y + (Math.random() - 0.5) * 20,
-              vx: -s.dir.x * 3 + (Math.random() - 0.5) * 2,
-              vy: -s.dir.y * 3 + (Math.random() - 0.5) * 2,
-              life: 10, color: s.timer % 8 < 4 ? '#ff44ff' : '#ffaa00', r: 3
+              x: p.x - s.dir.x * 15,
+              y: p.y - s.dir.y * 15,
+              vx: 0, vy: 0,
+              life: 8, color: 'rgba(255,68,255,0.5)', r: PICK_HALF * 0.6
             });
+            // Sparks flying outward
+            for (var sp = 0; sp < 2; sp++) {
+              var sparkAng = Math.atan2(s.dir.y, s.dir.x) + Math.PI + (Math.random() - 0.5) * 1.5;
+              parts.push({
+                x: p.x + (Math.random() - 0.5) * 16,
+                y: p.y + (Math.random() - 0.5) * 16,
+                vx: Math.cos(sparkAng) * (3 + Math.random() * 4),
+                vy: Math.sin(sparkAng) * (3 + Math.random() * 4),
+                life: 8 + Math.random() * 6,
+                color: Math.random() < 0.5 ? '#ffaa00' : '#ff44ff',
+                r: 1.5 + Math.random() * 2
+              });
+            }
           }
           if (p.x < PICK_HALF) { p.x = PICK_HALF; s.timer = 0; }
           if (p.x > COLS * TILE - PICK_HALF) { p.x = COLS * TILE - PICK_HALF; s.timer = 0; }
@@ -5469,15 +5485,44 @@
         ctx.strokeStyle = '#ff44ff';
         ctx.lineWidth = 2 + prog * 3;
         ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.stroke();
+        // Inner spinning ring
+        ctx.globalAlpha = 0.2 + prog * 0.4;
+        ctx.strokeStyle = '#ffaa00';
+        ctx.lineWidth = 1.5;
+        var ringAng = Date.now() * 0.01;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, r * 0.6, ringAng, ringAng + Math.PI * 1.2);
+        ctx.stroke();
       } else {
-        var pulse = 0.6 + Math.sin(spin.timer * 0.4) * 0.4;
-        var r = 35 * pulse;
-        var grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
-        grad.addColorStop(0, 'rgba(255, 68, 255, 0.25)');
-        grad.addColorStop(0.6, 'rgba(255, 170, 0, 0.1)');
-        grad.addColorStop(1, 'rgba(255, 68, 255, 0)');
-        ctx.fillStyle = grad;
-        ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
+        // Dash: speed lines behind the pick
+        var trailLen = 40;
+        var perpX = -spin.dir.y, perpY = spin.dir.x; // perpendicular
+        ctx.globalAlpha = 0.35;
+        for (var li = 0; li < 5; li++) {
+          var offset = (li - 2) * 10;
+          var sx = p.x - spin.dir.x * trailLen + perpX * offset;
+          var sy = p.y - spin.dir.y * trailLen + perpY * offset;
+          var grad = ctx.createLinearGradient(sx, sy, p.x + perpX * offset, p.y + perpY * offset);
+          grad.addColorStop(0, 'rgba(255,68,255,0)');
+          grad.addColorStop(0.5, 'rgba(255,170,0,0.4)');
+          grad.addColorStop(1, 'rgba(255,68,255,0.6)');
+          ctx.strokeStyle = grad;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(sx, sy);
+          ctx.lineTo(p.x + perpX * offset, p.y + perpY * offset);
+          ctx.stroke();
+        }
+        // Glow around pick
+        var pulse = 0.7 + Math.sin(spin.timer * 0.6) * 0.3;
+        var gr = 28 * pulse;
+        var grd = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, gr);
+        grd.addColorStop(0, 'rgba(255, 68, 255, 0.3)');
+        grd.addColorStop(0.5, 'rgba(255, 170, 0, 0.15)');
+        grd.addColorStop(1, 'rgba(255, 68, 255, 0)');
+        ctx.globalAlpha = 0.6;
+        ctx.fillStyle = grd;
+        ctx.beginPath(); ctx.arc(p.x, p.y, gr, 0, Math.PI * 2); ctx.fill();
       }
       ctx.restore();
     }
