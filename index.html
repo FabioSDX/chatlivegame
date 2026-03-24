@@ -2408,68 +2408,96 @@
       if (waterSimTick % WATER_SIM_RATE !== 0) return;
       var rStart = Math.max(0, Math.floor(camY / TILE) - 5);
       var rEnd = Math.ceil((camY + canvas.height) / TILE) + 5;
-      // Process bottom-up so water falls correctly
+
+      // ── Phase 1: Gravity — water falls down ──
       for (var r = rEnd; r >= rStart; r--) {
         if (!worldMap[r]) continue;
         for (var c = 0; c < COLS; c++) {
           var cell = worldMap[r][c];
           if (!cell || cell.t !== WATER) continue;
-          // Already processed this tick? skip (use a frame marker)
-          if (cell._wt === waterSimTick) continue;
-          // Try to flow down
+          // Fall straight down
           var below = getCell(r + 1, c);
           if (below && below.t === E) {
-            worldMap[r + 1][c] = { t: WATER, hp: 1, cr: 0, _wt: waterSimTick };
+            worldMap[r + 1][c] = { t: WATER, hp: 1, cr: 0 };
             worldMap[r][c] = { t: E, hp: 0, cr: 0 };
             continue;
           }
-          // Try to flow down-diagonally
-          var goLeft = Math.random() < 0.5;
-          var dc1 = goLeft ? -1 : 1;
-          var dc2 = goLeft ? 1 : -1;
-          if (c + dc1 >= 0 && c + dc1 < COLS) {
-            var bl1 = getCell(r + 1, c + dc1);
-            if (bl1 && bl1.t === E) {
-              worldMap[r + 1][c + dc1] = { t: WATER, hp: 1, cr: 0, _wt: waterSimTick };
-              worldMap[r][c] = { t: E, hp: 0, cr: 0 };
-              continue;
+          // Fall diagonally
+          var dc = (waterSimTick + c) % 2 === 0 ? -1 : 1; // alternate to avoid bias
+          for (var d = 0; d < 2; d++) {
+            var nc = c + dc;
+            if (nc >= 0 && nc < COLS) {
+              var bd = getCell(r + 1, nc);
+              if (bd && bd.t === E) {
+                worldMap[r + 1][nc] = { t: WATER, hp: 1, cr: 0 };
+                worldMap[r][c] = { t: E, hp: 0, cr: 0 };
+                break;
+              }
+            }
+            dc = -dc; // try other side
+          }
+        }
+      }
+
+      // ── Phase 2: Equilibrium — level water per row ──
+      // For each row, find contiguous groups of (water + empty-with-support)
+      // and redistribute water evenly within each group
+      for (var r = rEnd; r >= rStart; r--) {
+        if (!worldMap[r]) continue;
+        var c = 0;
+        while (c < COLS) {
+          // Find start of a water-containing segment
+          if (!worldMap[r][c] || (worldMap[r][c].t !== WATER && worldMap[r][c].t !== E)) { c++; continue; }
+          // Scan contiguous segment of water/empty cells that have solid support below
+          var segStart = c;
+          var waterCount = 0;
+          while (c < COLS) {
+            var cell = worldMap[r][c];
+            if (!cell) break;
+            if (cell.t !== WATER && cell.t !== E) break;
+            // Must have solid support below (or be water/solid)
+            var belowCell = getCell(r + 1, c);
+            var hasSupport = belowCell && belowCell.t !== E;
+            if (!hasSupport && cell.t === E) break; // gap with no floor = segment end
+            if (!hasSupport && cell.t === WATER) {
+              // Water with no support will fall next tick, skip
+              c++; continue;
+            }
+            if (cell.t === WATER) waterCount++;
+            c++;
+          }
+          var segEnd = c;
+          var segLen = segEnd - segStart;
+          if (waterCount === 0 || waterCount === segLen) continue; // nothing to balance
+
+          // Clear all water in segment, then place waterCount tiles centered
+          for (var sc = segStart; sc < segEnd; sc++) {
+            if (worldMap[r][sc] && worldMap[r][sc].t === WATER) {
+              worldMap[r][sc] = { t: E, hp: 0, cr: 0 };
             }
           }
-          if (c + dc2 >= 0 && c + dc2 < COLS) {
-            var bl2 = getCell(r + 1, c + dc2);
-            if (bl2 && bl2.t === E) {
-              worldMap[r + 1][c + dc2] = { t: WATER, hp: 1, cr: 0, _wt: waterSimTick };
-              worldMap[r][c] = { t: E, hp: 0, cr: 0 };
-              continue;
+          // Place water: fill from the bottom (leftmost supported positions first)
+          // Find all supported empty positions in segment
+          var supported = [];
+          for (var sc = segStart; sc < segEnd; sc++) {
+            var belowC = getCell(r + 1, sc);
+            if (belowC && belowC.t !== E) {
+              supported.push(sc);
             }
           }
-          // Lateral spread: only if the column beside has less water stacked above
-          // Count water tiles above current position in this column vs neighbor
-          var myHeight = 0;
-          for (var cr = r; cr >= rStart; cr--) {
-            var cc = getCell(cr, c);
-            if (cc && cc.t === WATER) myHeight++; else break;
+          // Center the water within supported positions
+          var startIdx = Math.floor((supported.length - waterCount) / 2);
+          if (startIdx < 0) startIdx = 0;
+          var placed = 0;
+          for (var si = startIdx; si < supported.length && placed < waterCount; si++) {
+            worldMap[r][supported[si]] = { t: WATER, hp: 1, cr: 0 };
+            placed++;
           }
-          var tryDirs = [dc1, dc2];
-          for (var di = 0; di < 2; di++) {
-            var nc = c + tryDirs[di];
-            if (nc < 0 || nc >= COLS) continue;
-            var side = getCell(r, nc);
-            if (!side || side.t !== E) continue;
-            // Check neighbor has solid below (don't spread into air)
-            var sideBelow = getCell(r + 1, nc);
-            if (!sideBelow || (sideBelow.t === E)) continue;
-            // Count neighbor water height
-            var nHeight = 0;
-            for (var cr2 = r - 1; cr2 >= rStart; cr2--) {
-              var cc2 = getCell(cr2, nc);
-              if (cc2 && cc2.t === WATER) nHeight++; else break;
-            }
-            // Only spread if we have more water stacked than neighbor
-            if (myHeight > nHeight + 1) {
-              worldMap[r][nc] = { t: WATER, hp: 1, cr: 0, _wt: waterSimTick };
-              worldMap[r][c] = { t: E, hp: 0, cr: 0 };
-              break;
+          // If still need to place (more water than supported), fill from start
+          for (var si = 0; si < supported.length && placed < waterCount; si++) {
+            if (worldMap[r][supported[si]].t !== WATER) {
+              worldMap[r][supported[si]] = { t: WATER, hp: 1, cr: 0 };
+              placed++;
             }
           }
         }
