@@ -5405,8 +5405,12 @@
           var stepY = s.dir.y * SPIN_SPEED;
           p.x += stepX;
           p.y += stepY;
+          // Lock velocity to spin direction only
           p.vx = stepX;
           p.vy = stepY;
+          // Zero out the perpendicular axis so it doesn't drift
+          if (s.dir.x !== 0) p.vy = 0;
+          if (s.dir.y !== 0) p.vx = 0;
           if (s.dir.y <= 0) p.vy -= GRAVITY;
           var bpr = PICK_HALF + 10;
           var c0 = Math.floor((p.x - bpr) / TILE), c1 = Math.floor((p.x + bpr) / TILE);
