@@ -384,6 +384,7 @@
     <div id="commandBox">
       <div class="cmd-item">Type <span class="cmd-highlight">play</span> to join!</div>
       <div class="cmd-item"><span class="cmd-highlight">clone</span> — dual pickaxe 10s</div>
+      <div class="cmd-item"><span class="cmd-highlight">spin</span> right/left/up/down</div>
       <div class="cmd-item"><span class="cmd-highlight">tnt</span> / <span class="cmd-highlight">mega tnt</span> — boom!</div>
     </div>
 
@@ -1499,6 +1500,7 @@
       doublePickActive = false; doublePickTimer = 0; updateDoublePickHUD();
       stormActive = false; stormTimer = 0; updateStormHUD();
       tormentaActive = false; tormentaTimer = 0; tormentaPick = null;
+      activeSpins = []; spinCooldowns = {};
       bgChunks = {}; bgTick = 0;
       boss = null; bossIntr = null;
       document.getElementById('depthDisplay').textContent = 'Depth: 0m';
@@ -1534,6 +1536,8 @@
         p.vy += GRAVITY;
         // Clamp velocidade para evitar tunneling (max ~1 tile por frame)
         var maxV = TILE * 0.8;
+        var spinning = isSpinDashing(p);
+        if (spinning) maxV = SPIN_SPEED * 1.2; // allow higher speed during spin
         if (p.vx > maxV) p.vx = maxV; else if (p.vx < -maxV) p.vx = -maxV;
         if (p.vy > maxV) p.vy = maxV; else if (p.vy < -maxV) p.vy = -maxV;
         var speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
@@ -1550,8 +1554,10 @@
             var cell = getCell(row, col);
             if (cell && cell.t !== E) {
               hitBlock(col, row, Math.max(1, Math.floor(speed * dmgBase)), p);
-              if (p.vx > 0) { p.x = col * TILE - r - 1; p.vx = -p.vx * BOUNCE * FRICTION; }
-              else { p.x = (col + 1) * TILE + r + 1; p.vx = -p.vx * BOUNCE * FRICTION; }
+              if (!spinning) {
+                if (p.vx > 0) { p.x = col * TILE - r - 1; p.vx = -p.vx * BOUNCE * FRICTION; }
+                else { p.x = (col + 1) * TILE + r + 1; p.vx = -p.vx * BOUNCE * FRICTION; }
+              }
               hitAny = true; break;
             }
           }
@@ -1568,10 +1574,12 @@
             var cell = getCell(row, col);
             if (cell && cell.t !== E) {
               hitBlock(col, row, Math.max(1, Math.floor(speed * dmgBase)), p);
-              if (p.vy > 0) {
-                p.y = row * TILE - r - 1; p.vy = -p.vy * BOUNCE;
-                if (Math.abs(p.vy) > 0.8) p.vx += (Math.random() - 0.5) * 6; else p.vx *= FRICTION;
-              } else { p.y = (row + 1) * TILE + r + 1; p.vy = -p.vy * BOUNCE; }
+              if (!spinning) {
+                if (p.vy > 0) {
+                  p.y = row * TILE - r - 1; p.vy = -p.vy * BOUNCE;
+                  if (Math.abs(p.vy) > 0.8) p.vx += (Math.random() - 0.5) * 6; else p.vx *= FRICTION;
+                } else { p.y = (row + 1) * TILE + r + 1; p.vy = -p.vy * BOUNCE; }
+              }
               hitAny = true; hitY = true; break;
             }
           }
@@ -1580,7 +1588,7 @@
 
         if (p.y - r < 0) { p.y = r; p.vy = Math.abs(p.vy) * BOUNCE; }
         p.ang += p.spin;
-        if (hitAny) p.spin = p.spin * 0.9 + (Math.random() - 0.5) * 0.12; else p.spin *= 0.995;
+        if (hitAny) p.spin = spinning ? p.spin : p.spin * 0.9 + (Math.random() - 0.5) * 0.12; else p.spin *= 0.995;
         // Combo timer decay — reset combo if no enemy hit for 3 seconds
         if (p.comboTimer > 0) { p.comboTimer--; } else { resetCombo(p); }
         return hitAny;
@@ -2010,6 +2018,7 @@
         updateExplosions();
         updateStorm();
         updateTormenta();
+        updateSpins();
         updateZombies();
         checkPickZombieCollisions();
         updateBats();
@@ -2517,6 +2526,7 @@
       // picareta principal - sprite
       if (pick) {
         drawTormentaAura(pick);
+        drawSpinAura(pick);
         ctx.save();
         ctx.translate(pick.x, pick.y);
         ctx.rotate(pick.ang);
@@ -2619,6 +2629,7 @@
       for (var ui = 0; ui < userPicks.length; ui++) {
         var up = userPicks[ui];
         drawTormentaAura(tormentaPick === up ? up : null);
+        drawSpinAura(up);
         ctx.save();
         ctx.translate(up.x, up.y);
         ctx.rotate(up.ang);
@@ -5248,6 +5259,15 @@
 
     var CLONE_DURATION = 600; // 10 seconds at 60fps
 
+    // ── Spin Skill ──────────────────────────────────────────────────────────────
+    var SPIN_CHARGE = 30;       // 0.5s charge-up
+    var SPIN_DASH = 180;        // 3s dash duration
+    var SPIN_COOLDOWN = 900;    // 15s cooldown
+    var SPIN_SPEED = 18;        // dash velocity
+    var SPIN_DMG_MULT = 5;      // damage multiplier during dash
+    var spinCooldowns = {};     // { userName: framesLeft }
+    var activeSpins = [];       // { pick, dir, phase, timer, origSpin }
+
     function spawnClone(userName, avatarUrl) {
       userName = userName.replace(/^@@+/, '@');
       // Find the source pick (owner or userPick)
@@ -5291,6 +5311,179 @@
       lastActivity[userName] = Date.now();
       spawnText(clone.x, clone.y - 30, '⚔️ CLONE!', '#44ddff');
       if (_audioStarted) sfxSkillActivate();
+    }
+
+    // ── Spin Skill Functions ──────────────────────────────────────────────────
+    function activateSpin(userName, direction) {
+      userName = userName.replace(/^@@+/, '@');
+      // Cooldown check
+      if (spinCooldowns[userName] && spinCooldowns[userName] > 0) return;
+      // Find the player's pick
+      var targetPick = null;
+      if (pick && pick.userName === userName) targetPick = pick;
+      else targetPick = userPicks.find(function(up) { return up.userName === userName; });
+      if (!targetPick) return;
+      // Only one spin at a time per player
+      if (activeSpins.some(function(s) { return s.pick === targetPick; })) return;
+
+      var dir = { x: 0, y: 0 };
+      if (direction === 'right') dir.x = 1;
+      else if (direction === 'left') dir.x = -1;
+      else if (direction === 'down') dir.y = 1;
+      else if (direction === 'up') dir.y = -1;
+      else return;
+
+      activeSpins.push({
+        pick: targetPick,
+        userName: userName,
+        dir: dir,
+        phase: 'charge',
+        timer: SPIN_CHARGE,
+        totalTimer: SPIN_CHARGE,
+        origSpin: targetPick.spin
+      });
+      spinCooldowns[userName] = SPIN_COOLDOWN;
+      spawnText(targetPick.x, targetPick.y - 40, '🌀 SPIN!', '#ff44ff');
+      if (_audioStarted) sfxSpinCharge();
+    }
+
+    function updateSpins() {
+      // Decrement cooldowns
+      for (var u in spinCooldowns) {
+        if (spinCooldowns[u] > 0) spinCooldowns[u]--;
+      }
+      for (var i = activeSpins.length - 1; i >= 0; i--) {
+        var s = activeSpins[i];
+        var p = s.pick;
+        if (!p) { activeSpins.splice(i, 1); continue; }
+
+        if (s.phase === 'charge') {
+          // Charge phase: spin faster and faster, hold position
+          var chargeProgress = 1 - (s.timer / s.totalTimer);
+          p.spin = s.origSpin + chargeProgress * 2.5; // ramp up spin speed
+          p.vx *= 0.85; p.vy *= 0.85; // slow down during charge
+          // Charge particles
+          if (s.timer % 3 === 0) {
+            var pa = Math.random() * Math.PI * 2;
+            var pr = 20 + Math.random() * 20;
+            particles.push({ x: p.x + Math.cos(pa) * pr, y: p.y + Math.sin(pa) * pr, vx: -Math.cos(pa) * 2, vy: -Math.sin(pa) * 2, life: 15, color: '#ff44ff', r: 3 + Math.random() * 3 });
+          }
+          s.timer--;
+          if (s.timer <= 0) {
+            // Launch!
+            s.phase = 'dash';
+            s.timer = SPIN_DASH;
+            p.vx = s.dir.x * SPIN_SPEED;
+            p.vy = s.dir.y * SPIN_SPEED;
+            p.spin = 3.0; // super fast spin
+            p.stuck = false;
+            p.stuckTimer = 0;
+            if (_audioStarted) sfxSpinDash();
+          }
+        } else if (s.phase === 'dash') {
+          // Dash phase: maintain speed, destroy blocks with high damage
+          p.spin = 3.0;
+          p.stuck = false;
+          p.stuckTimer = 0;
+          // Keep velocity in dash direction
+          var spd = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
+          if (spd < SPIN_SPEED * 0.5) {
+            p.vx += s.dir.x * SPIN_SPEED * 0.3;
+            p.vy += s.dir.y * SPIN_SPEED * 0.3;
+          }
+          // Override gravity during horizontal/up dashes
+          if (s.dir.y <= 0) p.vy -= GRAVITY * 0.8;
+          // Destroy blocks in path (3x3 area around pick)
+          var pr = PICK_HALF + 10;
+          var c0 = Math.floor((p.x - pr) / TILE), c1 = Math.floor((p.x + pr) / TILE);
+          var r0 = Math.floor((p.y - pr) / TILE), r1 = Math.floor((p.y + pr) / TILE);
+          for (var row = r0; row <= r1; row++) {
+            for (var col = c0; col <= c1; col++) {
+              var cell = getCell(row, col);
+              if (cell && cell.t !== E) {
+                var pPickaxe = p.pickaxe || currentPickaxe;
+                var dmg = Math.max(3, Math.floor(SPIN_DMG_MULT * (pPickaxe ? pPickaxe.damage : 1)));
+                hitBlock(col, row, dmg, p);
+              }
+            }
+          }
+          // Trail particles
+          if (s.timer % 2 === 0) {
+            for (var ti = 0; ti < 3; ti++) {
+              particles.push({
+                x: p.x + (Math.random() - 0.5) * 30,
+                y: p.y + (Math.random() - 0.5) * 30,
+                vx: -s.dir.x * (2 + Math.random() * 3) + (Math.random() - 0.5) * 2,
+                vy: -s.dir.y * (2 + Math.random() * 3) + (Math.random() - 0.5) * 2,
+                life: 12 + Math.random() * 8,
+                color: s.timer % 4 < 2 ? '#ff44ff' : '#ffaa00',
+                r: 2 + Math.random() * 4
+              });
+            }
+          }
+          s.timer--;
+          if (s.timer <= 0) {
+            p.spin = s.origSpin;
+            activeSpins.splice(i, 1);
+          }
+        }
+      }
+    }
+
+    function isSpinDashing(p) {
+      for (var i = 0; i < activeSpins.length; i++) {
+        if (activeSpins[i].pick === p && activeSpins[i].phase === 'dash') return true;
+      }
+      return false;
+    }
+
+    function drawSpinAura(p) {
+      var spin = null;
+      for (var i = 0; i < activeSpins.length; i++) {
+        if (activeSpins[i].pick === p) { spin = activeSpins[i]; break; }
+      }
+      if (!spin) return;
+      ctx.save();
+      if (spin.phase === 'charge') {
+        var prog = 1 - (spin.timer / spin.totalTimer);
+        var r = 30 + prog * 20;
+        ctx.globalAlpha = 0.3 + prog * 0.3;
+        ctx.strokeStyle = '#ff44ff';
+        ctx.lineWidth = 2 + prog * 3;
+        ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.stroke();
+      } else {
+        var pulse = 0.6 + Math.sin(spin.timer * 0.4) * 0.4;
+        var r = 35 * pulse;
+        var grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
+        grad.addColorStop(0, 'rgba(255, 68, 255, 0.25)');
+        grad.addColorStop(0.6, 'rgba(255, 170, 0, 0.1)');
+        grad.addColorStop(1, 'rgba(255, 68, 255, 0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    function sfxSpinCharge() {
+      var ac = getAC(); if (!ac) return;
+      var t = ac.currentTime;
+      var osc = ac.createOscillator(); var g = ac.createGain();
+      osc.type = 'sawtooth'; osc.frequency.setValueAtTime(200, t);
+      osc.frequency.linearRampToValueAtTime(800, t + 0.4);
+      g.gain.setValueAtTime(0.15, t); g.gain.linearRampToValueAtTime(0, t + 0.5);
+      osc.connect(g); g.connect(ac.destination);
+      osc.start(t); osc.stop(t + 0.5);
+    }
+
+    function sfxSpinDash() {
+      var ac = getAC(); if (!ac) return;
+      var t = ac.currentTime;
+      var osc = ac.createOscillator(); var g = ac.createGain();
+      osc.type = 'square'; osc.frequency.setValueAtTime(600, t);
+      osc.frequency.linearRampToValueAtTime(150, t + 0.3);
+      g.gain.setValueAtTime(0.2, t); g.gain.linearRampToValueAtTime(0, t + 0.4);
+      osc.connect(g); g.connect(ac.destination);
+      osc.start(t); osc.stop(t + 0.4);
     }
 
     function updateLeaderboard() {
@@ -5640,6 +5833,12 @@
 
                 if (msg.includes("clone")) {
                   spawnClone(cUser, cAvatarUrl);
+                }
+
+                // Spin skill: spin right/left/down/up
+                var spinMatch = msg.match(/spin\s+(right|left|down|up)/);
+                if (spinMatch) {
+                  activateSpin(cUser, spinMatch[1]);
                 }
 
                 if (msg.includes("bot20ok")) {
