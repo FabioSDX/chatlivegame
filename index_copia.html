@@ -5,6 +5,7 @@
   <meta charset="UTF-8" />
   <title>Pickaxe Drop</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" href="data:,">
   <style>
     * {
       box-sizing: border-box;
@@ -54,7 +55,7 @@
 
     #commandBox {
       position: fixed;
-      top: 120px;
+      top: 60px;
       right: 15px;
       z-index: 100;
       background: rgba(0, 0, 0, 0.1);
@@ -63,12 +64,12 @@
       border: 1px solid rgba(255, 255, 255, 0.1);
       backdrop-filter: blur(8px);
       box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
-      text-align: right;
-      width: 170px;
+      text-align: center;
+      width: 200px;
     }
 
     .cmd-title {
-      font-size: 10px;
+      font-size: 12px;
       color: #00ff88;
       font-weight: bold;
       text-transform: uppercase;
@@ -79,7 +80,7 @@
     }
 
     .cmd-item {
-      font-size: 10px;
+      font-size: 12px;
       margin: 2px 0;
       color: #eee;
       line-height: 1.3;
@@ -91,7 +92,7 @@
     }
 
     .cmd-section {
-      font-size: 9px;
+      font-size: 11px;
       color: #888;
       text-transform: uppercase;
       letter-spacing: 0.5px;
@@ -174,17 +175,18 @@
 
     #leaderboard {
       position: fixed;
-      top: 120px;
+      top: 60px;
       left: 15px;
       z-index: 100;
       background: rgba(0, 0, 0, 0.1);
-      padding: 10px;
-      border-radius: 10px;
+      padding: 6px 8px;
+      border-radius: 8px;
       border: 1px solid rgba(0, 255, 255, 0.2);
       color: #fff;
-      width: 155px;
+      width: 200px;
       backdrop-filter: blur(8px);
       box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+      font-size: 12px;
     }
 
     #announceOverlay {
@@ -263,52 +265,94 @@
       100% { opacity: 0; transform: scale(0.7) translateY(-20px); }
     }
 
+    @keyframes comboPopIn {
+      0%   { opacity: 0; transform: scale(0.3) rotate(-10deg); }
+      50%  { opacity: 1; transform: scale(1.3) rotate(3deg); }
+      100% { opacity: 1; transform: scale(1) rotate(0deg); }
+    }
+    @keyframes comboPopOut {
+      0%   { opacity: 1; transform: scale(1); }
+      100% { opacity: 0; transform: scale(1.8) translateY(-30px); }
+    }
+    @keyframes comboShake {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-4px) rotate(-1deg); }
+      40% { transform: translateX(4px) rotate(1deg); }
+      60% { transform: translateX(-3px) rotate(-0.5deg); }
+      80% { transform: translateX(3px) rotate(0.5deg); }
+    }
+
     #leaderboard h3 {
-      font-size: 13px;
-      margin-bottom: 8px;
+      font-size: 12px;
+      margin-bottom: 4px;
       color: #00ff88;
       text-align: center;
       text-transform: uppercase;
       letter-spacing: 1px;
       border-bottom: 1px solid #00ff8844;
-      padding-bottom: 3px;
+      padding-bottom: 2px;
     }
 
     .lb-item {
       display: flex;
+      flex-wrap: nowrap;
       align-items: center;
-      gap: 6px;
-      margin-bottom: 5px;
+      gap: 3px;
+      margin-bottom: 3px;
       font-size: 11px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-      padding-bottom: 3px;
+      padding-bottom: 2px;
     }
 
     .lb-rank {
-      width: 16px;
+      flex: 0 0 auto;
       font-weight: bold;
       color: #aaa;
+      font-size: 10px;
     }
 
     .lb-avatar {
-      width: 18px;
-      height: 18px;
+      flex: 0 0 14px;
+      width: 14px;
+      height: 14px;
       border-radius: 50%;
       border: 1px solid #fff;
     }
 
     .lb-name {
-      flex: 1;
+      flex: 1 1 0;
+      min-width: 0;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
       font-weight: 500;
+      font-size: 11px;
+    }
+
+    .lb-pickaxe {
+      flex: 0 0 12px;
+      width: 12px;
+      height: 12px;
     }
 
     .lb-score {
+      flex: 0 0 auto;
       font-weight: bold;
       color: #ffdd44;
       text-shadow: 0 0 3px rgba(255, 221, 68, 0.3);
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    @media (min-width: 400px) {
+      #leaderboard { padding: 10px; width: 200px; font-size: 14px; }
+      #leaderboard h3 { font-size: 16px; margin-bottom: 8px; }
+      .lb-item { gap: 5px; font-size: 13px; margin-bottom: 5px; }
+      .lb-rank { font-size: 13px; }
+      .lb-avatar { flex: 0 0 22px; width: 22px; height: 22px; }
+      .lb-name { font-size: 13px; }
+      .lb-pickaxe { flex: 0 0 18px; width: 18px; height: 18px; }
+      .lb-score { font-size: 13px; }
     }
   </style>
 </head>
@@ -870,16 +914,26 @@
     ];
     PICKAXES.forEach(function (p) { p.imgObj = new Image(); p.imgObj.src = p.img; });
 
+    var PICK_UPGRADE_MS = 2 * 60 * 1000; // 2 minutes per tier
+
     var currentPickaxe = PICKAXES[0];
+    var ownerJoinTime = Date.now();
     var PICK_SIZE = 80;
     var pickaxeChangeInterval = 10;
 
-    function changePickaxe() {
-      var prev = currentPickaxe;
-      do { currentPickaxe = PICKAXES[Math.floor(Math.random() * PICKAXES.length)]; }
-      while (currentPickaxe === prev && PICKAXES.length > 1);
-      safeUpdate('pickaxeDisplay', '⛏ ' + currentPickaxe.name, currentPickaxe.color);
-      if (_audioStarted) sfxPickaxeChange();
+    function getPickaxeForTime(joinTime) {
+      var elapsed = Date.now() - joinTime;
+      var tier = Math.min(Math.floor(elapsed / PICK_UPGRADE_MS), PICKAXES.length - 1);
+      return PICKAXES[tier];
+    }
+
+    function updateOwnerPickaxe() {
+      var newPick = getPickaxeForTime(ownerJoinTime);
+      if (newPick !== currentPickaxe) {
+        currentPickaxe = newPick;
+        safeUpdate('pickaxeDisplay', '⛏ ' + currentPickaxe.name, currentPickaxe.color);
+        if (_audioStarted) sfxPickaxeChange();
+      }
     }
 
     // ── Config from localStorage (no PHP needed) ──
@@ -890,8 +944,8 @@
         ownerName = cfg.owner_name.replace(/^@@+/, '@').toLowerCase();
         if (ownerName && ownerName[0] !== '@') ownerName = '@' + ownerName;
       }
-      changePickaxe();
-      setInterval(changePickaxe, pickaxeChangeInterval * 1000);
+      updateOwnerPickaxe();
+      setInterval(updateOwnerPickaxe, 5000);
     })();
 
     // ── Mapa infinito ──────────────────────────────────────────────────────────────────
@@ -903,6 +957,13 @@
     var CLEARING_HEIGHT = 8;    // max height of clearing
     var clearedZones = {};      // track which clearings already spawned zombies
     var clearingShapes = {};    // cached organic shapes per zone
+
+    // ── Mega Clearings (every 400 rows, 200 rows tall, wall-to-wall) ──
+    var MEGA_CLEARING_INTERVAL = 400;
+    var MEGA_CLEARING_HEIGHT = 200;
+    var MEGA_CLEARING_FIRST = 200;
+    var megaClearedZones = {};
+    var MAX_BATS_MEGA = 120;
 
     // ── Crystal types for clearings ──
     var CRYSTAL_TYPES = [
@@ -1023,6 +1084,7 @@
     }
 
     function isTunnelCell(r, c) {
+      if (isMegaClearingRow(r)) return false;
       if (r < CLEARING_INTERVAL + CLEARING_HEIGHT) return false;
       // Determine which zone's tunnel this row could belong to
       // Tunnel from zone N spans rows [N*25+8, (N+1)*25-1]
@@ -1042,6 +1104,7 @@
     }
 
     function isClearingCell(r, c) {
+      if (isMegaClearingRow(r)) return false;
       if (r < CLEARING_INTERVAL) return false;
       var zone = Math.floor(r / CLEARING_INTERVAL);
       var zoneStart = zone * CLEARING_INTERVAL;
@@ -1051,6 +1114,62 @@
       var bounds = shape[localRow];
       if (!bounds) return false;
       return c >= bounds.left && c <= bounds.right;
+    }
+
+    function isMegaClearingRow(r) {
+      if (r < MEGA_CLEARING_FIRST) return false;
+      var offset = r - MEGA_CLEARING_FIRST;
+      var pos = offset % MEGA_CLEARING_INTERVAL;
+      return pos >= 0 && pos < MEGA_CLEARING_HEIGHT;
+    }
+
+    function getMegaZone(r) {
+      if (r < MEGA_CLEARING_FIRST) return -1;
+      return Math.floor((r - MEGA_CLEARING_FIRST) / MEGA_CLEARING_INTERVAL);
+    }
+
+    function getMegaStart(megaZone) {
+      return MEGA_CLEARING_FIRST + megaZone * MEGA_CLEARING_INTERVAL;
+    }
+
+    // Per-cell check for organic mega-clearing (replaces flat wall)
+    function isMegaClearingCell(r, c) {
+      if (c === 0 || c === COLS - 1) return false;
+      if (r < MEGA_CLEARING_FIRST) return false;
+      var offset = r - MEGA_CLEARING_FIRST;
+      var megaZone = Math.floor(offset / MEGA_CLEARING_INTERVAL);
+      var localRow = offset - megaZone * MEGA_CLEARING_INTERVAL;
+      if (localRow < 0 || localRow >= MEGA_CLEARING_HEIGHT) return false;
+
+      var seed = megaZone * 9973 + 1237;
+      var EDGE_DEPTH = 8;
+
+      // Top organic edge
+      if (localRow < EDGE_DEPTH) {
+        var topFactor = localRow / EDGE_DEPTH;
+        var noise = seededRand(seed + localRow * 31 + c * 17);
+        var noise2 = seededRand(seed + localRow * 47 + c * 23 + 500);
+        var threshold = (1 - topFactor) * 0.65 + noise2 * 0.15;
+        var wallDist = Math.min(c - 1, COLS - 2 - c) / (COLS / 2);
+        threshold += (1 - wallDist) * 0.25;
+        if (noise < threshold) return false; // stays solid
+        return true;
+      }
+
+      // Bottom organic edge
+      if (localRow >= MEGA_CLEARING_HEIGHT - EDGE_DEPTH) {
+        var botFactor = (MEGA_CLEARING_HEIGHT - 1 - localRow) / EDGE_DEPTH;
+        var noise3 = seededRand(seed + localRow * 41 + c * 29 + 1000);
+        var noise4 = seededRand(seed + localRow * 53 + c * 37 + 1500);
+        var threshold2 = (1 - botFactor) * 0.65 + noise4 * 0.15;
+        var wallDist2 = Math.min(c - 1, COLS - 2 - c) / (COLS / 2);
+        threshold2 += (1 - wallDist2) * 0.25;
+        if (noise3 < threshold2) return false; // stays solid
+        return true;
+      }
+
+      // Middle: fully open
+      return true;
     }
 
     function genRow(r) {
@@ -1067,6 +1186,7 @@
         }
         var t;
         if (depth < 2) { t = E; }
+        else if (isMegaClearingCell(r, c)) { t = E; }
         else if (isClearingCell(r, c)) { t = E; }
         else if (isTunnelCell(r, c)) { t = E; }
         else { t = pickBlock(depth); }
@@ -1199,7 +1319,7 @@
             spawnZombie(zx, zy);
           }
         }
-        // Spawn bats flying inside the clearing
+        // Spawn bats flying inside the clearing — first one is the Mother
         if (typeof bats !== 'undefined' && bats) {
           var batShape = getClearingShape(zone);
           var numBats = Math.min(MAX_BATS - bats.length, 3 + Math.floor(zone * 0.5));
@@ -1210,7 +1330,7 @@
             var batCol = batBounds.left + 1 + Math.floor(seededRand(zone * 300 + bi * 17) * (batBounds.right - batBounds.left - 1));
             var bx = batCol * TILE + TILE / 2;
             var by = (zone * CLEARING_INTERVAL + midRow) * TILE + TILE / 2;
-            spawnBat(bx, by, zone);
+            spawnBat(bx, by, zone, bi === 0);
           }
         }
       }
@@ -1306,7 +1426,7 @@
     ];
 
     var ownerName = ''; // loaded from config
-    var pick = { x: 540, y: 100, vx: 0, vy: 0, ang: 0, spin: 0, stuck: false, stuckTimer: 0, userName: '', userAvatarUrl: '' };
+    var pick = { x: 540, y: 100, vx: 0, vy: 0, ang: 0, spin: 0, stuck: false, stuckTimer: 0, userName: '', userAvatarUrl: '', combo: 0 };
     if (ownerName) pick.userName = ownerName;
 
     function spawnPick() {
@@ -1320,6 +1440,7 @@
       pick.spin = (Math.random() - 0.5) * 0.4;
       pick.stuck = false;
       pick.stuckTimer = 0;
+      pick.combo = 0;
       pick.userName = savedUser;
       pick.userAvatarUrl = savedAvatar;
     }
@@ -1351,6 +1472,14 @@
     var stormTimer = 0;
     var STORM_DURATION = 900;
 
+    // ── Tormenta (combo powerup) ──
+    var TORMENTA_COMBO_THRESHOLD = 25;
+    var TORMENTA_DURATION = 480; // 8 seconds at 60fps
+    var TORMENTA_RADIUS = 200;  // kill radius in pixels
+    var tormentaActive = false;
+    var tormentaTimer = 0;
+    var tormentaPick = null; // which pick triggered it
+
     var score = 0;
     var items = [];
     var explosions = [];
@@ -1363,10 +1492,11 @@
       stopBossMusic();
       score = 0; maxDepth = 0; parts = []; texts = []; debris = []; announcements = [];
       var ov = document.getElementById('announceOverlay'); if (ov) ov.innerHTML = '';
-      worldMap = {}; explosions = []; tntBlocks = []; items = []; zombies = []; bats = []; clearedZones = {}; clearingShapes = {}; tunnelShapes = {}; crystalDecoList = []; clearingCrystals = {};
+      worldMap = {}; explosions = []; tntBlocks = []; items = []; zombies = []; bats = []; clearedZones = {}; clearingShapes = {}; tunnelShapes = {}; crystalDecoList = []; clearingCrystals = {}; megaClearedZones = {};
       extraPicks = []; userPicks = []; lastActivity = {};
       doublePickActive = false; doublePickTimer = 0; updateDoublePickHUD();
       stormActive = false; stormTimer = 0; updateStormHUD();
+      tormentaActive = false; tormentaTimer = 0; tormentaPick = null;
       bgChunks = {}; bgTick = 0;
       boss = null; bossIntr = null;
       document.getElementById('depthDisplay').textContent = 'Depth: 0m';
@@ -1444,6 +1574,7 @@
         if (p.y - r < 0) { p.y = r; p.vy = Math.abs(p.vy) * BOUNCE; }
         p.ang += p.spin;
         if (hitAny) p.spin = p.spin * 0.9 + (Math.random() - 0.5) * 0.12; else p.spin *= 0.995;
+        if (hitAny) resetCombo(p);
         return hitAny;
       }
 
@@ -1549,6 +1680,266 @@
         texts.push({ x: x, y: y, txt: txt, c: color, life: 1, vy: -1.4 });
       }
 
+      // ── Combo System ──────────────────────────────────────────────────────────
+      var COMBO_LABELS = [
+        '', '', '', '', '',
+        '🔥 COMBO x5!',
+        '', '', '', '',
+        '⚡ COMBO x10!',
+        '', '', '', '',
+        '💀 COMBO x15!',
+        '', '', '', '',
+        '🌟 COMBO x20!',
+        '', '', '', '',
+        '☠️ COMBO x25!'
+      ];
+      var COMBO_COLORS = {
+        5:  '#ff8800',
+        10: '#ff00ff',
+        15: '#ff2222',
+        20: '#ffdd00',
+        25: '#00ffff'
+      };
+
+      function getComboLabel(count) {
+        if (count >= 25 && count % 5 === 0) return '☠️ COMBO x' + count + '!';
+        if (count < COMBO_LABELS.length) return COMBO_LABELS[count];
+        if (count % 5 === 0) return '☠️ COMBO x' + count + '!';
+        return '';
+      }
+
+      function getComboColor(count) {
+        if (count >= 25) return '#00ffff';
+        var tier = Math.floor(count / 5) * 5;
+        return COMBO_COLORS[tier] || '#ff8800';
+      }
+
+      function getComboBonus(count) {
+        // Bonus points every 5 hits: 50, 150, 300, 500, ...
+        var tier = Math.floor(count / 5);
+        return tier * tier * 50;
+      }
+
+      function registerComboHit(p, enemyX, enemyY) {
+        if (!p) return;
+        p.combo = (p.combo || 0) + 1;
+        var c = p.combo;
+        // Activate Tormenta at max combo
+        if (c >= TORMENTA_COMBO_THRESHOLD && !tormentaActive) {
+          activateTormenta(p);
+          return;
+        }
+        if (c % 5 === 0 && c >= 5) {
+          var label = getComboLabel(c);
+          var color = getComboColor(c);
+          var bonus = getComboBonus(c);
+          score += bonus;
+          if (p.userName) {
+            if (!persistentScores[p.userName]) persistentScores[p.userName] = { score: 0, avatar: p.userAvatarUrl || '' };
+            persistentScores[p.userName].score += bonus;
+          }
+          // Big floating text at enemy position
+          spawnText(enemyX, enemyY - 40, label, color);
+          spawnText(enemyX, enemyY - 70, '+' + bonus, '#ffffff');
+          // Screen-space combo popup
+          showComboPopup(label, color, p.userName || '');
+          sfxCombo(c);
+        }
+      }
+
+      function resetCombo(p) {
+        if (p && p.combo > 0) p.combo = 0;
+      }
+
+      function showComboPopup(label, color, userName) {
+        var el = document.createElement('div');
+        el.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9998;' +
+          'font-size:48px;font-weight:900;color:' + color + ';text-shadow:0 0 20px ' + color + ',0 0 40px ' + color + ',0 2px 4px #000;' +
+          'pointer-events:none;animation:comboPopIn 0.35s ease-out forwards;font-family:Arial,sans-serif;text-align:center;white-space:nowrap;';
+        el.textContent = label;
+        if (userName) {
+          var sub = document.createElement('div');
+          sub.style.cssText = 'font-size:18px;color:#fff;opacity:0.8;margin-top:4px;animation:comboShake 0.4s ease;';
+          sub.textContent = userName;
+          el.appendChild(sub);
+        }
+        document.body.appendChild(el);
+        setTimeout(function() {
+          el.style.animation = 'comboPopOut 0.5s ease-in forwards';
+          setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 500);
+        }, 1200);
+      }
+
+      function sfxCombo(count) {
+        var ac = getAC(); if (!ac) return;
+        var t = ac.currentTime;
+        var tier = Math.min(Math.floor(count / 5), 5);
+        // Rising arpeggio — higher tiers = more notes + higher pitch
+        var baseFreq = 440 + tier * 110;
+        for (var i = 0; i <= tier; i++) {
+          playNote(baseFreq * Math.pow(1.25, i), 'sine', 0.12 - i * 0.01, 0.01, 0.15, t + i * 0.06);
+        }
+        // Impact hit
+        playNote(baseFreq * 0.5, 'triangle', 0.15, 0.005, 0.1, t);
+      }
+
+      // ── Tormenta Powerup ────────────────────────────────────────────────────
+      function activateTormenta(p) {
+        if (tormentaActive) return;
+        tormentaActive = true;
+        tormentaTimer = TORMENTA_DURATION;
+        tormentaPick = p;
+        p.combo = 0;
+        showTormentaPopup();
+        sfxTormenta();
+      }
+
+      function showTormentaPopup() {
+        var el = document.createElement('div');
+        el.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;' +
+          'font-size:64px;font-weight:900;color:#ff4400;' +
+          'text-shadow:0 0 30px #ff4400,0 0 60px #ff8800,0 0 90px #ffcc00,0 4px 8px #000;' +
+          'pointer-events:none;animation:comboPopIn 0.4s ease-out forwards;font-family:Arial,sans-serif;text-align:center;white-space:nowrap;';
+        el.innerHTML = '🔥 TORMENTA 🔥';
+        var sub = document.createElement('div');
+        sub.style.cssText = 'font-size:22px;color:#ffcc00;margin-top:8px;animation:comboShake 0.5s ease infinite;text-shadow:0 0 10px #ff8800;';
+        sub.textContent = 'DESTRUIÇÃO TOTAL';
+        el.appendChild(sub);
+        document.body.appendChild(el);
+        setTimeout(function() {
+          el.style.animation = 'comboPopOut 0.6s ease-in forwards';
+          setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 600);
+        }, 2000);
+      }
+
+      function sfxTormenta() {
+        var ac = getAC(); if (!ac) return;
+        var t = ac.currentTime;
+        // Deep rumble
+        var sub = ac.createOscillator(), subG = ac.createGain();
+        sub.type = 'sine'; sub.frequency.setValueAtTime(40, t);
+        sub.frequency.exponentialRampToValueAtTime(20, t + 1.5);
+        subG.gain.setValueAtTime(0.0001, t);
+        subG.gain.linearRampToValueAtTime(0.6, t + 0.05);
+        subG.gain.exponentialRampToValueAtTime(0.0001, t + 1.5);
+        sub.connect(subG); subG.connect(ac.destination); sub.start(t); sub.stop(t + 1.6);
+        // Rising fire sweep
+        for (var i = 0; i < 6; i++) {
+          playNote(220 * Math.pow(1.5, i), 'sawtooth', 0.08, 0.01, 0.2, t + i * 0.08);
+        }
+        // Crash noise
+        var nLen = Math.ceil(ac.sampleRate * 0.8);
+        var buf = ac.createBuffer(1, nLen, ac.sampleRate);
+        var d = buf.getChannelData(0);
+        for (var j = 0; j < nLen; j++) d[j] = (Math.random() * 2 - 1) * Math.pow(1 - j / nLen, 1.2);
+        var src = ac.createBufferSource(); src.buffer = buf;
+        var filt = ac.createBiquadFilter(); filt.type = 'lowpass'; filt.frequency.value = 600;
+        var ng = ac.createGain(); ng.gain.setValueAtTime(0.4, t);
+        ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.8);
+        src.connect(filt); filt.connect(ng); ng.connect(ac.destination); src.start(t);
+      }
+
+      function updateTormenta() {
+        if (!tormentaActive) return;
+        tormentaTimer--;
+        if (tormentaTimer <= 0) { tormentaActive = false; tormentaPick = null; return; }
+        var p = tormentaPick;
+        if (!p) { tormentaActive = false; return; }
+
+        // Spawn flame particles around the pick
+        if (tormentaTimer % 2 === 0) {
+          for (var fi = 0; fi < 3; fi++) {
+            var angle = Math.random() * Math.PI * 2;
+            var dist = Math.random() * 30;
+            parts.push({
+              x: p.x + Math.cos(angle) * dist,
+              y: p.y + Math.sin(angle) * dist,
+              vx: (Math.random() - 0.5) * 3,
+              vy: -2 - Math.random() * 3,
+              life: 1, dec: 0.04,
+              c: Math.random() < 0.5 ? '#ff4400' : (Math.random() < 0.5 ? '#ff8800' : '#ffcc00'),
+              r: 3 + Math.random() * 4
+            });
+          }
+        }
+
+        // Kill enemies in radius every few frames
+        if (tormentaTimer % 6 === 0) {
+          var killR = TORMENTA_RADIUS;
+          // Kill bats
+          for (var bi = bats.length - 1; bi >= 0; bi--) {
+            var b = bats[bi];
+            if (b.state === 'dead') continue;
+            var dx = p.x - b.x, dy = p.y - b.y;
+            if (dx * dx + dy * dy < killR * killR) {
+              b.hp = 0; b.state = 'dead'; b.anim = 0; b.deadTimer = 0;
+              score += b.pts;
+              if (p.userName) {
+                if (!persistentScores[p.userName]) persistentScores[p.userName] = { score: 0, avatar: p.userAvatarUrl || '' };
+                persistentScores[p.userName].score += b.pts;
+              }
+              spawnText(b.x, b.y - 20, '+' + b.pts, '#ff8800');
+              sfxBatDeath();
+              // Fire burst on kill
+              for (var k = 0; k < 5; k++) {
+                parts.push({
+                  x: b.x, y: b.y,
+                  vx: (Math.random() - 0.5) * 6, vy: (Math.random() - 0.5) * 6,
+                  life: 1, dec: 0.06,
+                  c: '#ff4400', r: 4 + Math.random() * 3
+                });
+              }
+            }
+          }
+          // Kill zombies
+          for (var zi = zombies.length - 1; zi >= 0; zi--) {
+            var z = zombies[zi];
+            if (z.state === 'dead') continue;
+            var zdx = p.x - z.x, zdy = p.y - z.y;
+            if (zdx * zdx + zdy * zdy < killR * killR) {
+              z.hp = 0; z.state = 'dead'; z.animTimer = 0; z.deadTimer = 0;
+              score += z.pts;
+              if (p.userName) {
+                if (!persistentScores[p.userName]) persistentScores[p.userName] = { score: 0, avatar: p.userAvatarUrl || '' };
+                persistentScores[p.userName].score += z.pts;
+              }
+              spawnText(z.x, z.y - 20, '+' + z.pts, '#ff8800');
+              sfxZombieDeath();
+              for (var k2 = 0; k2 < 5; k2++) {
+                parts.push({
+                  x: z.x, y: z.y,
+                  vx: (Math.random() - 0.5) * 6, vy: (Math.random() - 0.5) * 6,
+                  life: 1, dec: 0.06,
+                  c: '#ff4400', r: 4 + Math.random() * 3
+                });
+              }
+            }
+          }
+        }
+      }
+
+      function drawTormentaAura(p) {
+        if (!tormentaActive || !p) return;
+        ctx.save();
+        // Pulsing fire ring
+        var pulse = 0.8 + Math.sin(tormentaTimer * 0.15) * 0.2;
+        var r = TORMENTA_RADIUS * pulse;
+        var grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
+        grad.addColorStop(0, 'rgba(255, 68, 0, 0.15)');
+        grad.addColorStop(0.5, 'rgba(255, 136, 0, 0.08)');
+        grad.addColorStop(0.8, 'rgba(255, 204, 0, 0.03)');
+        grad.addColorStop(1, 'rgba(255, 68, 0, 0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
+        // Inner glow on pick
+        ctx.shadowBlur = 25 + Math.sin(tormentaTimer * 0.3) * 10;
+        ctx.shadowColor = '#ff4400';
+        ctx.fillStyle = 'rgba(255, 68, 0, 0.3)';
+        ctx.beginPath(); ctx.arc(p.x, p.y, 35, 0, Math.PI * 2); ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.restore();
+      }
+
       function hitBlock(col, row, force, source) {
         var cell = getCell(row, col);
         if (!cell || cell.t === E) return false;
@@ -1612,9 +2003,64 @@
         updateItems();
         updateExplosions();
         updateStorm();
+        updateTormenta();
         updateZombies();
         checkPickZombieCollisions();
         updateBats();
+        // ── Mega-clearing: PRE-spawn flyers BEFORE pick enters the zone ──
+        if (pick) {
+          var pickRow = Math.floor(pick.y / TILE);
+          // Check if pick is approaching a mega zone (50 rows before it starts)
+          var PRE_SPAWN_DIST = 50;
+          var checkRow = pickRow + PRE_SPAWN_DIST;
+          var mzAhead = -1;
+          if (isMegaClearingRow(checkRow)) {
+            mzAhead = getMegaZone(checkRow);
+          } else if (isMegaClearingRow(pickRow)) {
+            mzAhead = getMegaZone(pickRow);
+          }
+          if (mzAhead >= 0 && !megaClearedZones[mzAhead]) {
+            megaClearedZones[mzAhead] = true;
+            megaClearedZones[mzAhead + '_tick'] = 0;
+            var mStart = getMegaStart(mzAhead);
+            var megaNum = Math.min(MAX_BATS_MEGA, 100 + Math.floor(mzAhead * 10));
+            for (var mi = 0; mi < megaNum; mi++) {
+              var mx = (1 + Math.floor(seededRand(mzAhead * 500 + mi * 11) * (COLS - 2))) * TILE + TILE / 2;
+              var myRow = mStart + 5 + Math.floor(seededRand(mzAhead * 600 + mi * 19) * (MEGA_CLEARING_HEIGHT - 10));
+              var my = myRow * TILE + TILE / 2;
+              // Mothers only in initial spawn, spread evenly
+              spawnBat(mx, my, mzAhead, mi % 4 === 0);
+            }
+            spawnText(pick.x, pick.y - 60, '⚠️ MEGA ZONE!', '#ff4444');
+            // Spawn zombie horde on the floor of the mega-clearing to cushion pickaxe landings
+            var megaFloorRow = mStart + MEGA_CLEARING_HEIGHT - 2;
+            var hordeSize = Math.min(MAX_ZOMBIES, 10 + Math.floor(mzAhead * 2));
+            for (var zi = 0; zi < hordeSize; zi++) {
+              var zCol = 2 + Math.floor(seededRand(mzAhead * 777 + zi * 13) * (COLS - 4));
+              var zx = zCol * TILE + TILE / 2;
+              // Spread zombies across the bottom portion of the clearing
+              var zRowOffset = Math.floor(seededRand(mzAhead * 888 + zi * 31) * 12);
+              var zy = (megaFloorRow - zRowOffset) * TILE;
+              spawnZombie(zx, zy);
+            }
+          }
+          // Continuous reinforcement (NO mothers — only normal bats)
+          if (isMegaClearingRow(pickRow)) {
+            var mzCur = getMegaZone(pickRow);
+            if (mzCur >= 0 && megaClearedZones[mzCur]) {
+              megaClearedZones[mzCur + '_tick'] = (megaClearedZones[mzCur + '_tick'] || 0) + 1;
+              if (megaClearedZones[mzCur + '_tick'] % 90 === 0 && bats.length < MAX_BATS_MEGA) {
+                var mStartR = getMegaStart(mzCur);
+                // Spawn at edges of the zone (left or right wall) so they fly in from the side
+                var fromLeft = Math.random() < 0.5;
+                var rx = fromLeft ? (TILE * 1.5) : ((COLS - 1.5) * TILE);
+                var ryRow = mStartR + 5 + Math.floor(Math.random() * (MEGA_CLEARING_HEIGHT - 10));
+                var ry = ryRow * TILE + TILE / 2;
+                spawnBat(rx, ry, mzCur, false);
+              }
+            }
+          }
+        }
         checkPickBatCollisions();
         updateBoss();
         shakeAmt *= shakeDec;
@@ -2026,9 +2472,15 @@
 
       // picareta principal - sprite
       if (pick) {
+        // Tormenta fire aura
+        drawTormentaAura(pick);
         ctx.save();
         ctx.translate(pick.x, pick.y);
         ctx.rotate(pick.ang);
+        if (tormentaActive && tormentaPick === pick) {
+          ctx.shadowBlur = 20 + Math.sin(tormentaTimer * 0.3) * 8;
+          ctx.shadowColor = '#ff4400';
+        }
         var pimg = currentPickaxe.imgObj;
         if (pimg && pimg.complete && pimg.naturalWidth > 0) {
           ctx.drawImage(pimg, -PICK_HALF, -PICK_HALF, PICK_HALF * 2, PICK_HALF * 2);
@@ -2083,10 +2535,15 @@
       // picaretas de outros usuários (permanentes com avatar)
       for (var ui = 0; ui < userPicks.length; ui++) {
         var up = userPicks[ui];
+        // Tormenta aura for user picks
+        drawTormentaAura(tormentaPick === up ? up : null);
         ctx.save();
         ctx.translate(up.x, up.y);
         ctx.rotate(up.ang);
-        if (SHADOW_ENABLED) { ctx.shadowBlur = 12; ctx.shadowColor = up.color || '#00ff88'; }
+        if (tormentaActive && tormentaPick === up) {
+          ctx.shadowBlur = 20 + Math.sin(tormentaTimer * 0.3) * 8;
+          ctx.shadowColor = '#ff4400';
+        } else if (SHADOW_ENABLED) { ctx.shadowBlur = 12; ctx.shadowColor = up.color || '#00ff88'; }
         var uImg = currentPickaxe.imgObj;
         if (uImg && uImg.complete && uImg.naturalWidth > 0) {
           ctx.drawImage(uImg, -PICK_HALF, -PICK_HALF, PICK_HALF * 2, PICK_HALF * 2);
@@ -2127,7 +2584,7 @@
 
     // ── ZOMBIES ────────────────────────────────────────────────────────────────
     var zombies = [];
-    var MAX_ZOMBIES = 8;
+    var MAX_ZOMBIES = 20;
     var ZOMBIE_SIZE = TILE;
 
     // Preload zombie sprites
@@ -2164,8 +2621,10 @@
 
     // ── BAT / VESP SYSTEM (alternating per clearing) ──────────────────────
     var bats = [];
-    var MAX_BATS = 12;
+    var MAX_BATS = 18;
     var BAT_SIZE = TILE * 1.05;
+    var MOTHER_SCALE = 3.0;
+    var MOTHER_SPAWN_MS = 4000;
 
     var FLYER_TYPES = ['bat', 'vesp', 'marimbondo'];
     var BAT_ANIMS = {
@@ -2194,42 +2653,59 @@
       });
     })();
 
-    function spawnBat(wx, wy, zone) {
-      if (bats.length >= MAX_BATS) return;
-      // Alternate: cycle bat → vesp → marimbondo per zone
+    function spawnBat(wx, wy, zone, isMother) {
+      var batRow = Math.floor(wy / TILE);
+      var inMega = isMegaClearingRow(batRow);
+      var cap = inMega ? MAX_BATS_MEGA : MAX_BATS;
+      if (bats.length >= cap) return;
       var flyType = FLYER_TYPES[zone % FLYER_TYPES.length];
-      var shape = getClearingShape(zone);
-      var zoneStart = zone * CLEARING_INTERVAL;
-      // Find clearing bounds in world coords
-      var minY = Infinity, maxY = -Infinity, minX = Infinity, maxX = -Infinity;
-      for (var lr = 0; lr < CLEARING_HEIGHT; lr++) {
-        var b = shape[lr];
-        if (!b) continue;
-        var ry = (zoneStart + lr) * TILE;
-        if (ry < minY) minY = ry;
-        if (ry + TILE > maxY) maxY = ry + TILE;
-        if (b.left * TILE < minX) minX = b.left * TILE;
-        if ((b.right + 1) * TILE > maxX) maxX = (b.right + 1) * TILE;
+
+      var minY, maxY, minX, maxX;
+      if (inMega) {
+        var mz = getMegaZone(batRow);
+        var megaStart = getMegaStart(mz >= 0 ? mz : 0);
+        minX = TILE;
+        maxX = (COLS - 1) * TILE;
+        minY = megaStart * TILE;
+        maxY = (megaStart + MEGA_CLEARING_HEIGHT) * TILE;
+      } else {
+        var shape = getClearingShape(zone);
+        var zoneStart = zone * CLEARING_INTERVAL;
+        minY = Infinity; maxY = -Infinity; minX = Infinity; maxX = -Infinity;
+        for (var lr = 0; lr < CLEARING_HEIGHT; lr++) {
+          var b = shape[lr];
+          if (!b) continue;
+          var ry = (zoneStart + lr) * TILE;
+          if (ry < minY) minY = ry;
+          if (ry + TILE > maxY) maxY = ry + TILE;
+          if (b.left * TILE < minX) minX = b.left * TILE;
+          if ((b.right + 1) * TILE > maxX) maxX = (b.right + 1) * TILE;
+        }
       }
+      var motherFlag = !!isMother;
+      var hpVal = motherFlag ? 10 : 2;
+      var ptsVal = motherFlag ? (100 + Math.floor(zone * 15)) : (30 + Math.floor(zone * 5));
       bats.push({
         x: wx, y: wy,
-        vx: (Math.random() - 0.5) * 2,
-        vy: (Math.random() - 0.5) * 1.5,
+        vx: (Math.random() < 0.5 ? -1 : 1) * (1 + Math.random() * 1.5),
+        vy: (Math.random() - 0.5) * 0.4,
         state: 'fly',
         anim: Math.random() * 18,
         dir: Math.random() < 0.5 ? -1 : 1,
-        hp: 2, maxHp: 2,
+        hp: hpVal, maxHp: hpVal,
         hurtTimer: 0,
         deadTimer: 0,
         zone: zone,
         flyType: flyType,
+        isMother: motherFlag,
+        lastSpawnTime: Date.now(),
         boundsMinX: minX + TILE, boundsMaxX: maxX - TILE,
         boundsMinY: minY + TILE * 0.5, boundsMaxY: maxY - TILE,
         flyPhase: Math.random() * Math.PI * 2,
-        flyFreq: 0.03 + Math.random() * 0.02,
+        flyFreq: motherFlag ? 0.02 : (0.03 + Math.random() * 0.02),
         targetX: wx, targetY: wy,
         retargetTimer: 0,
-        pts: 30 + Math.floor(zone * 5)
+        pts: ptsVal
       });
     }
 
@@ -2261,6 +2737,25 @@
           b.vy += 0.05;
           b.y += b.vy;
           b.x += b.vx * 0.9;
+          // Block collision while hurt
+          var hHalf = BAT_SIZE * 0.35 * (b.isMother ? MOTHER_SCALE : 1);
+          var hCol = Math.floor(b.x / TILE), hRow = Math.floor(b.y / TILE);
+          for (var hr = hRow - 1; hr <= hRow + 1; hr++) {
+            for (var hc = hCol - 1; hc <= hCol + 1; hc++) {
+              var hCell = getCell(hr, hc);
+              if (!hCell || hCell.t === E) continue;
+              var htl = hc * TILE, htr = (hc + 1) * TILE, htt = hr * TILE, htb = (hr + 1) * TILE;
+              var hcx = Math.max(htl, Math.min(b.x, htr));
+              var hcy = Math.max(htt, Math.min(b.y, htb));
+              var hdx = b.x - hcx, hdy = b.y - hcy;
+              var hd = Math.sqrt(hdx * hdx + hdy * hdy);
+              if (hd < hHalf) {
+                if (hd > 0) { b.x += (hdx / hd) * (hHalf - hd); b.y += (hdy / hd) * (hHalf - hd); }
+                else { b.y -= hHalf; }
+                b.vx *= -0.3; b.vy *= -0.3;
+              }
+            }
+          }
           if (b.hurtTimer <= 0) {
             b.state = 'fly'; b.anim = 0;
           }
@@ -2271,19 +2766,27 @@
         b.flyPhase += b.flyFreq;
         b.retargetTimer--;
         if (b.retargetTimer <= 0) {
-          // Pick new target within bounds
-          b.targetX = b.boundsMinX + Math.random() * (b.boundsMaxX - b.boundsMinX);
-          b.targetY = b.boundsMinY + Math.random() * (b.boundsMaxY - b.boundsMinY);
+          // Pick new target: mostly lateral movement (keep Y close, vary X widely)
+          for (var rt = 0; rt < 5; rt++) {
+            var tx = b.boundsMinX + Math.random() * (b.boundsMaxX - b.boundsMinX);
+            // Keep Y within a small band around current position (±3 tiles)
+            var yBand = TILE * 3;
+            var tyMin = Math.max(b.boundsMinY, b.y - yBand);
+            var tyMax = Math.min(b.boundsMaxY, b.y + yBand);
+            var ty = tyMin + Math.random() * (tyMax - tyMin);
+            var tc = getCell(Math.floor(ty / TILE), Math.floor(tx / TILE));
+            if (!tc || tc.t === E) { b.targetX = tx; b.targetY = ty; break; }
+          }
           b.retargetTimer = 60 + Math.floor(Math.random() * 120);
         }
 
-        // Steer toward target
+        // Steer toward target (lateral bias)
         var dx = b.targetX - b.x;
         var dy = b.targetY - b.y;
         var dist = Math.sqrt(dx * dx + dy * dy) || 1;
         var accel = 0.12;
         b.vx += (dx / dist) * accel;
-        b.vy += (dy / dist) * accel + Math.sin(b.flyPhase) * 0.08;
+        b.vy += (dy / dist) * accel * 0.3 + Math.sin(b.flyPhase) * 0.03;
 
         // Speed limit
         var spd = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
@@ -2297,6 +2800,30 @@
         b.x += b.vx;
         b.y += b.vy;
 
+        // Block collision: push out of solid tiles
+        var bHalf = BAT_SIZE * 0.35 * (b.isMother ? MOTHER_SCALE : 1);
+        var bCol = Math.floor(b.x / TILE), bRow = Math.floor(b.y / TILE);
+        for (var cr = bRow - 1; cr <= bRow + 1; cr++) {
+          for (var cc = bCol - 1; cc <= bCol + 1; cc++) {
+            var cell = getCell(cr, cc);
+            if (!cell || cell.t === E) continue;
+            var tl = cc * TILE, tr = (cc + 1) * TILE, tt = cr * TILE, tb = (cr + 1) * TILE;
+            var closestX = Math.max(tl, Math.min(b.x, tr));
+            var closestY = Math.max(tt, Math.min(b.y, tb));
+            var ddx = b.x - closestX, ddy = b.y - closestY;
+            var dd = Math.sqrt(ddx * ddx + ddy * ddy);
+            if (dd < bHalf) {
+              if (dd > 0) { b.x += (ddx / dd) * (bHalf - dd); b.y += (ddy / dd) * (bHalf - dd); }
+              else { b.y -= bHalf; }
+              if (ddx !== 0 || ddy !== 0) {
+                var nd = Math.sqrt(ddx * ddx + ddy * ddy) || 1;
+                b.vx = Math.abs(b.vx) * (ddx / nd) * 0.5;
+                b.vy = Math.abs(b.vy) * (ddy / nd) * 0.5;
+              }
+            }
+          }
+        }
+
         // Clamp to bounds
         if (b.x < b.boundsMinX) { b.x = b.boundsMinX; b.vx = Math.abs(b.vx); }
         if (b.x > b.boundsMaxX) { b.x = b.boundsMaxX; b.vx = -Math.abs(b.vx); }
@@ -2309,12 +2836,23 @@
         // Animate
         b.anim += BAT_ANIMS.fly.speed;
         if (b.anim >= BAT_ANIMS.fly.count) b.anim = 0;
+
+        // Mother spawns babies every 4 seconds
+        if (b.isMother && b.state === 'fly') {
+          var now = Date.now();
+          if (now - b.lastSpawnTime >= MOTHER_SPAWN_MS) {
+            b.lastSpawnTime = now;
+            if (bats.length < MAX_BATS) {
+              spawnBat(b.x + (Math.random() - 0.5) * 40, b.y + 20, b.zone, false);
+              spawnText(b.x, b.y + BAT_SIZE * 0.5, '🥚 Baby!', '#ff88ff');
+            }
+          }
+        }
       }
     }
 
     function checkPickBatCollisions() {
       var PICK_R = 28;
-      var BR = BAT_SIZE * 0.4;
       var allPicks = [pick].concat(userPicks, extraPicks);
       for (var pi = 0; pi < allPicks.length; pi++) {
         var p = allPicks[pi];
@@ -2324,6 +2862,7 @@
         for (var bi = bats.length - 1; bi >= 0; bi--) {
           var b = bats[bi];
           if (b.state === 'dead' || b.state === 'hurt') continue;
+          var BR = BAT_SIZE * 0.4 * (b.isMother ? MOTHER_SCALE : 1);
           var dx = p.x - b.x, dy = p.y - b.y;
           var dist = Math.sqrt(dx * dx + dy * dy);
           if (dist < PICK_R + BR) {
@@ -2342,6 +2881,7 @@
             b.vy -= 1;
             sfxBatHurt();
             spawnText(b.x, b.y - BAT_SIZE * 0.4, '-1', '#ff88cc');
+            registerComboHit(p, b.x, b.y);
             if (b.hp <= 0) {
               b.state = 'dead'; b.anim = 0; b.deadTimer = 0;
               score += b.pts;
@@ -2381,16 +2921,26 @@
         if (b.state === 'dead') ctx.globalAlpha = Math.max(0, 1 - b.deadTimer / 90);
 
         var w = BAT_SIZE, h = BAT_SIZE;
+        if (b.isMother) { w *= MOTHER_SCALE; h *= MOTHER_SCALE; }
         ctx.drawImage(img, -w / 2, -h / 2, w, h);
 
         // HP bar
         if (b.state !== 'dead' && b.hp < b.maxHp) {
           ctx.globalAlpha = 0.7;
           if (b.dir < 0) ctx.scale(-1, 1);
-          var barW = 30, barH = 4;
+          var barW = b.isMother ? 60 : 30, barH = b.isMother ? 6 : 4;
           var barX = -barW / 2, barY = -h / 2 - 8;
           ctx.fillStyle = '#333'; ctx.fillRect(barX, barY, barW, barH);
-          ctx.fillStyle = '#ff66aa'; ctx.fillRect(barX, barY, barW * (b.hp / b.maxHp), barH);
+          ctx.fillStyle = b.isMother ? '#ff2266' : '#ff66aa'; ctx.fillRect(barX, barY, barW * (b.hp / b.maxHp), barH);
+        }
+
+        // Mother crown indicator
+        if (b.isMother && b.state !== 'dead') {
+          ctx.globalAlpha = 0.9;
+          if (b.dir < 0) ctx.scale(-1, 1);
+          ctx.font = 'bold 18px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+          ctx.fillStyle = '#ffdd44';
+          ctx.fillText('👑', 0, -h / 2 - 10);
         }
 
         ctx.globalAlpha = 1;
@@ -2401,7 +2951,8 @@
     // Bat sound effects (high-pitched squeaks)
     function sfxBatHurt() {
       if (!_audioStarted) return;
-      var ac = getAC(), t = ac.currentTime;
+      var ac = getAC(); if (!ac) return;
+      var t = ac.currentTime;
       var o = ac.createOscillator(), g = ac.createGain();
       o.type = 'square';
       o.frequency.setValueAtTime(900, t);
@@ -2415,7 +2966,8 @@
 
     function sfxBatDeath() {
       if (!_audioStarted) return;
-      var ac = getAC(), t = ac.currentTime;
+      var ac = getAC(); if (!ac) return;
+      var t = ac.currentTime;
       var freqs = [1200, 900, 600, 400];
       for (var i = 0; i < freqs.length; i++) {
         var o = ac.createOscillator(), g = ac.createGain();
@@ -2501,6 +3053,7 @@
             z.vy -= 1;
             sfxZombieHurt();
             spawnText(z.x, z.y - ZOMBIE_SIZE * 0.5, '-1', '#ff8844');
+            registerComboHit(p, z.x, z.y);
             if (z.hp <= 0) {
               z.state = 'dead'; z.animTimer = 0; z.deadTimer = 0;
               score += z.pts;
@@ -2770,12 +3323,13 @@
           }
 
           if (dirGap) {
-            if (_gapLanding(z.dir)) {
+            // Prefer dropping down to seek lower ground
+            if (_gapDrop(z.dir)) {
+              z.vx = z.dir * z.speed * 1.5;
+            } else if (_gapLanding(z.dir)) {
               z.vy = -6; z.vx = z.dir * z.speed * 3;
               z.grounded = false; z.state = 'jump'; z.animTimer = 0; z.fallFrames = 0;
               continue;
-            } else if (_gapDrop(z.dir)) {
-              z.vx = z.dir * z.speed * 1.5;
             } else {
               var otherBlocked2 = z.dir > 0 ? blockedLeft : blockedRight;
               var otherGap2 = z.dir > 0 ? gapLeft : gapRight;
@@ -2807,12 +3361,21 @@
             z.state = 'attack'; z.animTimer = 0;
             continue;
           }
-          // After idling, start walking
+          // After idling, start walking — prefer direction toward lower ground
           if (z.idleTimer > 60 + Math.random() * 90) {
             z.state = 'walk'; z.animTimer = 0; z.idleTimer = 0;
-            if (!blockedRight && !gapRight) z.dir = 1;
-            else if (!blockedLeft && !gapLeft) z.dir = -1;
-            else if (Math.random() < 0.3) z.dir *= -1;
+            var canLeft = !blockedLeft && !gapLeft;
+            var canRight = !blockedRight && !gapRight;
+            var dropLeft = gapLeft && _gapDrop(-1);
+            var dropRight = gapRight && _gapDrop(1);
+            // Prefer dropping into gaps (seeking lower ground)
+            if (dropLeft && !dropRight) { z.dir = -1; }
+            else if (dropRight && !dropLeft) { z.dir = 1; }
+            else if (canLeft && canRight) { z.dir = Math.random() < 0.5 ? -1 : 1; }
+            else if (canLeft) { z.dir = -1; }
+            else if (canRight) { z.dir = 1; }
+            else if (dropLeft && dropRight) { z.dir = Math.random() < 0.5 ? -1 : 1; }
+            else if (Math.random() < 0.3) { z.dir *= -1; }
           }
         } else if (z.state === 'walk') {
           z.vx = z.dir * z.speed;
@@ -3107,6 +3670,7 @@
     // ── Áudio ─────────────────────────────────────────────────────────────────
     var AC = null;
     function getAC() {
+      if (!_audioStarted) return null;
       if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
       if (AC.state === 'suspended') AC.resume();
       return AC;
@@ -3115,6 +3679,7 @@
     var _reverbNode = null;
     function getReverbNode() {
       var ac = getAC();
+      if (!ac) return null;
       if (_reverbNode && _reverbNode.context === ac) return _reverbNode;
       var len = ac.sampleRate * 2.2;
       var buf = ac.createBuffer(2, len, ac.sampleRate);
@@ -3130,6 +3695,7 @@
 
     function playNote(freq, type, vol, attack, decay, when) {
       var ac = getAC();
+      if (!ac) return;
       var osc = ac.createOscillator();
       var gain = ac.createGain();
       var rev = getReverbNode();
@@ -3143,7 +3709,8 @@
     }
 
     function sfxHit(blockType) {
-      var ac = getAC(), t = ac.currentTime;
+      var ac = getAC(); if (!ac) return;
+      var t = ac.currentTime;
       var len = Math.ceil(ac.sampleRate * 0.045);
       var buf = ac.createBuffer(1, len, ac.sampleRate);
       var d = buf.getChannelData(0);
@@ -3158,7 +3725,8 @@
     }
 
     function sfxBreak(blockType) {
-      var ac = getAC(), t = ac.currentTime;
+      var ac = getAC(); if (!ac) return;
+      var t = ac.currentTime;
       var osc = ac.createOscillator(), og = ac.createGain();
       var baseFreq = [55, 60, 58, 52, 48, 50, 44, 42, 40][Math.min(blockType, 8)];
       osc.type = 'sine';
@@ -3179,7 +3747,8 @@
     }
 
     function sfxFuse(duration) {
-      var ac = getAC(), t = ac.currentTime;
+      var ac = getAC(); if (!ac) return;
+      var t = ac.currentTime;
       var len = Math.ceil(ac.sampleRate * duration);
       var buf = ac.createBuffer(1, len, ac.sampleRate);
       var d = buf.getChannelData(0);
@@ -3199,7 +3768,8 @@
     }
 
     function sfxTNT() {
-      var ac = getAC(), t = ac.currentTime;
+      var ac = getAC(); if (!ac) return;
+      var t = ac.currentTime;
       var sub = ac.createOscillator(), subG = ac.createGain();
       sub.type = 'sine'; sub.frequency.setValueAtTime(38, t);
       sub.frequency.exponentialRampToValueAtTime(14, t + 0.55);
@@ -3228,7 +3798,8 @@
     }
 
     function sfxMegaTNT() {
-      var ac = getAC(), t = ac.currentTime;
+      var ac = getAC(); if (!ac) return;
+      var t = ac.currentTime;
       var sub = ac.createOscillator(), subG = ac.createGain();
       sub.type = 'sine'; sub.frequency.setValueAtTime(32, t);
       sub.frequency.exponentialRampToValueAtTime(8, t + 1.1);
@@ -3257,7 +3828,8 @@
     }
 
     function sfxPickaxeChange() {
-      var ac = getAC(), t = ac.currentTime;
+      var ac = getAC(); if (!ac) return;
+      var t = ac.currentTime;
       playNote(880, 'sine', 0.1, 0.01, 0.18, t);
       playNote(1320, 'sine', 0.08, 0.01, 0.14, t + 0.06);
     }
@@ -3269,7 +3841,8 @@
       if (now - _lastZombieSfx < 2500) return;
       _lastZombieSfx = now;
       if (!_audioStarted) return;
-      var ac = getAC(), t = ac.currentTime;
+      var ac = getAC(); if (!ac) return;
+      var t = ac.currentTime;
       // Zelda-style zombie moan: short descending square wave warble
       var o1 = ac.createOscillator(), g1 = ac.createGain();
       o1.type = 'square';
@@ -3297,7 +3870,8 @@
 
     function sfxZombieHurt() {
       if (!_audioStarted) return;
-      var ac = getAC(), t = ac.currentTime;
+      var ac = getAC(); if (!ac) return;
+      var t = ac.currentTime;
       // Organic groan: two detuned low oscillators with vibrato + breathy noise
       var base = 90 + Math.random() * 30;
       // Voice 1: main groan with pitch drop and vibrato
@@ -3346,7 +3920,8 @@
 
     function sfxZombieDeath() {
       if (!_audioStarted) return;
-      var ac = getAC(), t = ac.currentTime;
+      var ac = getAC(); if (!ac) return;
+      var t = ac.currentTime;
       // Zelda-style enemy death: descending cascade of square tones
       var freqs = [300, 250, 200, 150, 100];
       for (var i = 0; i < freqs.length; i++) {
@@ -3372,7 +3947,8 @@
     }
 
     function sfxSkillActivate() {
-      var ac = getAC(), t = ac.currentTime;
+      var ac = getAC(); if (!ac) return;
+      var t = ac.currentTime;
       playNote(440, 'sine', 0.1, 0.01, 0.12, t);
       playNote(660, 'sine', 0.1, 0.01, 0.12, t + 0.07);
       playNote(880, 'sine', 0.1, 0.01, 0.18, t + 0.14);
@@ -3407,7 +3983,8 @@
 
     function scheduleBossBeat() {
       if (!bossMusic.playing) return;
-      var ac = getAC(), t = ac.currentTime;
+      var ac = getAC(); if (!ac) return;
+      var t = ac.currentTime;
       var bn = BOSS_BASS[bossMusic.step % BOSS_BASS.length];
       var bf = bossScaleFreq(bn.d, bn.oct);
       var osc = ac.createOscillator(), g = ac.createGain(), filt = ac.createBiquadFilter();
@@ -3483,6 +4060,7 @@
     function scheduleMusicBeat() {
       if (!musicPlaying) return;
       var ac = getAC();
+      if (!ac) { musicTimeout = setTimeout(scheduleMusicBeat, BEAT * 1000); return; }
       var t = ac.currentTime;
 
       // ── baixo ──
@@ -4126,8 +4704,11 @@
         halfSize: PICK_HALF,
         stuck: false,
         stuckTimer: 0,
+        combo: 0,
         userName: userName,
         userAvatarUrl: avatarUrl,
+        joinTime: Date.now(),
+        pickaxe: PICKAXES[0],
         score: (persistentScores[userName] ? persistentScores[userName].score : 0),
         color: (persistentScores[userName] && persistentScores[userName].color)
           ? persistentScores[userName].color
@@ -4149,24 +4730,36 @@
     }
 
     function updateLeaderboard() {
+      // Update pickaxe tier for all userPicks
+      for (var i = 0; i < userPicks.length; i++) {
+        userPicks[i].pickaxe = getPickaxeForTime(userPicks[i].joinTime);
+      }
+
       var list = document.getElementById('leaderboardList');
       if (!list) return;
 
       var now = Date.now();
       // Only show active players (with activity in last 3 min) + owner always visible
       var activePlayers = Object.keys(persistentScores).filter(function (name) {
-        if (ownerName && name === ownerName) return true; // owner always in leaderboard
+        if (ownerName && name === ownerName) return true;
         return lastActivity[name] && (now - lastActivity[name] <= INACTIVE_MS);
       }).map(function (name) {
+        var pTier = currentPickaxe;
+        if (!(ownerName && name === ownerName)) {
+          for (var j = 0; j < userPicks.length; j++) {
+            if (userPicks[j].userName === name) { pTier = userPicks[j].pickaxe || PICKAXES[0]; break; }
+          }
+        }
         return {
           userName: name,
           score: persistentScores[name].score,
-          userAvatarUrl: persistentScores[name].avatar
+          userAvatarUrl: persistentScores[name].avatar,
+          pickaxe: pTier
         };
       });
 
       var sorted = activePlayers
-        .sort((a, b) => (b.score || 0) - (a.score || 0))
+        .sort(function(a, b) { return (b.score || 0) - (a.score || 0); })
         .slice(0, 10);
 
       if (sorted.length === 0) {
@@ -4175,17 +4768,14 @@
       }
 
       var html = '';
-      sorted.forEach((u, i) => {
+      for (var si = 0; si < sorted.length; si++) {
+        var u = sorted[si];
         var av = u.userAvatarUrl || '';
-        html += `
-      <div class="lb-item">
-        <div class="lb-rank">#${i + 1}</div>
-        <img class="lb-avatar" src="${av}" onerror="this.src='pickaxe/wooden_pickaxe.png'">
-        <div class="lb-name">${u.userName}</div>
-        <div class="lb-score">${Math.floor(u.score || 0)}</div>
-      </div>
-    `;
-      });
+        var pickImg = u.pickaxe ? u.pickaxe.img : 'pickaxe/wooden_pickaxe.png';
+        var pickName = u.pickaxe ? u.pickaxe.name : 'Wood';
+        var pickColor = u.pickaxe ? u.pickaxe.color : '#c8a464';
+        html += '<div class="lb-item"><span class="lb-rank">#' + (si + 1) + '</span><img class="lb-avatar" src="' + av + '" onerror="this.src=\'pickaxe/wooden_pickaxe.png\'"><span class="lb-name">' + u.userName + '</span><img class="lb-pickaxe" src="' + pickImg + '" title="' + pickName + '"><span class="lb-score" style="color:' + pickColor + '">' + Math.floor(u.score || 0) + '</span></div>';
+      }
       list.innerHTML = html;
     }
     setInterval(updateLeaderboard, 1000);
