@@ -1544,6 +1544,7 @@
 
     function applyPhysics(p, r) {
         if (!p) return false;
+        if (p._spinLock) return false; // skip physics during spin dash
         p.vy += GRAVITY;
         // Clamp velocidade para evitar tunneling (max ~1 tile por frame)
         var maxV = TILE * 0.8;
@@ -5381,6 +5382,7 @@
         if (!p) { activeSpins.splice(i, 1); continue; }
 
         if (s.phase === 'charge') {
+          p._spinLock = false;
           var chargeProgress = 1 - (s.timer / s.totalTimer);
           p.spin = s.origSpin + chargeProgress * 2.5;
           p.vx *= 0.85; p.vy *= 0.85;
@@ -5398,6 +5400,7 @@
             if (_audioStarted) sfxSpinDash();
           }
         } else if (s.phase === 'dash') {
+          p._spinLock = true;
           p.spin = 3.0;
           p.stuck = false;
           p.stuckTimer = 0;
@@ -5441,6 +5444,7 @@
           if (p.y < PICK_HALF) { p.y = PICK_HALF; s.timer = 0; }
           s.timer--;
           if (s.timer <= 0) {
+            p._spinLock = false;
             p.spin = s.origSpin;
             p.vx = s.dir.x * 3; p.vy = s.dir.y * 3;
             activeSpins.splice(i, 1);
