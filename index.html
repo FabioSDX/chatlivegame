@@ -4573,6 +4573,13 @@
         }
         spawnText(canvas.width / 2, camY + 100, '20 BOTS ADDED!', '#ffff00');
       }
+      // Arrow keys → spin (owner pick)
+      if (pick && pick.userName) {
+        if (e.key === 'ArrowRight') { e.preventDefault(); activateSpin(pick.userName, 'right'); }
+        if (e.key === 'ArrowLeft')  { e.preventDefault(); activateSpin(pick.userName, 'left'); }
+        if (e.key === 'ArrowDown')  { e.preventDefault(); activateSpin(pick.userName, 'down'); }
+        if (e.key === 'ArrowUp')    { e.preventDefault(); activateSpin(pick.userName, 'up'); }
+      }
     });
 
     // ── Touch: double tap = TNT, triple tap = Mega TNT, long press = 20 bots ──
