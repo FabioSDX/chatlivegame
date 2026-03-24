@@ -5313,15 +5313,16 @@
     // ── Spin Skill Functions ──────────────────────────────────────────────────
     function activateSpin(userName, direction) {
       userName = userName.replace(/^@@+/, '@');
-      // Cooldown check
-      if (spinCooldowns[userName] && spinCooldowns[userName] > 0) return;
+      // Cooldown per direction
+      var cdKey = userName + '_' + direction;
+      if (spinCooldowns[cdKey] && spinCooldowns[cdKey] > 0) return;
       // Find the player's pick
       var targetPick = null;
       if (pick && pick.userName === userName) targetPick = pick;
       else targetPick = userPicks.find(function(up) { return up.userName === userName; });
       if (!targetPick) return;
-      // Only one spin at a time per player
-      if (activeSpins.some(function(s) { return s.pick === targetPick; })) return;
+      // Only one spin per direction at a time per player
+      if (activeSpins.some(function(s) { return s.pick === targetPick && s.direction === direction; })) return;
 
       var dir = { x: 0, y: 0 };
       if (direction === 'right') dir.x = 1;
@@ -5333,13 +5334,14 @@
       activeSpins.push({
         pick: targetPick,
         userName: userName,
+        direction: direction,
         dir: dir,
         phase: 'charge',
         timer: SPIN_CHARGE,
         totalTimer: SPIN_CHARGE,
         origSpin: targetPick.spin
       });
-      spinCooldowns[userName] = SPIN_COOLDOWN;
+      spinCooldowns[cdKey] = SPIN_COOLDOWN;
       spawnText(targetPick.x, targetPick.y - 40, '🌀 SPIN!', '#ff44ff');
       if (_audioStarted) sfxSpinCharge();
     }
