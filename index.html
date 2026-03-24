@@ -1486,10 +1486,12 @@
     // ── Spin Skill ──────────────────────────────────────────────────────────────
     var SPIN_CHARGE = 30;       // 0.5s charge-up
     var SPIN_DASH = 30;         // 0.5s dash duration
-    var SPIN_COOLDOWN = 300;    // 5s cooldown
+    var SPIN_COOLDOWN = 300;    // 5s cooldown per direction
     var SPIN_SPEED = 10;        // dash velocity
     var SPIN_DMG_MULT = 3;      // damage multiplier during dash
-    var spinCooldowns = {};     // { userName: framesLeft }
+    var SPIN_MAX_QUEUE = 4;     // max queued spins per player
+    var spinCooldowns = {};     // { userName_direction: framesLeft }
+    var spinQueues = {};        // { userName: [{ direction, dir }] }
     var activeSpins = [];       // { pick, dir, phase, timer, origSpin }
 
     var score = 0;
@@ -1509,7 +1511,7 @@
       doublePickActive = false; doublePickTimer = 0; updateDoublePickHUD();
       stormActive = false; stormTimer = 0; updateStormHUD();
       tormentaActive = false; tormentaTimer = 0; tormentaPick = null;
-      activeSpins = []; spinCooldowns = {};
+      activeSpins = []; spinCooldowns = {}; spinQueues = {};
       bgChunks = {}; bgTick = 0;
       boss = null; bossIntr = null;
       document.getElementById('depthDisplay').textContent = 'Depth: 0m';
@@ -5321,8 +5323,6 @@
       if (pick && pick.userName === userName) targetPick = pick;
       else targetPick = userPicks.find(function(up) { return up.userName === userName; });
       if (!targetPick) return;
-      // Only one spin per direction at a time per player
-      if (activeSpins.some(function(s) { return s.pick === targetPick && s.direction === direction; })) return;
 
       var dir = { x: 0, y: 0 };
       if (direction === 'right') dir.x = 1;
@@ -5331,18 +5331,42 @@
       else if (direction === 'up') dir.y = -1;
       else return;
 
+      // Init queue for this player
+      if (!spinQueues[userName]) spinQueues[userName] = [];
+      // Don't exceed max queue
+      if (spinQueues[userName].length >= SPIN_MAX_QUEUE) return;
+      // Don't queue same direction twice in a row
+      var q = spinQueues[userName];
+      if (q.length > 0 && q[q.length - 1].direction === direction) return;
+
+      spinQueues[userName].push({ direction: direction, dir: dir, pick: targetPick });
+      spinCooldowns[cdKey] = SPIN_COOLDOWN;
+
+      // If no active spin for this player, start immediately
+      if (!activeSpins.some(function(s) { return s.userName === userName; })) {
+        startNextSpin(userName);
+      } else {
+        spawnText(targetPick.x, targetPick.y - 40, '🌀 +' + direction.toUpperCase(), '#cc44ff');
+      }
+    }
+
+    function startNextSpin(userName) {
+      if (!spinQueues[userName] || spinQueues[userName].length === 0) return;
+      var next = spinQueues[userName].shift();
+      var p = next.pick;
+      if (!p) return;
+
       activeSpins.push({
-        pick: targetPick,
+        pick: p,
         userName: userName,
-        direction: direction,
-        dir: dir,
+        direction: next.direction,
+        dir: next.dir,
         phase: 'charge',
         timer: SPIN_CHARGE,
         totalTimer: SPIN_CHARGE,
-        origSpin: targetPick.spin
+        origSpin: p.spin
       });
-      spinCooldowns[cdKey] = SPIN_COOLDOWN;
-      spawnText(targetPick.x, targetPick.y - 40, '🌀 SPIN!', '#ff44ff');
+      spawnText(p.x, p.y - 40, '🌀 SPIN ' + next.direction.toUpperCase() + '!', '#ff44ff');
       if (_audioStarted) sfxSpinCharge();
     }
 
@@ -5377,22 +5401,18 @@
           p.spin = 3.0;
           p.stuck = false;
           p.stuckTimer = 0;
-          // Move pick forward by SPIN_SPEED pixels in direction, destroying blocks along the way
           var stepX = s.dir.x * SPIN_SPEED;
           var stepY = s.dir.y * SPIN_SPEED;
           p.x += stepX;
           p.y += stepY;
-          // Cancel normal velocity so applyPhysics doesn't fight us
           p.vx = stepX;
           p.vy = stepY;
-          // Counteract gravity for non-down dashes
           if (s.dir.y <= 0) p.vy -= GRAVITY;
-          // Destroy blocks at current position (only existing cells, max 9 blocks)
           var bpr = PICK_HALF + 10;
           var c0 = Math.floor((p.x - bpr) / TILE), c1 = Math.floor((p.x + bpr) / TILE);
           var r0 = Math.floor((p.y - bpr) / TILE), r1 = Math.floor((p.y + bpr) / TILE);
           for (var row = r0; row <= r1; row++) {
-            if (!worldMap[row]) continue; // only destroy already-generated rows
+            if (!worldMap[row]) continue;
             for (var col = c0; col <= c1; col++) {
               if (col < 0 || col >= COLS) continue;
               var cell = worldMap[row] ? worldMap[row][col] : null;
@@ -5403,7 +5423,6 @@
               }
             }
           }
-          // Trail particles (limited)
           if (s.timer % 4 === 0) {
             parts.push({
               x: p.x + (Math.random() - 0.5) * 20,
@@ -5413,15 +5432,16 @@
               life: 10, color: s.timer % 8 < 4 ? '#ff44ff' : '#ffaa00', r: 3
             });
           }
-          // Boundary check
           if (p.x < PICK_HALF) { p.x = PICK_HALF; s.timer = 0; }
           if (p.x > COLS * TILE - PICK_HALF) { p.x = COLS * TILE - PICK_HALF; s.timer = 0; }
           if (p.y < PICK_HALF) { p.y = PICK_HALF; s.timer = 0; }
           s.timer--;
           if (s.timer <= 0) {
             p.spin = s.origSpin;
-            p.vx = s.dir.x * 3; p.vy = s.dir.y * 3; // gentle exit velocity
+            p.vx = s.dir.x * 3; p.vy = s.dir.y * 3;
             activeSpins.splice(i, 1);
+            // Start next queued spin for this player
+            startNextSpin(s.userName);
           }
         }
       }
