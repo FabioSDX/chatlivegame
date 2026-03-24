@@ -959,7 +959,7 @@
     // ── Zombie Boss Gate (alternates with Queen Gate) ──
     var ZBOSS_SCALE = 3.5;
     var ZBOSS_HP = 25;
-    var ZBOSS_COUNT = 3;
+    var ZBOSS_COUNT = 4;
     var ZBOSS_IMMUNE = true; // Zombie bosses only die to Tormenta
     var MAX_ZOMBIES_MEGA = 40;
 
@@ -2010,17 +2010,21 @@
               megaClearedZones[mz + '_type'] = isZombieGate ? 'zombie' : 'queen';
 
               if (isZombieGate) {
-                // ── ZOMBIE GATE: spawn zombies + zombie bosses ──
-                var zMegaNum = Math.min(MAX_ZOMBIES_MEGA, 20 + Math.floor(mz * 5));
-                for (var mi = 0; mi < zMegaNum; mi++) {
+                // ── ZOMBIE GATE: spawn bats (flying) + zombie bosses on flat floor ──
+                // Spawn flying enemies throughout the clearing (same as queen gate)
+                var megaNum = Math.min(MAX_BATS_MEGA, 100 + Math.floor(mz * 10));
+                for (var mi = 0; mi < megaNum; mi++) {
                   var mx = (1 + Math.floor(seededRand(mz * 500 + mi * 11) * (COLS - 2))) * TILE + TILE / 2;
                   var myRow = mStart + 5 + Math.floor(seededRand(mz * 600 + mi * 19) * (MEGA_CLEARING_HEIGHT - 20));
                   var my = myRow * TILE + TILE / 2;
-                  spawnZombie(mx, my);
+                  spawnBat(mx, my, mz, mi % 4 === 0);
                 }
-                // Spawn Zombie Boss Gate at the bottom
+                // Spawn Zombie Boss Gate: 4 bosses on invisible flat floor
                 var zbRow = mStart + MEGA_CLEARING_HEIGHT - 10;
-                var zbY = zbRow * TILE + TILE / 2;
+                var zbFloorY = zbRow * TILE; // top of the invisible floor row
+                // Store the floor row for the invisible barrier
+                megaClearedZones[mz + '_zbFloorRow'] = zbRow;
+                var zbY = zbFloorY - ZOMBIE_SIZE * ZBOSS_SCALE * 0.5; // feet on floor
                 var zbSpacing = ((COLS - 2) * TILE) / (ZBOSS_COUNT + 1);
                 for (var zbi = 0; zbi < ZBOSS_COUNT; zbi++) {
                   var zbX = TILE + zbSpacing * (zbi + 1);
@@ -2066,20 +2070,15 @@
                 shakeAmt = 20;
               }
             }
-            // Continuous reinforcement every 90 frames (~1.5s)
+            // Continuous reinforcement every 90 frames (~1.5s) — always bats
             if (mz >= 0 && megaClearedZones[mz]) {
               megaClearedZones[mz + '_tick'] = (megaClearedZones[mz + '_tick'] || 0) + 1;
-              var isZGate = megaClearedZones[mz + '_type'] === 'zombie';
-              if (megaClearedZones[mz + '_tick'] % 90 === 0) {
+              if (megaClearedZones[mz + '_tick'] % 90 === 0 && bats.length < MAX_BATS_MEGA) {
                 var rx = (1 + Math.floor(Math.random() * (COLS - 2))) * TILE + TILE / 2;
                 var ry = pick.y + 200 + Math.random() * 400;
                 var ryRow = Math.floor(ry / TILE);
                 if (isMegaClearingRow(ryRow)) {
-                  if (isZGate && zombies.length < MAX_ZOMBIES_MEGA) {
-                    spawnZombie(rx, ry);
-                  } else if (!isZGate && bats.length < MAX_BATS_MEGA) {
-                    spawnBat(rx, ry, mz, Math.random() < 0.2);
-                  }
+                  spawnBat(rx, ry, mz, Math.random() < 0.2);
                 }
               }
             }
@@ -3047,35 +3046,23 @@
         if (zombies[i].isZBoss && zombies[i].state !== 'dead') bosses.push(zombies[i]);
       }
       if (bosses.length === 0) return;
-      bosses.sort(function(a, b) { return a.x - b.x; });
-      var segments = [];
+      // All bosses share the same Y — use a single horizontal barrier line
+      var floorY = bosses[0].y;
       var wallL = TILE, wallR = (COLS - 1) * TILE;
-      segments.push({ x1: wallL, y1: bosses[0].y, x2: bosses[0].x, y2: bosses[0].y });
-      for (var qi = 0; qi < bosses.length - 1; qi++) {
-        segments.push({ x1: bosses[qi].x, y1: bosses[qi].y, x2: bosses[qi + 1].x, y2: bosses[qi + 1].y });
-      }
-      segments.push({ x1: bosses[bosses.length - 1].x, y1: bosses[bosses.length - 1].y, x2: wallR, y2: bosses[bosses.length - 1].y });
-      var BARRIER_THICK = 30;
+      var BARRIER_THICK = 35;
       var allPicks = [pick].concat(userPicks, extraPicks);
       for (var pi = 0; pi < allPicks.length; pi++) {
         var p = allPicks[pi];
         if (!p || p.stuck) continue;
-        for (var si = 0; si < segments.length; si++) {
-          var seg = segments[si];
-          var minX = Math.min(seg.x1, seg.x2), maxX = Math.max(seg.x1, seg.x2);
-          if (p.x < minX - 20 || p.x > maxX + 20) continue;
-          var frac = (maxX - minX) > 0 ? (p.x - minX) / (maxX - minX) : 0.5;
-          frac = Math.max(0, Math.min(1, frac));
-          var lineY = seg.y1 + (seg.y2 - seg.y1) * frac;
-          var dy = p.y - lineY;
-          if (Math.abs(dy) < BARRIER_THICK && p.vy > 0.5) {
-            p.vy = -Math.abs(p.vy) * 0.7 - 2;
-            p.y = lineY - BARRIER_THICK;
-            p.spin += (Math.random() - 0.5) * 0.3;
-            spawnText(p.x, p.y - 20, '⚡', '#44ff00');
-            for (var sp = 0; sp < 3; sp++) {
-              parts.push({ x: p.x, y: lineY, vx: (Math.random() - 0.5) * 4, vy: -1 - Math.random() * 2, life: 1, dec: 0.08, c: '#44ff00', r: 2 + Math.random() * 2 });
-            }
+        if (p.x < wallL || p.x > wallR) continue;
+        var dy = p.y - floorY;
+        if (Math.abs(dy) < BARRIER_THICK && p.vy > 0.5) {
+          p.vy = -Math.abs(p.vy) * 0.7 - 2;
+          p.y = floorY - BARRIER_THICK;
+          p.spin += (Math.random() - 0.5) * 0.3;
+          spawnText(p.x, p.y - 20, '⚡', '#44ff00');
+          for (var sp = 0; sp < 3; sp++) {
+            parts.push({ x: p.x, y: floorY, vx: (Math.random() - 0.5) * 4, vy: -1 - Math.random() * 2, life: 1, dec: 0.08, c: '#44ff00', r: 2 + Math.random() * 2 });
           }
         }
       }
@@ -3201,38 +3188,48 @@
       for (var i = 0; i < zombies.length; i++) {
         if (zombies[i].isZBoss && zombies[i].state !== 'dead') bosses.push(zombies[i]);
       }
-      if (bosses.length < 2) return;
+      if (bosses.length === 0) return;
       bosses.sort(function(a, b) { return a.x - b.x; });
       var t = Date.now() * 0.003;
-      ctx.save();
-      for (var qi = 0; qi < bosses.length - 1; qi++) {
-        var q1 = bosses[qi], q2 = bosses[qi + 1];
-        var pulse = 0.5 + Math.sin(t + qi) * 0.3;
-        ctx.strokeStyle = 'rgba(0, 255, 80, ' + (0.4 * pulse) + ')';
-        ctx.lineWidth = 12 + Math.sin(t * 2 + qi) * 4;
-        ctx.beginPath(); ctx.moveTo(q1.x, q1.y); ctx.lineTo(q2.x, q2.y); ctx.stroke();
-        ctx.strokeStyle = 'rgba(100, 255, 150, ' + (0.6 * pulse) + ')';
-        ctx.lineWidth = 4 + Math.sin(t * 3) * 2;
-        ctx.beginPath(); ctx.moveTo(q1.x, q1.y); ctx.lineTo(q2.x, q2.y); ctx.stroke();
-        for (var s = 0; s < 5; s++) {
-          var frac = (s + 0.5) / 5 + Math.sin(t * 4 + s * 1.3) * 0.05;
-          var sx = q1.x + (q2.x - q1.x) * frac;
-          var sy = q1.y + (q2.y - q1.y) * frac + Math.sin(t * 5 + s * 2) * 15;
-          ctx.fillStyle = 'rgba(200, 255, 100, ' + (0.7 * pulse) + ')';
-          ctx.beginPath(); ctx.arc(sx, sy, 3 + Math.random() * 3, 0, Math.PI * 2); ctx.fill();
-        }
-      }
-      var leftB = bosses[0], rightB = bosses[bosses.length - 1];
+      var floorY = bosses[0].y + ZOMBIE_SIZE * ZBOSS_SCALE * 0.5;
       var wallLeft = TILE, wallRight = (COLS - 1) * TILE;
-      var pL = 0.5 + Math.sin(t + 10) * 0.3;
-      ctx.strokeStyle = 'rgba(0, 255, 80, ' + (0.3 * pL) + ')';
-      ctx.lineWidth = 10 + Math.sin(t * 2 + 5) * 3;
-      ctx.beginPath(); ctx.moveTo(wallLeft, leftB.y); ctx.lineTo(leftB.x, leftB.y); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(rightB.x, rightB.y); ctx.lineTo(wallRight, rightB.y); ctx.stroke();
-      ctx.strokeStyle = 'rgba(100, 255, 150, ' + (0.5 * pL) + ')';
-      ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.moveTo(wallLeft, leftB.y); ctx.lineTo(leftB.x, leftB.y); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(rightB.x, rightB.y); ctx.lineTo(wallRight, rightB.y); ctx.stroke();
+      ctx.save();
+      // Draw invisible floor as subtle glow line
+      var fPulse = 0.3 + Math.sin(t * 1.5) * 0.15;
+      ctx.strokeStyle = 'rgba(0, 255, 80, ' + (0.15 * fPulse) + ')';
+      ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.moveTo(wallLeft, floorY); ctx.lineTo(wallRight, floorY); ctx.stroke();
+      // Energy barrier between bosses (at body center height)
+      if (bosses.length >= 2) {
+        for (var qi = 0; qi < bosses.length - 1; qi++) {
+          var q1 = bosses[qi], q2 = bosses[qi + 1];
+          var pulse = 0.5 + Math.sin(t + qi) * 0.3;
+          ctx.strokeStyle = 'rgba(0, 255, 80, ' + (0.4 * pulse) + ')';
+          ctx.lineWidth = 12 + Math.sin(t * 2 + qi) * 4;
+          ctx.beginPath(); ctx.moveTo(q1.x, q1.y); ctx.lineTo(q2.x, q2.y); ctx.stroke();
+          ctx.strokeStyle = 'rgba(100, 255, 150, ' + (0.6 * pulse) + ')';
+          ctx.lineWidth = 4 + Math.sin(t * 3) * 2;
+          ctx.beginPath(); ctx.moveTo(q1.x, q1.y); ctx.lineTo(q2.x, q2.y); ctx.stroke();
+          for (var s = 0; s < 5; s++) {
+            var frac = (s + 0.5) / 5 + Math.sin(t * 4 + s * 1.3) * 0.05;
+            var sx = q1.x + (q2.x - q1.x) * frac;
+            var sy = q1.y + Math.sin(t * 5 + s * 2) * 15;
+            ctx.fillStyle = 'rgba(200, 255, 100, ' + (0.7 * pulse) + ')';
+            ctx.beginPath(); ctx.arc(sx, sy, 3 + Math.random() * 3, 0, Math.PI * 2); ctx.fill();
+          }
+        }
+        // Extend barrier to walls
+        var leftB = bosses[0], rightB = bosses[bosses.length - 1];
+        var pL = 0.5 + Math.sin(t + 10) * 0.3;
+        ctx.strokeStyle = 'rgba(0, 255, 80, ' + (0.3 * pL) + ')';
+        ctx.lineWidth = 10 + Math.sin(t * 2 + 5) * 3;
+        ctx.beginPath(); ctx.moveTo(wallLeft, leftB.y); ctx.lineTo(leftB.x, leftB.y); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(rightB.x, rightB.y); ctx.lineTo(wallRight, rightB.y); ctx.stroke();
+        ctx.strokeStyle = 'rgba(100, 255, 150, ' + (0.5 * pL) + ')';
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(wallLeft, leftB.y); ctx.lineTo(leftB.x, leftB.y); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(rightB.x, rightB.y); ctx.lineTo(wallRight, rightB.y); ctx.stroke();
+      }
       ctx.restore();
     }
 
@@ -3435,7 +3432,7 @@
           continue;
         }
 
-        // ── Zombie Boss: stay near home, just patrol slowly ──
+        // ── Zombie Boss: stay near home, just patrol slowly on flat floor ──
         if (z.isZBoss) {
           z.animTimer += ZOMBIE_ANIMS.walk.speed;
           if (z.animTimer >= ZOMBIE_ANIMS.walk.count) z.animTimer = 0;
@@ -3448,14 +3445,10 @@
           z.vx *= 0.95;
           z.x += z.vx;
           z.dir = z.vx > 0 ? 1 : -1;
-          // Apply gravity, stay grounded
-          z.vy += ZG; z.y += z.vy;
-          var bFootRow = Math.floor((z.y + ZOMBIE_SIZE * ZBOSS_SCALE * 0.5) / TILE);
-          var bGround = getCell(bFootRow, Math.floor(z.x / TILE));
-          if (bGround && bGround.t !== E && z.vy >= 0) {
-            z.y = bFootRow * TILE - ZOMBIE_SIZE * ZBOSS_SCALE * 0.5;
-            z.vy = 0;
-          }
+          // Lock to flat floor Y (invisible platform)
+          z.y = z.homeY;
+          z.vy = 0;
+          z.grounded = true;
           // Wall clamp
           var bwL = TILE + 1, bwR = (COLS - 1) * TILE - 1;
           if (z.x < bwL + ZOMBIE_SIZE * ZBOSS_SCALE * 0.4) z.x = bwL + ZOMBIE_SIZE * ZBOSS_SCALE * 0.4;
