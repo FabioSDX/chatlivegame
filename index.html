@@ -2390,22 +2390,32 @@
       var shape = getClearingShape(zone);
       var zoneStart = zone * CLEARING_INTERVAL;
       var waterStartLocal = CLEARING_HEIGHT - WATER_DEPTH_ROWS;
-      // Use the bottom row shape (narrowest) as reference for all water rows
-      var bottomShape = shape[CLEARING_HEIGHT - 1];
-      if (!bottomShape) return;
-      var wLeft = bottomShape.left + 2;  // 2 tiles margin from wall
-      var wRight = bottomShape.right - 2;
-      if (wLeft >= wRight) return;
-      // Place water as a clean rectangle
-      for (var lr = waterStartLocal; lr < CLEARING_HEIGHT; lr++) {
+      // Start from the bottom row and work up
+      // Each row can only be as wide as the row below it (or narrower)
+      var prevLeft = COLS, prevRight = 0;
+      // First, determine the bottom row bounds (this sets the max width)
+      var botShape = shape[CLEARING_HEIGHT - 1];
+      if (!botShape) return;
+      prevLeft = botShape.left + 2;
+      prevRight = botShape.right - 2;
+      if (prevLeft >= prevRight) return;
+      // Place water bottom-up, each row clamped to previous row's width
+      for (var lr = CLEARING_HEIGHT - 1; lr >= waterStartLocal; lr--) {
+        var b = shape[lr];
+        if (!b) continue;
+        var rowLeft = Math.max(prevLeft, b.left + 1);
+        var rowRight = Math.min(prevRight, b.right - 1);
+        if (rowLeft >= rowRight) continue;
         var row = zoneStart + lr;
         if (!worldMap[row]) continue;
-        for (var c = wLeft; c <= wRight; c++) {
-          // Only place in truly empty cells (skip any solid blocks)
+        for (var c = rowLeft; c <= rowRight; c++) {
           if (worldMap[row][c] && worldMap[row][c].t === E) {
             worldMap[row][c] = { t: WATER, hp: 1, cr: 0 };
           }
         }
+        // Clamp next row up to this row's width
+        prevLeft = rowLeft;
+        prevRight = rowRight;
       }
     }
 
