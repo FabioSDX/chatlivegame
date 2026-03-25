@@ -2289,35 +2289,103 @@
       var vol = poolVolumes[zone] || 0;
       if (vol <= 0) { poolCells[zone] = new Set(); return; }
 
-      // Only consider cells within the clearing shape bounds (no flood fill outside)
-      var cells = new Set();
-      var remaining = vol;
+      // Phase 1: Find all reachable empty cells starting from clearing interior
+      // Water can only exit the clearing through broken wall/floor blocks of the clearing itself
+      var reachable = new Set();
+      var queue = [];
 
-      // Scan clearing rows bottom-up
-      for (var lr = CLEARING_HEIGHT - 1; lr >= 0 && remaining > 0; lr--) {
+      // Seed: empty cells strictly inside clearing (not on edges)
+      for (var lr = 0; lr < CLEARING_HEIGHT; lr++) {
         var b = shape[lr];
         if (!b) continue;
         var row = zoneStart + lr;
         if (!worldMap[row]) continue;
-
-        var contained = [];
         for (var c = b.left; c <= b.right; c++) {
           if (worldMap[row][c] && worldMap[row][c].t === E) {
-            contained.push(c);
+            reachable.add(row + ',' + c);
+            queue.push(row, c);
           }
         }
-        if (contained.length === 0) continue;
+      }
 
-        if (contained.length <= remaining) {
-          for (var i = 0; i < contained.length; i++) {
-            cells.add(row + ',' + contained[i]);
+      // BFS: from clearing cells, expand ONLY through broken clearing borders
+      // A cell outside the clearing is reachable only if it's adjacent to a clearing cell
+      // AND the border between them was originally a wall (solid block at clearing edge)
+      var maxCells = 400;
+      var idx = 0;
+      while (idx < queue.length && reachable.size < maxCells) {
+        var qr = queue[idx++], qc = queue[idx++];
+        // Check if this cell is inside the clearing
+        var qLocal = qr - zoneStart;
+        var insideClearing = false;
+        if (qLocal >= 0 && qLocal < CLEARING_HEIGHT) {
+          var qb = shape[qLocal];
+          if (qb && qc >= qb.left && qc <= qb.right) insideClearing = true;
+        }
+
+        var dirs = [[qr-1,qc],[qr+1,qc],[qr,qc-1],[qr,qc+1]];
+        for (var ni = 0; ni < 4; ni++) {
+          var nr = dirs[ni][0], nc = dirs[ni][1];
+          if (nc < 0 || nc >= COLS) continue;
+          var nk = nr + ',' + nc;
+          if (reachable.has(nk)) continue;
+          if (!worldMap[nr] || !worldMap[nr][nc]) continue;
+          if (worldMap[nr][nc].t !== E) continue;
+
+          // Check if neighbor is inside clearing
+          var nLocal = nr - zoneStart;
+          var neighborInClearing = false;
+          if (nLocal >= 0 && nLocal < CLEARING_HEIGHT) {
+            var nb = shape[nLocal];
+            if (nb && nc >= nb.left && nc <= nb.right) neighborInClearing = true;
           }
-          remaining -= contained.length;
+
+          if (neighborInClearing) {
+            // Both inside clearing or entering clearing — always OK
+            reachable.add(nk);
+            queue.push(nr, nc);
+          } else if (insideClearing) {
+            // Exiting clearing — this is a broken wall/floor, allow water to flow out
+            // But only expand downward or same level (water doesn't flow up outside clearing)
+            if (nr >= qr) {
+              reachable.add(nk);
+              queue.push(nr, nc);
+            }
+          } else {
+            // Both outside clearing — only expand downward (water flows down)
+            if (nr > qr) {
+              reachable.add(nk);
+              queue.push(nr, nc);
+            } else if (nr === qr) {
+              // Lateral: only if going toward lower ground (check if there's empty below)
+              if (worldMap[nr + 1] && worldMap[nr + 1][nc] && worldMap[nr + 1][nc].t === E) {
+                reachable.add(nk);
+                queue.push(nr, nc);
+              }
+            }
+          }
+        }
+      }
+
+      // Phase 2: Fill from bottom up with volume
+      var byRow = {};
+      reachable.forEach(function(key) {
+        var r = parseInt(key.split(',')[0]);
+        if (!byRow[r]) byRow[r] = [];
+        byRow[r].push(key);
+      });
+      var sortedRows = Object.keys(byRow).map(Number).sort(function(a,b){ return b - a; });
+      var cells = new Set();
+      var remaining = vol;
+      for (var ri = 0; ri < sortedRows.length && remaining > 0; ri++) {
+        var rowKeys = byRow[sortedRows[ri]];
+        if (rowKeys.length <= remaining) {
+          for (var i = 0; i < rowKeys.length; i++) cells.add(rowKeys[i]);
+          remaining -= rowKeys.length;
         } else {
           remaining = 0;
         }
       }
-
       poolCells[zone] = cells;
     }
 
