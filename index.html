@@ -5820,10 +5820,7 @@
         ctx.stroke();
         // Bright center glow
         ctx.shadowBlur = 0;
-        var cg = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 0.4);
-        cg.addColorStop(0, sc.replace(')', ',0.3)').replace('rgb', 'rgba').replace('#', ''));
-        cg.addColorStop(1, 'rgba(255,255,255,0)');
-        ctx.globalAlpha = prog * 0.5;
+        ctx.globalAlpha = prog * 0.4;
         ctx.fillStyle = 'rgba(255,255,255,' + (prog * 0.3) + ')';
         ctx.beginPath(); ctx.arc(p.x, p.y, r * 0.4, 0, Math.PI * 2); ctx.fill();
       } else {
@@ -5850,7 +5847,7 @@
         var gr = 32 * pulse;
         var grd = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, gr);
         grd.addColorStop(0, 'rgba(255,255,255,0.25)');
-        grd.addColorStop(0.4, sc.length === 7 ? sc + '44' : 'rgba(255,68,255,0.25)');
+        grd.addColorStop(0.4, 'rgba(255,255,255,0.12)');
         grd.addColorStop(1, 'rgba(0,0,0,0)');
         ctx.globalAlpha = 0.7;
         ctx.fillStyle = grd;
