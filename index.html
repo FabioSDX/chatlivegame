@@ -947,9 +947,6 @@
     var clearedZones = {};      // track which clearings already spawned zombies
     var clearingShapes = {};    // cached organic shapes per zone
 
-    // ── Water in clearings (even zones: 0, 2, 4...) ──
-    var WATER_DRAG = 0.92;
-
     // ── Mega Clearings (every 400 rows, 200 rows tall, wall-to-wall) ──
     var MEGA_CLEARING_INTERVAL = 400; // space between mega-clearing starts
     var MEGA_CLEARING_HEIGHT = 200;
@@ -1307,7 +1304,6 @@
       var lastEmptyRow = zone * CLEARING_INTERVAL + CLEARING_HEIGHT - 1;
       if (r === lastEmptyRow && zone >= 1 && !clearedZones[zone]) {
         clearedZones[zone] = true;
-        // Water in even clearings is visual-only (drawn in drawWater)
         if (typeof zombies !== 'undefined' && zombies) {
           var shape = getClearingShape(zone);
           var bounds = shape[CLEARING_HEIGHT - 1];
@@ -1516,7 +1512,6 @@
       stormActive = false; stormTimer = 0; updateStormHUD();
       tormentaActive = false; tormentaTimer = 0; tormentaPick = null;
       activeSpins = []; spinCooldowns = {}; spinQueues = {};
-      waterLevels = {};
       bgChunks = {}; bgTick = 0;
       boss = null; bossIntr = null;
       document.getElementById('depthDisplay').textContent = 'Depth: 0m';
@@ -1551,12 +1546,6 @@
         if (!p) return false;
         if (p._spinLock) return false; // skip physics during spin dash
         p.vy += GRAVITY;
-        // Water drag
-        if (isInWater(p.x, p.y)) {
-          p.vx *= WATER_DRAG;
-          p.vy *= WATER_DRAG;
-          p.vy -= GRAVITY * 0.6; // buoyancy: counteract most gravity
-        }
         // Clamp velocidade para evitar tunneling (max ~1 tile por frame)
         var maxV = TILE * 0.8;
         if (p.vx > maxV) p.vx = maxV; else if (p.vx < -maxV) p.vx = -maxV;
@@ -2036,7 +2025,6 @@
         updateStorm();
         updateTormenta();
         updateSpins();
-        updateWaterFlow();
         updateZombies();
         checkPickZombieCollisions();
         updateBats();
@@ -2376,147 +2364,6 @@
       ctx.globalAlpha = 1;
     }
 
-    // ── Water Effect (visual overlay with dynamic level) ────────────────────
-    var waterLevels = {}; // { zone: { topRow, botRow, left, right } }
-    var WATER_FLOW_RATE = 12; // check for flow every N frames
-    var waterFlowTick = 0;
-
-    function hasWater(zone) {
-      return zone >= 2 && zone % 2 === 0;
-    }
-
-    function initWaterZone(zone) {
-      if (waterLevels[zone]) return;
-      var shape = getClearingShape(zone);
-      var zoneStart = zone * CLEARING_INTERVAL;
-      // Use bottom 3 rows of clearing, narrowest width
-      var minLeft = COLS, maxRight = 0;
-      for (var lr = CLEARING_HEIGHT - 3; lr < CLEARING_HEIGHT; lr++) {
-        var b = shape[lr];
-        if (!b) continue;
-        if (b.left < minLeft) minLeft = b.left;
-        if (b.right > maxRight) maxRight = b.right;
-      }
-      waterLevels[zone] = {
-        topRow: zoneStart + CLEARING_HEIGHT - 3,
-        botRow: zoneStart + CLEARING_HEIGHT - 1,
-        left: minLeft,
-        right: maxRight
-      };
-    }
-
-    function updateWaterFlow() {
-      waterFlowTick++;
-      if (waterFlowTick % WATER_FLOW_RATE !== 0) return;
-      for (var zk in waterLevels) {
-        var wl = waterLevels[zk];
-        if (wl.topRow > wl.botRow) continue; // no water left
-        // Check if there's empty space below the bottom row of water
-        var checkRow = wl.botRow + 1;
-        if (!worldMap[checkRow]) continue;
-        var hasSpace = false;
-        for (var c = wl.left; c <= wl.right; c++) {
-          var cell = worldMap[checkRow] ? worldMap[checkRow][c] : null;
-          if (cell && cell.t === E) { hasSpace = true; break; }
-        }
-        if (hasSpace) {
-          // Water flows down: bottom extends, top shrinks
-          wl.botRow++;
-          wl.topRow++;
-          // If top goes past original clearing, water is gone
-          if (wl.topRow > wl.botRow) {
-            wl.topRow = wl.botRow + 1; // mark as empty
-          }
-        }
-      }
-    }
-
-    function isInWater(px, py) {
-      var r = Math.floor(py / TILE);
-      var c = Math.floor(px / TILE);
-      var zone = Math.floor(r / CLEARING_INTERVAL);
-      if (!hasWater(zone)) return false;
-      var wl = waterLevels[zone];
-      if (!wl) return false;
-      return r >= wl.topRow && r <= wl.botRow && c >= wl.left && c <= wl.right;
-    }
-
-    function drawWater() {
-      var t = Date.now() * 0.003;
-      var rStart = Math.floor(camY / TILE);
-      var rEnd = Math.ceil((camY + canvas.height) / TILE) + 1;
-      var zoneMin = Math.floor(rStart / CLEARING_INTERVAL);
-      var zoneMax = Math.ceil(rEnd / CLEARING_INTERVAL);
-
-      for (var zone = zoneMin; zone <= zoneMax; zone++) {
-        if (!hasWater(zone)) continue;
-        initWaterZone(zone);
-        var wl = waterLevels[zone];
-        if (!wl || wl.topRow > wl.botRow) continue;
-
-        var wx = wl.left * TILE;
-        var ww = (wl.right - wl.left + 1) * TILE;
-        var totalRows = wl.botRow - wl.topRow + 1;
-
-        for (var r = wl.topRow; r <= wl.botRow; r++) {
-          var wy = r * TILE;
-          var wi = r - wl.topRow;
-          ctx.save();
-          // Water body — darker deeper
-          var depthFrac = wi / totalRows;
-          ctx.globalAlpha = 0.28 + depthFrac * 0.14;
-          ctx.fillStyle = '#1e64c8';
-          ctx.fillRect(wx, wy, ww, TILE);
-          // Caustic shimmer
-          ctx.globalAlpha = 0.07;
-          ctx.fillStyle = '#88ccff';
-          for (var cx = 0; cx < ww; cx += 28) {
-            var cy = Math.sin(t * 2 + cx * 0.05 + wi) * 4;
-            ctx.beginPath();
-            ctx.arc(wx + cx + 14, wy + TILE * 0.5 + cy, 9, 0, Math.PI * 2);
-            ctx.fill();
-          }
-          // Surface wave on top row
-          if (r === wl.topRow) {
-            ctx.globalAlpha = 0.5;
-            ctx.beginPath();
-            ctx.moveTo(wx, wy);
-            for (var sx = 0; sx <= ww; sx += 6) {
-              var swy = wy + Math.sin(t * 3 + (wx + sx) * 0.05) * 3 + Math.sin(t * 1.7 + (wx + sx) * 0.09) * 2;
-              ctx.lineTo(wx + sx, swy);
-            }
-            ctx.lineTo(wx + ww, wy + 6);
-            ctx.lineTo(wx, wy + 6);
-            ctx.closePath();
-            ctx.fillStyle = 'rgba(100, 180, 255, 0.35)';
-            ctx.fill();
-            ctx.strokeStyle = 'rgba(180, 220, 255, 0.6)';
-            ctx.lineWidth = 1.5;
-            ctx.beginPath();
-            for (var sx2 = 0; sx2 <= ww; sx2 += 6) {
-              var swy2 = wy + Math.sin(t * 3 + (wx + sx2) * 0.05) * 3 + Math.sin(t * 1.7 + (wx + sx2) * 0.09) * 2;
-              if (sx2 === 0) ctx.moveTo(wx, swy2); else ctx.lineTo(wx + sx2, swy2);
-            }
-            ctx.stroke();
-          }
-          ctx.restore();
-        }
-        // Bubbles
-        if (Math.random() < 0.03) {
-          var br = wl.topRow + Math.floor(Math.random() * totalRows);
-          parts.push({
-            x: (wl.left + Math.random() * (wl.right - wl.left)) * TILE + TILE / 2,
-            y: br * TILE + TILE * 0.5,
-            vx: (Math.random() - 0.5) * 0.3,
-            vy: -0.5 - Math.random() * 0.8,
-            life: 25 + Math.random() * 25,
-            color: 'rgba(180,220,255,0.5)',
-            r: 2 + Math.random() * 3
-          });
-        }
-      }
-    }
-
     function draw() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       drawBackground(); // caverna de cristais
@@ -2555,9 +2402,6 @@
       // Crystal decorations growing from clearing walls
       var viewTop = camY - TILE * 2;
       var viewBot = camY + canvas.height + TILE * 2;
-
-      // Water overlay in clearings
-      drawWater();
       ctx.globalAlpha = 0.9;
       for (var ci = crystalDecoList.length - 1; ci >= 0; ci--) {
         var cd = crystalDecoList[ci];
