@@ -953,6 +953,10 @@
     var MEGA_CLEARING_FIRST = 200;    // first mega-clearing starts at row 200
     var megaClearedZones = {};
     var MAX_BATS_MEGA = 120;
+
+    // ── Water Table (underground water level) ──
+    var WATER_TABLE_ROW = 150;  // water starts at depth 150m
+    var WATER_DRAG = 0.91;
     var QUEEN_SCALE = 4.0;
     var QUEEN_HP = 30;
     var QUEEN_COUNT = 3;
@@ -1546,6 +1550,12 @@
         if (!p) return false;
         if (p._spinLock) return false; // skip physics during spin dash
         p.vy += GRAVITY;
+        // Water table drag
+        if (isInWater(p.x, p.y)) {
+          p.vx *= WATER_DRAG;
+          p.vy *= WATER_DRAG;
+          p.vy -= GRAVITY * 0.55; // buoyancy
+        }
         // Clamp velocidade para evitar tunneling (max ~1 tile por frame)
         var maxV = TILE * 0.8;
         if (p.vx > maxV) p.vx = maxV; else if (p.vx < -maxV) p.vx = -maxV;
@@ -2364,6 +2374,89 @@
       ctx.globalAlpha = 1;
     }
 
+    // ── Water Table Rendering ────────────────────────────────────────────────
+    function isInWater(px, py) {
+      var r = Math.floor(py / TILE);
+      if (r < WATER_TABLE_ROW) return false;
+      var c = Math.floor(px / TILE);
+      var cell = getCell(r, c);
+      return cell && cell.t === E;
+    }
+
+    function drawWaterTable() {
+      var t = Date.now() * 0.003;
+      var rStart = Math.max(WATER_TABLE_ROW, Math.floor(camY / TILE));
+      var rEnd = Math.ceil((camY + canvas.height) / TILE) + 1;
+      if (rStart > rEnd) return;
+
+      for (var r = rStart; r <= rEnd; r++) {
+        if (!worldMap[r]) continue;
+        for (var c = 0; c < COLS; c++) {
+          var cell = worldMap[r][c];
+          if (!cell || cell.t !== E) continue;
+          var x = c * TILE;
+          var y = r * TILE;
+          // Depth below water table
+          var depth = r - WATER_TABLE_ROW;
+          var alpha = Math.min(0.45, 0.15 + depth * 0.003);
+
+          ctx.save();
+          ctx.globalAlpha = alpha;
+          ctx.fillStyle = '#0a3a6a';
+          ctx.fillRect(x, y, TILE, TILE);
+
+          // Caustic light ripples
+          ctx.globalAlpha = alpha * 0.25;
+          ctx.fillStyle = '#4488cc';
+          var cx1 = Math.sin(t * 1.5 + c * 0.8 + r * 0.3) * TILE * 0.3;
+          var cy1 = Math.cos(t * 1.1 + r * 0.6 + c * 0.5) * TILE * 0.25;
+          ctx.beginPath();
+          ctx.arc(x + TILE * 0.5 + cx1, y + TILE * 0.5 + cy1, 12, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Surface wave — only on tiles where the tile above is NOT water (solid or above water table)
+          var aboveRow = r - 1;
+          var isAboveWater = false;
+          if (aboveRow >= WATER_TABLE_ROW && worldMap[aboveRow]) {
+            var aboveCell = worldMap[aboveRow][c];
+            if (aboveCell && aboveCell.t === E) isAboveWater = true;
+          }
+          if (!isAboveWater) {
+            ctx.globalAlpha = 0.5;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            for (var wx = 0; wx <= TILE; wx += 5) {
+              var wy = y + Math.sin(t * 3 + (x + wx) * 0.06) * 2.5 + Math.sin(t * 1.8 + (x + wx) * 0.1) * 1.5;
+              ctx.lineTo(x + wx, wy);
+            }
+            ctx.lineTo(x + TILE, y + 5);
+            ctx.lineTo(x, y + 5);
+            ctx.closePath();
+            ctx.fillStyle = 'rgba(80, 160, 255, 0.35)';
+            ctx.fill();
+          }
+          ctx.restore();
+        }
+      }
+
+      // Bubbles
+      if (Math.random() < 0.04) {
+        var br = rStart + Math.floor(Math.random() * (rEnd - rStart));
+        var bc = Math.floor(Math.random() * COLS);
+        if (worldMap[br] && worldMap[br][bc] && worldMap[br][bc].t === E) {
+          parts.push({
+            x: bc * TILE + Math.random() * TILE,
+            y: br * TILE + Math.random() * TILE,
+            vx: (Math.random() - 0.5) * 0.3,
+            vy: -0.6 - Math.random() * 0.8,
+            life: 20 + Math.random() * 25,
+            color: 'rgba(150,200,255,0.5)',
+            r: 2 + Math.random() * 3
+          });
+        }
+      }
+    }
+
     function draw() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       drawBackground(); // caverna de cristais
@@ -2398,6 +2491,9 @@
           }
         }
       }
+
+      // Water table overlay
+      drawWaterTable();
 
       // Crystal decorations growing from clearing walls
       var viewTop = camY - TILE * 2;
