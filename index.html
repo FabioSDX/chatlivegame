@@ -5215,7 +5215,9 @@
       } else {
         _apiConnected = false;
         _activeApiKey = '';
-        showApiSetup('All API keys exhausted. Add new keys or play offline.');
+        // Don't show setup modal — just update status and retest
+        var txtApi = document.getElementById('statusTextApi');
+        if (txtApi) { txtApi.textContent = 'API: no keys (retesting...)'; txtApi.style.color = '#ff4444'; }
         startKeyRetest();
       }
       loadKeysList();
@@ -6369,24 +6371,21 @@
               }
               return;
             }
-            // Live ended or invalid chat — not a key problem
+            // Live ended or invalid chat — not a key problem, just rotate and retry
             if (errCode === 404 || errCode === 400) {
+              console.log('[checkConnection] Live error ' + errCode + ', clearing chat ID');
               clearLiveChatId();
+              getNextApiKey(); // rotate but don't remove
               if (dotApi) dotApi.classList.add('online');
               if (txtApi) { txtApi.textContent = apiStatusText(); txtApi.style.color = '#00ff88'; }
               if (dotLive) { dotLive.classList.remove('online'); dotLive.classList.add('warning'); }
-              if (txtLive) { txtLive.textContent = 'Live: reconnecting...'; txtLive.style.color = '#ffaa00'; txtLive.style.cursor = 'pointer'; }
+              if (txtLive) { txtLive.textContent = 'Live: reconnecting...'; txtLive.style.color = '#ffaa00'; }
               resolveLive();
               return;
             }
-            // Any other error — remove key immediately
-            console.warn('[checkConnection] Key error, removing:', usedKey.substring(0, 8) + '...', errCode, errMsg);
-            rotateApiKey(usedKey, errMsg || 'error_' + errCode);
-            if (getOkKeyCount() === 0) {
-              if (_apiCheckInterval) { clearInterval(_apiCheckInterval); _apiCheckInterval = null; }
-              if (dotApi) dotApi.classList.remove('online');
-              if (txtApi) { txtApi.textContent = 'API: no keys'; txtApi.style.color = '#ff4444'; }
-            }
+            // Any other error — just rotate to next key, don't remove
+            console.warn('[checkConnection] Error ' + errCode + ', rotating key:', usedKey.substring(0, 8) + '...');
+            getNextApiKey();
             return;
           }
 
