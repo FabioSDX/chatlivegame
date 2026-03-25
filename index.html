@@ -3904,12 +3904,13 @@
           }
 
           if (dirGap) {
-            if (_gapLanding(z.dir)) {
+            if (_gapDrop(z.dir)) {
+              // Drop down — explore lower areas
+              z.vx = z.dir * z.speed * 1.8;
+            } else if (_gapLanding(z.dir)) {
               z.vy = -6; z.vx = z.dir * z.speed * 3;
               z.grounded = false; z.state = 'jump'; z.animTimer = 0; z.fallFrames = 0;
               continue;
-            } else if (_gapDrop(z.dir)) {
-              z.vx = z.dir * z.speed * 1.5;
             } else {
               var otherBlocked2 = z.dir > 0 ? blockedLeft : blockedRight;
               var otherGap2 = z.dir > 0 ? gapLeft : gapRight;
@@ -3944,9 +3945,17 @@
           // After idling, start walking
           if (z.idleTimer > 60 + Math.random() * 90) {
             z.state = 'walk'; z.animTimer = 0; z.idleTimer = 0;
-            if (!blockedRight && !gapRight) z.dir = 1;
-            else if (!blockedLeft && !gapLeft) z.dir = -1;
-            else if (Math.random() < 0.3) z.dir *= -1;
+            // Random direction, prefer gaps (explore lower areas)
+            var canL = !blockedLeft;
+            var canR = !blockedRight;
+            if (canL && canR) {
+              // Prefer direction with gap (leads down)
+              if (gapLeft && !gapRight) z.dir = -1;
+              else if (gapRight && !gapLeft) z.dir = 1;
+              else z.dir = Math.random() < 0.5 ? -1 : 1;
+            } else if (canR) z.dir = 1;
+            else if (canL) z.dir = -1;
+            else z.dir = Math.random() < 0.5 ? -1 : 1;
           }
         } else if (z.state === 'walk') {
           z.vx = z.dir * z.speed;
@@ -3965,9 +3974,9 @@
           }
           // Random groan
           if (Math.random() < 0.003) sfxZombieGroan();
-          // Random jump to explore
-          if (Math.random() < 0.008) {
-            z.vy = -7 - Math.random() * 2;
+          // Random jump to explore lower areas
+          if (Math.random() < 0.015) {
+            z.vy = -5 - Math.random() * 3;
             z.vx = z.dir * z.speed * 2.5;
             z.grounded = false; z.state = 'jump'; z.animTimer = 0; z.fallFrames = 0;
           }
