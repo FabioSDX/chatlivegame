@@ -623,21 +623,6 @@
             break;
           }
 
-      // Place torches on clearing walls (every 3 rows, left and right walls)
-      if (isNearClearing && zone >= 1) {
-        var localRow = r - zone * CLEARING_INTERVAL;
-        if (localRow >= 1 && localRow < CLEARING_HEIGHT - 1 && localRow % 3 === 1) {
-          var tShape = getClearingShape(zone);
-          var tb = tShape[localRow];
-          if (tb) {
-            // Left wall torch
-            torchList.push({ x: tb.left * TILE + TILE * 0.3, y: r * TILE + TILE * 0.3, wallDir: 'left', zone: zone, wallCol: tb.left - 1, wallRow: r });
-            // Right wall torch
-            torchList.push({ x: (tb.right + 1) * TILE - TILE * 0.3, y: r * TILE + TILE * 0.3, wallDir: 'right', zone: zone, wallCol: tb.right + 1, wallRow: r });
-          }
-        }
-      }
-
           // move até o ponto de colisão (com pequena margem)
           b.x += remainVx * (earliest.t - 0.001);
           b.y += remainVy * (earliest.t - 0.001);
@@ -1280,6 +1265,19 @@
             var bx = batCol * TILE + TILE / 2;
             var by = (zone * CLEARING_INTERVAL + midRow) * TILE + TILE / 2;
             spawnBat(bx, by, zone, bi === 0);
+          }
+        }
+      }
+
+      // Place torches on clearing walls (every 3 rows, left and right walls)
+      if (isNearClearing && zone >= 1) {
+        var tLocalRow = r - zone * CLEARING_INTERVAL;
+        if (tLocalRow >= 1 && tLocalRow < CLEARING_HEIGHT - 1 && tLocalRow % 3 === 1) {
+          var tShape = getClearingShape(zone);
+          var tb = tShape[tLocalRow];
+          if (tb) {
+            torchList.push({ x: tb.left * TILE + TILE * 0.3, y: r * TILE + TILE * 0.3, wallDir: 'left', zone: zone, wallCol: tb.left - 1, wallRow: r });
+            torchList.push({ x: (tb.right + 1) * TILE - TILE * 0.3, y: r * TILE + TILE * 0.3, wallDir: 'right', zone: zone, wallCol: tb.right + 1, wallRow: r });
           }
         }
       }
