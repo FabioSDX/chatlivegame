@@ -948,7 +948,7 @@
     var clearingShapes = {};    // cached organic shapes per zone
 
     // ── Water in clearings (even zones: 0, 2, 4...) ──
-    var WATER_DRAG = 0.92;     // velocity multiplier per frame in water
+    var WATER_DRAG = 0.92;
 
     // ── Mega Clearings (every 400 rows, 200 rows tall, wall-to-wall) ──
     var MEGA_CLEARING_INTERVAL = 400; // space between mega-clearing starts
@@ -1516,6 +1516,7 @@
       stormActive = false; stormTimer = 0; updateStormHUD();
       tormentaActive = false; tormentaTimer = 0; tormentaPick = null;
       activeSpins = []; spinCooldowns = {}; spinQueues = {};
+      waterLevels = {};
       bgChunks = {}; bgTick = 0;
       boss = null; bossIntr = null;
       document.getElementById('depthDisplay').textContent = 'Depth: 0m';
@@ -2035,6 +2036,7 @@
         updateStorm();
         updateTormenta();
         updateSpins();
+        updateWaterFlow();
         updateZombies();
         checkPickZombieCollisions();
         updateBats();
@@ -2374,21 +2376,59 @@
       ctx.globalAlpha = 1;
     }
 
-    // ── Water Effect (visual overlay, no tiles) ────────────────────────────
+    // ── Water Effect (visual overlay with dynamic level) ────────────────────
+    var waterLevels = {}; // { zone: { topRow, botRow, left, right } }
+    var WATER_FLOW_RATE = 12; // check for flow every N frames
+    var waterFlowTick = 0;
+
     function hasWater(zone) {
       return zone >= 2 && zone % 2 === 0;
     }
 
-    function getWaterBounds(zone) {
+    function initWaterZone(zone) {
+      if (waterLevels[zone]) return;
       var shape = getClearingShape(zone);
       var zoneStart = zone * CLEARING_INTERVAL;
-      var rows = [];
+      // Use bottom 3 rows of clearing, narrowest width
+      var minLeft = COLS, maxRight = 0;
       for (var lr = CLEARING_HEIGHT - 3; lr < CLEARING_HEIGHT; lr++) {
         var b = shape[lr];
         if (!b) continue;
-        rows.push({ row: zoneStart + lr, left: b.left, right: b.right });
+        if (b.left < minLeft) minLeft = b.left;
+        if (b.right > maxRight) maxRight = b.right;
       }
-      return rows;
+      waterLevels[zone] = {
+        topRow: zoneStart + CLEARING_HEIGHT - 3,
+        botRow: zoneStart + CLEARING_HEIGHT - 1,
+        left: minLeft,
+        right: maxRight
+      };
+    }
+
+    function updateWaterFlow() {
+      waterFlowTick++;
+      if (waterFlowTick % WATER_FLOW_RATE !== 0) return;
+      for (var zk in waterLevels) {
+        var wl = waterLevels[zk];
+        if (wl.topRow > wl.botRow) continue; // no water left
+        // Check if there's empty space below the bottom row of water
+        var checkRow = wl.botRow + 1;
+        if (!worldMap[checkRow]) continue;
+        var hasSpace = false;
+        for (var c = wl.left; c <= wl.right; c++) {
+          var cell = worldMap[checkRow] ? worldMap[checkRow][c] : null;
+          if (cell && cell.t === E) { hasSpace = true; break; }
+        }
+        if (hasSpace) {
+          // Water flows down: bottom extends, top shrinks
+          wl.botRow++;
+          wl.topRow++;
+          // If top goes past original clearing, water is gone
+          if (wl.topRow > wl.botRow) {
+            wl.topRow = wl.botRow + 1; // mark as empty
+          }
+        }
+      }
     }
 
     function isInWater(px, py) {
@@ -2396,12 +2436,9 @@
       var c = Math.floor(px / TILE);
       var zone = Math.floor(r / CLEARING_INTERVAL);
       if (!hasWater(zone)) return false;
-      var zoneStart = zone * CLEARING_INTERVAL;
-      var localRow = r - zoneStart;
-      if (localRow < CLEARING_HEIGHT - 3 || localRow >= CLEARING_HEIGHT) return false;
-      var shape = getClearingShape(zone);
-      var b = shape[localRow];
-      return b && c >= b.left && c <= b.right;
+      var wl = waterLevels[zone];
+      if (!wl) return false;
+      return r >= wl.topRow && r <= wl.botRow && c >= wl.left && c <= wl.right;
     }
 
     function drawWater() {
@@ -2413,19 +2450,21 @@
 
       for (var zone = zoneMin; zone <= zoneMax; zone++) {
         if (!hasWater(zone)) continue;
-        var wb = getWaterBounds(zone);
-        if (wb.length === 0) continue;
+        initWaterZone(zone);
+        var wl = waterLevels[zone];
+        if (!wl || wl.topRow > wl.botRow) continue;
 
-        for (var wi = 0; wi < wb.length; wi++) {
-          var wr = wb[wi];
-          var wy = wr.row * TILE;
-          var wx = wr.left * TILE;
-          var ww = (wr.right - wr.left + 1) * TILE;
+        var wx = wl.left * TILE;
+        var ww = (wl.right - wl.left + 1) * TILE;
+        var totalRows = wl.botRow - wl.topRow + 1;
 
+        for (var r = wl.topRow; r <= wl.botRow; r++) {
+          var wy = r * TILE;
+          var wi = r - wl.topRow;
           ctx.save();
-          // Water body
-          var depthFrac = wi / wb.length;
-          ctx.globalAlpha = 0.3 + depthFrac * 0.12;
+          // Water body — darker deeper
+          var depthFrac = wi / totalRows;
+          ctx.globalAlpha = 0.28 + depthFrac * 0.14;
           ctx.fillStyle = '#1e64c8';
           ctx.fillRect(wx, wy, ww, TILE);
           // Caustic shimmer
@@ -2438,7 +2477,7 @@
             ctx.fill();
           }
           // Surface wave on top row
-          if (wi === 0) {
+          if (r === wl.topRow) {
             ctx.globalAlpha = 0.5;
             ctx.beginPath();
             ctx.moveTo(wx, wy);
@@ -2463,11 +2502,11 @@
           ctx.restore();
         }
         // Bubbles
-        if (Math.random() < 0.03 && wb.length > 0) {
-          var bRow = wb[Math.floor(Math.random() * wb.length)];
+        if (Math.random() < 0.03) {
+          var br = wl.topRow + Math.floor(Math.random() * totalRows);
           parts.push({
-            x: (bRow.left + Math.random() * (bRow.right - bRow.left)) * TILE + TILE / 2,
-            y: bRow.row * TILE + TILE * 0.5,
+            x: (wl.left + Math.random() * (wl.right - wl.left)) * TILE + TILE / 2,
+            y: br * TILE + TILE * 0.5,
             vx: (Math.random() - 0.5) * 0.3,
             vy: -0.5 - Math.random() * 0.8,
             life: 25 + Math.random() * 25,
