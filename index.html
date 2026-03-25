@@ -1020,92 +1020,6 @@
       return shape;
     }
 
-    // ── Tunnel system connecting clearings ──
-    var tunnelShapes = {}; // cached tunnel paths per zone pair
-
-    function getTunnelShape(zone) {
-      // Tunnel connects bottom of clearing `zone` to top of clearing `zone+1`
-      if (tunnelShapes[zone]) return tunnelShapes[zone];
-      if (zone < 1) { tunnelShapes[zone] = []; return []; }
-
-      var shape = []; // array of { row, left, right }
-      var seed = zone * 7919 + 3571;
-
-      // Source: bottom of clearing zone
-      var srcShape = getClearingShape(zone);
-      var srcBottom = srcShape[CLEARING_HEIGHT - 1];
-      var srcRow = zone * CLEARING_INTERVAL + CLEARING_HEIGHT; // first row below clearing
-
-      // Destination: top of clearing zone+1
-      var dstShape = getClearingShape(zone + 1);
-      var dstTop = dstShape[0];
-      var dstRow = (zone + 1) * CLEARING_INTERVAL; // first row of next clearing
-
-      if (!srcBottom || !dstTop) { tunnelShapes[zone] = []; return []; }
-
-      var totalRows = dstRow - srcRow;
-      if (totalRows <= 0) { tunnelShapes[zone] = []; return []; }
-
-      // Start center from source clearing, end center at destination clearing
-      var startCenter = Math.floor((srcBottom.left + srcBottom.right) / 2);
-      var endCenter = Math.floor((dstTop.left + dstTop.right) / 2);
-
-      // Tunnel width: 1-2 blocks, aggressive zigzag
-      var curCenter = startCenter;
-      var zigDir = seededRand(seed) > 0.5 ? 1 : -1; // initial zigzag direction
-      var zigLen = 2 + Math.floor(seededRand(seed + 1) * 3); // rows before switching
-      var zigCount = 0;
-      for (var i = 0; i < totalRows; i++) {
-        var progress = i / totalRows;
-        // Base lerp toward destination
-        var targetCenter = startCenter + (endCenter - startCenter) * progress;
-
-        // Aggressive zigzag: shift sideways in alternating runs
-        zigCount++;
-        if (zigCount >= zigLen) {
-          zigDir *= -1;
-          zigLen = 2 + Math.floor(seededRand(seed + i * 47 + 999) * 3);
-          zigCount = 0;
-        }
-        var zigShift = zigDir * (2 + Math.floor(seededRand(seed + i * 47) * 2));
-        curCenter = Math.round(targetCenter + zigShift);
-        curCenter = Math.max(2, Math.min(COLS - 3, curCenter));
-
-        // Narrow width: 1 block wide, occasionally 2 near clearings
-        var distFactor = Math.min(progress, 1 - progress) * 2;
-        var baseWidth = 0.5 + (1 - distFactor) * 0.5;
-        var halfW = Math.max(0, Math.round(baseWidth));
-
-        var left = Math.max(1, curCenter - halfW);
-        var right = Math.min(COLS - 2, curCenter + halfW);
-
-        shape.push({ row: srcRow + i, left: left, right: right });
-      }
-
-      tunnelShapes[zone] = shape;
-      return shape;
-    }
-
-    function isTunnelCell(r, c) {
-      if (isMegaClearingRow(r)) return false; // mega-clearing takes priority
-      if (r < CLEARING_INTERVAL + CLEARING_HEIGHT) return false;
-      // Determine which zone's tunnel this row could belong to
-      // Tunnel from zone N spans rows [N*25+8, (N+1)*25-1]
-      var zone = Math.floor(r / CLEARING_INTERVAL);
-      // Check if we're in the gap between clearing `zone` bottom and clearing `zone+1` top
-      var tunnelStart = zone * CLEARING_INTERVAL + CLEARING_HEIGHT;
-      var tunnelEnd = (zone + 1) * CLEARING_INTERVAL;
-      if (r < tunnelStart || r >= tunnelEnd) return false;
-      if (zone < 1) return false;
-      var shape = getTunnelShape(zone);
-      var idx = r - tunnelStart;
-      if (idx >= 0 && idx < shape.length) {
-        var s = shape[idx];
-        return c >= s.left && c <= s.right;
-      }
-      return false;
-    }
-
     function isClearingCell(r, c) {
       // Skip if inside a mega-clearing (mega takes priority)
       if (isMegaClearingRow(r)) return false;
@@ -1191,7 +1105,6 @@
         if (depth < 2) { t = E; }
         else if (isMegaClearingCell(r, c)) { t = E; }
         else if (isClearingCell(r, c)) { t = E; }
-        else if (isTunnelCell(r, c)) { t = E; }
         else { t = pickBlock(depth); }
         row[c] = { t: t, hp: (t === E ? 0 : BDEF[t].hp), cr: 0 };
       }
@@ -1249,54 +1162,6 @@
                 type: ct,
                 zone: zone,
                 wallRow: w.wr, wallCol: w.wc
-              });
-            }
-          }
-        }
-      }
-
-      // Place crystal decorations in tunnel walls
-      var tunnelZone = Math.floor(r / CLEARING_INTERVAL);
-      var tunnelStart = tunnelZone * CLEARING_INTERVAL + CLEARING_HEIGHT;
-      var tunnelEnd = (tunnelZone + 1) * CLEARING_INTERVAL;
-      if (r >= tunnelStart && r < tunnelEnd && tunnelZone >= 1) {
-        if (!clearingCrystals[tunnelZone]) {
-          clearingCrystals[tunnelZone] = CRYSTAL_TYPES[Math.floor(seededRand(tunnelZone * 53) * CRYSTAL_TYPES.length)];
-        }
-        var tct = clearingCrystals[tunnelZone];
-        for (var c = 1; c < COLS - 1; c++) {
-          if (row[c].t !== E || !isTunnelCell(r, c)) continue;
-          var twalls = [];
-          if (!isTunnelCell(r, c - 1) && !isClearingCell(r, c - 1)) twalls.push({ dir: 'left', wr: r, wc: c - 1 });
-          if (!isTunnelCell(r, c + 1) && !isClearingCell(r, c + 1)) twalls.push({ dir: 'right', wr: r, wc: c + 1 });
-          if (!isTunnelCell(r - 1, c) && !isClearingCell(r - 1, c)) twalls.push({ dir: 'up', wr: r - 1, wc: c });
-          if (!isTunnelCell(r + 1, c) && !isClearingCell(r + 1, c)) twalls.push({ dir: 'down', wr: r + 1, wc: c });
-          if (twalls.length === 0) continue;
-          var tseed = r * 1000 + c + 50000;
-          for (var twi = 0; twi < twalls.length; twi++) {
-            var tw = twalls[twi];
-            var tBaseRot, tBaseAX = c * TILE + TILE / 2, tBaseAY = r * TILE + TILE / 2;
-            if (tw.dir === 'up')         { tBaseRot = 0;              tBaseAY = r * TILE + TILE * 0.05; }
-            else if (tw.dir === 'down')  { tBaseRot = Math.PI;        tBaseAY = r * TILE + TILE * 0.95; }
-            else if (tw.dir === 'left')  { tBaseRot = Math.PI * 0.5;  tBaseAX = c * TILE + TILE * 0.05; }
-            else                         { tBaseRot = -Math.PI * 0.5; tBaseAX = c * TILE + TILE * 0.95; }
-            var tcount = 2 + Math.floor(seededRand(tseed * 43 + twi * 71) * 2);
-            for (var tci = 0; tci < tcount; tci++) {
-              var tcs = tseed * 100 + twi * 50 + tci;
-              var tspread, toffPerp;
-              tspread = (seededRand(tcs * 61) - 0.5) * TILE * 0.9;
-              toffPerp = (seededRand(tcs * 73) - 0.5) * TILE * 0.15;
-              var tcx, tcy;
-              if (tw.dir === 'up' || tw.dir === 'down') { tcx = tBaseAX + tspread; tcy = tBaseAY + toffPerp; }
-              else { tcx = tBaseAX + toffPerp; tcy = tBaseAY + tspread; }
-              crystalDecoList.push({
-                x: tcx, y: tcy,
-                variant: Math.floor(seededRand(tcs * 13) * 2),
-                rotation: tBaseRot + (seededRand(tcs * 97) - 0.5) * 0.6,
-                scale: 0.35 + seededRand(tcs * 31) * 0.4,
-                type: tct,
-                zone: tunnelZone,
-                wallRow: tw.wr, wallCol: tw.wc
               });
             }
           }
@@ -1509,7 +1374,7 @@
       stopBossMusic();
       score = 0; maxDepth = 0; parts = []; texts = []; debris = []; announcements = [];
       var ov = document.getElementById('announceOverlay'); if (ov) ov.innerHTML = '';
-      worldMap = {}; explosions = []; tntBlocks = []; items = []; zombies = []; bats = []; clearedZones = {}; clearingShapes = {}; tunnelShapes = {}; crystalDecoList = []; clearingCrystals = {}; megaClearedZones = {};
+      worldMap = {}; explosions = []; tntBlocks = []; items = []; zombies = []; bats = []; clearedZones = {}; clearingShapes = {}; crystalDecoList = []; clearingCrystals = {}; megaClearedZones = {};
       extraPicks = []; userPicks = []; lastActivity = {};
       doublePickActive = false; doublePickTimer = 0; updateDoublePickHUD();
       stormActive = false; stormTimer = 0; updateStormHUD();
