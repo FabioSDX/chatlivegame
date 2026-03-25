@@ -2289,60 +2289,35 @@
       var vol = poolVolumes[zone] || 0;
       if (vol <= 0) { poolCells[zone] = new Set(); return; }
 
-      // Phase 1: Flood fill from clearing to find all connected empty cells
-      var connected = new Set();
-      var queue = [];
-      // Seed: empty cells inside clearing shape
-      for (var lr = 0; lr < CLEARING_HEIGHT; lr++) {
+      // Only consider cells within the clearing shape bounds (no flood fill outside)
+      var cells = new Set();
+      var remaining = vol;
+
+      // Scan clearing rows bottom-up
+      for (var lr = CLEARING_HEIGHT - 1; lr >= 0 && remaining > 0; lr--) {
         var b = shape[lr];
         if (!b) continue;
         var row = zoneStart + lr;
         if (!worldMap[row]) continue;
+
+        var contained = [];
         for (var c = b.left; c <= b.right; c++) {
           if (worldMap[row][c] && worldMap[row][c].t === E) {
-            var key = row + ',' + c;
-            connected.add(key);
-            queue.push(row, c);
+            contained.push(c);
           }
         }
-      }
-      // BFS expand to adjacent empty cells
-      var maxExpand = 300;
-      var idx = 0;
-      while (idx < queue.length && connected.size < maxExpand) {
-        var qr = queue[idx++], qc = queue[idx++];
-        var dirs = [[qr-1,qc],[qr+1,qc],[qr,qc-1],[qr,qc+1]];
-        for (var ni = 0; ni < 4; ni++) {
-          var nr = dirs[ni][0], nc = dirs[ni][1];
-          if (nc < 0 || nc >= COLS) continue;
-          var nk = nr + ',' + nc;
-          if (connected.has(nk)) continue;
-          if (!worldMap[nr] || !worldMap[nr][nc]) continue;
-          if (worldMap[nr][nc].t !== E) continue;
-          connected.add(nk);
-          queue.push(nr, nc);
-        }
-      }
+        if (contained.length === 0) continue;
 
-      // Phase 2: Group by row, sort bottom-up, fill with volume
-      var byRow = {};
-      connected.forEach(function(key) {
-        var r = parseInt(key.split(',')[0]);
-        if (!byRow[r]) byRow[r] = [];
-        byRow[r].push(key);
-      });
-      var sortedRows = Object.keys(byRow).map(Number).sort(function(a,b){ return b - a; });
-      var cells = new Set();
-      var remaining = vol;
-      for (var ri = 0; ri < sortedRows.length && remaining > 0; ri++) {
-        var rowKeys = byRow[sortedRows[ri]];
-        if (rowKeys.length <= remaining) {
-          for (var i = 0; i < rowKeys.length; i++) cells.add(rowKeys[i]);
-          remaining -= rowKeys.length;
+        if (contained.length <= remaining) {
+          for (var i = 0; i < contained.length; i++) {
+            cells.add(row + ',' + contained[i]);
+          }
+          remaining -= contained.length;
         } else {
           remaining = 0;
         }
       }
+
       poolCells[zone] = cells;
     }
 
