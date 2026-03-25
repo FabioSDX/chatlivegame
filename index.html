@@ -2289,12 +2289,13 @@
       var vol = poolVolumes[zone] || 0;
       if (vol <= 0) { poolCells[zone] = new Set(); return; }
 
-      // Phase 1: Find all reachable empty cells starting from clearing interior
-      // Water can only exit the clearing through broken wall/floor blocks of the clearing itself
+      var clearingBottom = zoneStart + CLEARING_HEIGHT;
+
+      // Phase 1: Find reachable empty cells via BFS from clearing
       var reachable = new Set();
       var queue = [];
 
-      // Seed: empty cells strictly inside clearing (not on edges)
+      // Seed: empty cells inside clearing
       for (var lr = 0; lr < CLEARING_HEIGHT; lr++) {
         var b = shape[lr];
         if (!b) continue;
@@ -2308,18 +2309,11 @@
         }
       }
 
-      // BFS: from clearing cells, expand ONLY through broken clearing borders
-      // A cell outside the clearing is reachable only if it's adjacent to a clearing cell
-      // AND the border between them was originally a wall (solid block at clearing edge)
-      var maxCells = 400;
-      var maxDepthBelow = 12; // water dilutes after 12 rows below clearing bottom
-      var clearingBottom = zoneStart + CLEARING_HEIGHT;
+      // BFS expand — no depth limit, but physics rules apply
+      var maxCells = 500;
       var idx = 0;
       while (idx < queue.length && reachable.size < maxCells) {
         var qr = queue[idx++], qc = queue[idx++];
-        // Depth limit: don't expand beyond maxDepthBelow rows outside clearing
-        if (qr >= clearingBottom + maxDepthBelow) continue;
-        // Check if this cell is inside the clearing
         var qLocal = qr - zoneStart;
         var insideClearing = false;
         if (qLocal >= 0 && qLocal < CLEARING_HEIGHT) {
@@ -2336,7 +2330,6 @@
           if (!worldMap[nr] || !worldMap[nr][nc]) continue;
           if (worldMap[nr][nc].t !== E) continue;
 
-          // Check if neighbor is inside clearing
           var nLocal = nr - zoneStart;
           var neighborInClearing = false;
           if (nLocal >= 0 && nLocal < CLEARING_HEIGHT) {
@@ -2345,33 +2338,20 @@
           }
 
           if (neighborInClearing) {
-            // Both inside clearing or entering clearing — always OK
             reachable.add(nk);
             queue.push(nr, nc);
           } else if (insideClearing) {
-            // Exiting clearing — this is a broken wall/floor, allow water to flow out
-            // But only expand downward or same level (water doesn't flow up outside clearing)
-            if (nr >= qr) {
-              reachable.add(nk);
-              queue.push(nr, nc);
-            }
+            if (nr >= qr) { reachable.add(nk); queue.push(nr, nc); }
           } else {
-            // Both outside clearing — only expand downward (water flows down)
-            if (nr > qr) {
-              reachable.add(nk);
-              queue.push(nr, nc);
-            } else if (nr === qr) {
-              // Lateral: only if going toward lower ground (check if there's empty below)
-              if (worldMap[nr + 1] && worldMap[nr + 1][nc] && worldMap[nr + 1][nc].t === E) {
-                reachable.add(nk);
-                queue.push(nr, nc);
-              }
+            if (nr > qr) { reachable.add(nk); queue.push(nr, nc); }
+            else if (nr === qr && worldMap[nr + 1] && worldMap[nr + 1][nc] && worldMap[nr + 1][nc].t === E) {
+              reachable.add(nk); queue.push(nr, nc);
             }
           }
         }
       }
 
-      // Phase 2: Fill from bottom up with volume
+      // Phase 2: Fill bottom-up, track how much is outside clearing
       var byRow = {};
       reachable.forEach(function(key) {
         var r = parseInt(key.split(',')[0]);
@@ -2381,15 +2361,27 @@
       var sortedRows = Object.keys(byRow).map(Number).sort(function(a,b){ return b - a; });
       var cells = new Set();
       var remaining = vol;
+      var outsideCount = 0;
       for (var ri = 0; ri < sortedRows.length && remaining > 0; ri++) {
         var rowKeys = byRow[sortedRows[ri]];
         if (rowKeys.length <= remaining) {
-          for (var i = 0; i < rowKeys.length; i++) cells.add(rowKeys[i]);
+          for (var i = 0; i < rowKeys.length; i++) {
+            cells.add(rowKeys[i]);
+            if (sortedRows[ri] >= clearingBottom) outsideCount++;
+          }
           remaining -= rowKeys.length;
         } else {
           remaining = 0;
         }
       }
+
+      // Phase 3: Drain — water outside clearing slowly reduces volume (dilution)
+      if (outsideCount > 0) {
+        // Lose 1 volume per 2 outside tiles each computation (gradual drain)
+        var drain = Math.max(1, Math.floor(outsideCount / 2));
+        poolVolumes[zone] = Math.max(0, vol - drain);
+      }
+
       poolCells[zone] = cells;
     }
 
@@ -2432,7 +2424,10 @@
           var x = c * TILE;
           var y = r * TILE;
           var depthFromTop = r - topWaterRow;
-          var alpha = 0.2 + depthFromTop * 0.06;
+          // Dilution: water outside clearing is more transparent
+          var distFromClearing = Math.max(0, r - (zone * CLEARING_INTERVAL + CLEARING_HEIGHT));
+          var dilution = Math.max(0.3, 1 - distFromClearing * 0.06);
+          var alpha = (0.2 + depthFromTop * 0.06) * dilution;
 
           ctx.save();
           ctx.globalAlpha = Math.min(0.45, alpha);
