@@ -2322,8 +2322,10 @@
             if (worldMap[belowRow][c].t !== E) hasFloor = true;
             else if (cells.has(belowRow + ',' + c)) hasFloor = true;
           } else {
-            hasFloor = true;
+            hasFloor = true; // row not generated yet = solid terrain
           }
+          // Bottom of clearing always has floor (natural terrain below)
+          if (localRow === CLEARING_HEIGHT - 1) hasFloor = true;
           if (!hasFloor) continue;
           // Left wall
           var leftOk = false;
