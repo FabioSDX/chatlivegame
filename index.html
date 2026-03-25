@@ -2271,8 +2271,8 @@
       var cells = new Set();
       var remaining = vol;
 
-      // Scan from below the clearing upward
-      var scanBottom = zoneStart + CLEARING_HEIGHT + 10;
+      // Scan from well below the clearing upward
+      var scanBottom = zoneStart + CLEARING_HEIGHT + 50;
       var scanTop = zoneStart;
 
       for (var row = scanBottom; row >= scanTop && remaining > 0; row--) {
@@ -2379,10 +2379,7 @@
         initPool(zone);
         computePool(zone);
         var cells = poolCells[zone];
-        if (!cells || cells.size === 0) {
-          if (poolVolumes[zone] > 0) console.log('WATER DEBUG zone=' + zone + ' vol=' + poolVolumes[zone] + ' cells=0');
-          continue;
-        }
+        if (!cells || cells.size === 0) continue;
 
         var zoneStart = zone * CLEARING_INTERVAL;
         // Find top water row for surface wave
