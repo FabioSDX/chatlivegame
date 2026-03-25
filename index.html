@@ -403,7 +403,9 @@
 
   <div id="announceOverlay"></div>
 
-  <canvas id="gameCanvas"></canvas>
+  <div id="gameWrapper" style="position:relative;display:inline-block;max-width:100vw;max-height:100vh;">
+    <canvas id="gameCanvas"></canvas>
+  </div>
   <script>
     var canvas = document.getElementById('gameCanvas');
     var ctx = canvas.getContext('2d');
@@ -1843,29 +1845,20 @@
       function resetCombo(p) {
         if (p && p.combo > 0) p.combo = 0;
       }
-      function getCanvasCenter() {
-        var rect = canvas.getBoundingClientRect();
-        return { x: rect.left + rect.width / 2, y: rect.top + rect.height * 0.45 };
-      }
-
       function showComboPopup(label, color, userName) {
-        var cc = getCanvasCenter();
-        var el = document.createElement('div');
-        el.style.cssText = 'position:fixed;top:' + cc.y + 'px;left:' + cc.x + 'px;transform:translate(-50%,-50%);z-index:9998;' +
-          'width:90vw;max-width:400px;font-size:clamp(20px,12vw,48px);font-weight:900;color:' + color + ';' +
-          'text-shadow:0 0 15px ' + color + ',0 0 30px ' + color + ',0 2px 4px #000;' +
-          'pointer-events:none;animation:comboPopIn 0.35s ease-out forwards;font-family:Arial,sans-serif;text-align:center;word-wrap:break-word;';
-        el.textContent = label;
-        if (userName) {
-          var sub = document.createElement('div');
-          sub.style.cssText = 'font-size:18px;color:#fff;opacity:0.8;margin-top:4px;animation:comboShake 0.4s ease;';
-          sub.textContent = userName;
-          el.appendChild(sub);
-        }
-        document.body.appendChild(el);
+        var overlay = document.getElementById('announceOverlay');
+        var card = document.createElement('div');
+        card.className = 'announce-card';
+        card.style.border = '2px solid ' + color;
+        card.style.boxShadow = '0 0 30px ' + color;
+        card.innerHTML =
+          '<div class="announce-icon" style="font-size:32px;">' + label.split(' ')[0] + '</div>' +
+          '<div class="announce-title" style="color:' + color + ';text-shadow:0 0 12px ' + color + ';font-size:clamp(18px,8vw,36px);">' + label + '</div>' +
+          (userName ? '<div class="announce-name">' + userName + '</div>' : '');
+        overlay.appendChild(card);
         setTimeout(function() {
-          el.style.animation = 'comboPopOut 0.5s ease-in forwards';
-          setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 500);
+          card.classList.add('fade-out');
+          setTimeout(function() { if (card.parentNode) card.parentNode.removeChild(card); }, 500);
         }, 1200);
       }
       function sfxCombo(count) {
@@ -1890,21 +1883,19 @@
         sfxTormenta();
       }
       function showTormentaPopup() {
-        var cc = getCanvasCenter();
-        var el = document.createElement('div');
-        el.style.cssText = 'position:fixed;top:' + cc.y + 'px;left:' + cc.x + 'px;transform:translate(-50%,-50%);z-index:9999;' +
-          'width:90vw;max-width:400px;font-size:clamp(24px,14vw,64px);font-weight:900;color:#ff4400;' +
-          'text-shadow:0 0 20px #ff4400,0 0 40px #ff8800,0 0 60px #ffcc00,0 4px 8px #000;' +
-          'pointer-events:none;animation:comboPopIn 0.4s ease-out forwards;font-family:Arial,sans-serif;text-align:center;word-wrap:break-word;';
-        el.innerHTML = '🔥 FIRESTORM 🔥';
-        var sub = document.createElement('div');
-        sub.style.cssText = 'font-size:clamp(12px,5vw,22px);color:#ffcc00;margin-top:6px;animation:comboShake 0.5s ease infinite;text-shadow:0 0 10px #ff8800;';
-        sub.textContent = 'TOTAL DESTRUCTION';
-        el.appendChild(sub);
-        document.body.appendChild(el);
+        var overlay = document.getElementById('announceOverlay');
+        var card = document.createElement('div');
+        card.className = 'announce-card';
+        card.style.border = '2px solid #ff4400';
+        card.style.boxShadow = '0 0 40px #ff4400, 0 0 80px #ff8800';
+        card.innerHTML =
+          '<div class="announce-icon">🔥</div>' +
+          '<div class="announce-title" style="color:#ff4400;text-shadow:0 0 20px #ff4400,0 0 40px #ff8800;font-size:clamp(22px,10vw,48px);">FIRESTORM</div>' +
+          '<div class="announce-pts" style="color:#ffcc00;animation:comboShake 0.5s ease infinite;">TOTAL DESTRUCTION</div>';
+        overlay.appendChild(card);
         setTimeout(function() {
-          el.style.animation = 'comboPopOut 0.6s ease-in forwards';
-          setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 600);
+          card.classList.add('fade-out');
+          setTimeout(function() { if (card.parentNode) card.parentNode.removeChild(card); }, 600);
         }, 2000);
       }
       function showDepthWarning(meters) {
@@ -1917,23 +1908,20 @@
         ];
         var idx = Math.min(Math.floor(meters / 200) - 1, warnings.length - 1);
         var w = warnings[idx] || { text: '💀 ' + meters + 'm... DEEPER INTO MADNESS', color: '#ff0044' };
-        var cc = getCanvasCenter();
-        var el = document.createElement('div');
-        el.style.cssText = 'position:fixed;top:' + cc.y + 'px;left:' + cc.x + 'px;transform:translate(-50%,-50%);z-index:9999;' +
-          'width:90vw;max-width:500px;font-size:clamp(18px,8vw,36px);font-weight:900;color:' + w.color + ';' +
-          'text-shadow:0 0 20px ' + w.color + ',0 0 40px #000,0 4px 8px #000;' +
-          'pointer-events:none;animation:comboPopIn 0.5s ease-out forwards;font-family:Arial,sans-serif;text-align:center;' +
-          'letter-spacing:2px;';
-        el.textContent = w.text;
-        var sub = document.createElement('div');
-        sub.style.cssText = 'font-size:clamp(12px,4vw,18px);color:#888;margin-top:8px;font-weight:normal;letter-spacing:0;';
-        sub.textContent = '— ' + meters + ' meters deep —';
-        el.appendChild(sub);
-        document.body.appendChild(el);
+        var overlay = document.getElementById('announceOverlay');
+        var card = document.createElement('div');
+        card.className = 'announce-card';
+        card.style.border = '2px solid ' + w.color;
+        card.style.boxShadow = '0 0 40px ' + w.color;
+        card.innerHTML =
+          '<div class="announce-icon">💀</div>' +
+          '<div class="announce-title" style="color:' + w.color + ';text-shadow:0 0 15px ' + w.color + ';font-size:clamp(16px,7vw,30px);">' + w.text + '</div>' +
+          '<div class="announce-pts" style="color:#888;">— ' + meters + ' meters deep —</div>';
+        overlay.appendChild(card);
         shakeAmt = Math.max(shakeAmt, 12);
         setTimeout(function() {
-          el.style.animation = 'comboPopOut 0.8s ease-in forwards';
-          setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 800);
+          card.classList.add('fade-out');
+          setTimeout(function() { if (card.parentNode) card.parentNode.removeChild(card); }, 800);
         }, 2500);
       }
 
