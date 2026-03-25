@@ -948,10 +948,7 @@
     var clearingShapes = {};    // cached organic shapes per zone
 
     // ── Water in clearings (even zones: 0, 2, 4...) ──
-    var WATER_DEPTH_ROWS = 3;  // bottom 3 rows of clearing are water
     var WATER_DRAG = 0.92;     // velocity multiplier per frame in water
-    var WATER_SIM_RATE = 8;    // simulate water every N frames (slower)
-    var waterSimTick = 0;
 
     // ── Mega Clearings (every 400 rows, 200 rows tall, wall-to-wall) ──
     var MEGA_CLEARING_INTERVAL = 400; // space between mega-clearing starts
@@ -1310,11 +1307,7 @@
       var lastEmptyRow = zone * CLEARING_INTERVAL + CLEARING_HEIGHT - 1;
       if (r === lastEmptyRow && zone >= 1 && !clearedZones[zone]) {
         clearedZones[zone] = true;
-        // Place water tiles in even clearings
-        if (hasWater(zone)) {
-          // Defer water placement to update loop (rows may not be generated yet)
-          clearedZones[zone + '_needsWater'] = true;
-        }
+        // Water in even clearings is visual-only (drawn in drawWater)
         if (typeof zombies !== 'undefined' && zombies) {
           var shape = getClearingShape(zone);
           var bounds = shape[CLEARING_HEIGHT - 1];
@@ -1579,7 +1572,7 @@
         for (var row = r0; row <= r1; row++) {
           for (var col = c0; col <= c1; col++) {
             var cell = getCell(row, col);
-            if (cell && cell.t !== E && cell.t !== WATER) {
+            if (cell && cell.t !== E) {
               hitBlock(col, row, Math.max(1, Math.floor(speed * dmgBase)), p);
               if (p.vx > 0) { p.x = col * TILE - r - 1; p.vx = -p.vx * BOUNCE * FRICTION; }
               else { p.x = (col + 1) * TILE + r + 1; p.vx = -p.vx * BOUNCE * FRICTION; }
@@ -1597,7 +1590,7 @@
         for (var row = r0; row <= r1; row++) {
           for (var col = c0; col <= c1; col++) {
             var cell = getCell(row, col);
-            if (cell && cell.t !== E && cell.t !== WATER) {
+            if (cell && cell.t !== E) {
               hitBlock(col, row, Math.max(1, Math.floor(speed * dmgBase)), p);
               if (p.vy > 0) {
                 p.y = row * TILE - r - 1; p.vy = -p.vy * BOUNCE;
@@ -1979,7 +1972,7 @@
 
       function hitBlock(col, row, force, source) {
         var cell = getCell(row, col);
-        if (!cell || cell.t === E || cell.t === WATER) return false;
+        if (!cell || cell.t === E) return false;
         var def = BDEF[cell.t];
         if (cell.t === BEDROCK) return true;
         cell.hp -= force;
@@ -2042,20 +2035,6 @@
         updateStorm();
         updateTormenta();
         updateSpins();
-        // Place deferred water in clearings
-        if (pick) {
-          var pickZone = Math.floor(Math.floor(pick.y / TILE) / CLEARING_INTERVAL);
-          for (var wz = pickZone - 2; wz <= pickZone + 2; wz++) {
-            if (wz >= 1 && clearedZones[wz + '_needsWater'] && !clearedZones[wz + '_waterPlaced']) {
-              var wFloorRow = wz * CLEARING_INTERVAL + CLEARING_HEIGHT;
-              if (worldMap[wFloorRow] && worldMap[wz * CLEARING_INTERVAL + CLEARING_HEIGHT - 1]) {
-                placeWaterInClearing(wz);
-                clearedZones[wz + '_waterPlaced'] = true;
-              }
-            }
-          }
-        }
-        updateWater();
         updateZombies();
         checkPickZombieCollisions();
         updateBats();
@@ -2395,134 +2374,100 @@
       ctx.globalAlpha = 1;
     }
 
-    // ── Water Effect (tile-based with flow physics) ─────────────────────────
+    // ── Water Effect (visual overlay, no tiles) ────────────────────────────
     function hasWater(zone) {
       return zone >= 2 && zone % 2 === 0;
     }
 
-    function placeWaterInClearing(zone) {
+    function getWaterBounds(zone) {
       var shape = getClearingShape(zone);
       var zoneStart = zone * CLEARING_INTERVAL;
-      var floorRow = zoneStart + CLEARING_HEIGHT;
-      // Use the bottom clearing row shape for width
-      var botShape = shape[CLEARING_HEIGHT - 1];
-      if (!botShape) return;
-      var wLeft = botShape.left + 1;
-      var wRight = botShape.right - 1;
-      if (wLeft >= wRight) return;
-      // Force solid floor below water
-      if (worldMap[floorRow]) {
-        for (var c = wLeft; c <= wRight; c++) {
-          if (!worldMap[floorRow][c] || worldMap[floorRow][c].t === E) {
-            worldMap[floorRow][c] = { t: COBBLE, hp: 9999, cr: 0 };
-          }
-        }
+      var rows = [];
+      for (var lr = CLEARING_HEIGHT - 3; lr < CLEARING_HEIGHT; lr++) {
+        var b = shape[lr];
+        if (!b) continue;
+        rows.push({ row: zoneStart + lr, left: b.left, right: b.right });
       }
-      // Also force solid walls on left and right edges for each water row
-      for (var lr = CLEARING_HEIGHT - 2; lr < CLEARING_HEIGHT; lr++) {
-        var row = zoneStart + lr;
-        if (!worldMap[row]) continue;
-        // Left wall
-        if (wLeft > 0 && worldMap[row][wLeft - 1] && worldMap[row][wLeft - 1].t === E) {
-          worldMap[row][wLeft - 1] = { t: COBBLE, hp: 9999, cr: 0 };
-        }
-        // Right wall
-        if (wRight < COLS - 1 && worldMap[row][wRight + 1] && worldMap[row][wRight + 1].t === E) {
-          worldMap[row][wRight + 1] = { t: COBBLE, hp: 9999, cr: 0 };
-        }
-        // Place water
-        for (var c = wLeft; c <= wRight; c++) {
-          if (worldMap[row][c] && worldMap[row][c].t === E) {
-            worldMap[row][c] = { t: WATER, hp: 1, cr: 0 };
-          }
-        }
-      }
-    }
-
-    function updateWater() {
-      waterSimTick++;
-      if (waterSimTick % WATER_SIM_RATE !== 0) return;
-      var rStart = Math.max(0, Math.floor(camY / TILE) - 5);
-      var rEnd = Math.ceil((camY + canvas.height) / TILE) + 5;
-      // Simple: water only falls straight down when block below is empty
-      for (var r = rEnd; r >= rStart; r--) {
-        if (!worldMap[r]) continue;
-        for (var c = 0; c < COLS; c++) {
-          var cell = worldMap[r][c];
-          if (!cell || cell.t !== WATER) continue;
-          if (worldMap[r + 1] && worldMap[r + 1][c] && worldMap[r + 1][c].t === E) {
-            worldMap[r + 1][c] = { t: WATER, hp: 1, cr: 0 };
-            worldMap[r][c] = { t: E, hp: 0, cr: 0 };
-          }
-        }
-      }
+      return rows;
     }
 
     function isInWater(px, py) {
       var r = Math.floor(py / TILE);
       var c = Math.floor(px / TILE);
-      var cell = getCell(r, c);
-      return cell && cell.t === WATER;
+      var zone = Math.floor(r / CLEARING_INTERVAL);
+      if (!hasWater(zone)) return false;
+      var zoneStart = zone * CLEARING_INTERVAL;
+      var localRow = r - zoneStart;
+      if (localRow < CLEARING_HEIGHT - 3 || localRow >= CLEARING_HEIGHT) return false;
+      var shape = getClearingShape(zone);
+      var b = shape[localRow];
+      return b && c >= b.left && c <= b.right;
     }
 
     function drawWater() {
       var t = Date.now() * 0.003;
       var rStart = Math.floor(camY / TILE);
       var rEnd = Math.ceil((camY + canvas.height) / TILE) + 1;
-      for (var r = rStart; r <= rEnd; r++) {
-        if (!worldMap[r]) continue;
-        for (var c = 0; c < COLS; c++) {
-          var cell = worldMap[r][c];
-          if (!cell || cell.t !== WATER) continue;
-          var x = c * TILE;
-          var y = r * TILE;
-          // Water body
+      var zoneMin = Math.floor(rStart / CLEARING_INTERVAL);
+      var zoneMax = Math.ceil(rEnd / CLEARING_INTERVAL);
+
+      for (var zone = zoneMin; zone <= zoneMax; zone++) {
+        if (!hasWater(zone)) continue;
+        var wb = getWaterBounds(zone);
+        if (wb.length === 0) continue;
+
+        for (var wi = 0; wi < wb.length; wi++) {
+          var wr = wb[wi];
+          var wy = wr.row * TILE;
+          var wx = wr.left * TILE;
+          var ww = (wr.right - wr.left + 1) * TILE;
+
           ctx.save();
-          ctx.globalAlpha = 0.35;
+          // Water body
+          var depthFrac = wi / wb.length;
+          ctx.globalAlpha = 0.3 + depthFrac * 0.12;
           ctx.fillStyle = '#1e64c8';
-          ctx.fillRect(x, y, TILE, TILE);
+          ctx.fillRect(wx, wy, ww, TILE);
           // Caustic shimmer
-          ctx.globalAlpha = 0.08 + Math.sin(t * 2 + c * 0.7 + r * 0.5) * 0.04;
+          ctx.globalAlpha = 0.07;
           ctx.fillStyle = '#88ccff';
-          ctx.beginPath();
-          ctx.arc(x + TILE * 0.5 + Math.sin(t + c) * 8, y + TILE * 0.5 + Math.cos(t * 0.7 + r) * 6, 10, 0, Math.PI * 2);
-          ctx.fill();
-          // Surface wave on top water tiles
-          var above = getCell(r - 1, c);
-          if (!above || above.t !== WATER) {
+          for (var cx = 0; cx < ww; cx += 28) {
+            var cy = Math.sin(t * 2 + cx * 0.05 + wi) * 4;
+            ctx.beginPath();
+            ctx.arc(wx + cx + 14, wy + TILE * 0.5 + cy, 9, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          // Surface wave on top row
+          if (wi === 0) {
             ctx.globalAlpha = 0.5;
             ctx.beginPath();
-            ctx.moveTo(x, y);
-            for (var wx = 0; wx <= TILE; wx += 4) {
-              var wy = y + Math.sin(t * 3 + (x + wx) * 0.06) * 2.5 + Math.sin(t * 1.8 + (x + wx) * 0.1) * 1.5;
-              ctx.lineTo(x + wx, wy);
+            ctx.moveTo(wx, wy);
+            for (var sx = 0; sx <= ww; sx += 6) {
+              var swy = wy + Math.sin(t * 3 + (wx + sx) * 0.05) * 3 + Math.sin(t * 1.7 + (wx + sx) * 0.09) * 2;
+              ctx.lineTo(wx + sx, swy);
             }
-            ctx.lineTo(x + TILE, y + 6);
-            ctx.lineTo(x, y + 6);
+            ctx.lineTo(wx + ww, wy + 6);
+            ctx.lineTo(wx, wy + 6);
             ctx.closePath();
-            ctx.fillStyle = 'rgba(100, 180, 255, 0.4)';
+            ctx.fillStyle = 'rgba(100, 180, 255, 0.35)';
             ctx.fill();
             ctx.strokeStyle = 'rgba(180, 220, 255, 0.6)';
             ctx.lineWidth = 1.5;
             ctx.beginPath();
-            for (var wx2 = 0; wx2 <= TILE; wx2 += 4) {
-              var wy2 = y + Math.sin(t * 3 + (x + wx2) * 0.06) * 2.5 + Math.sin(t * 1.8 + (x + wx2) * 0.1) * 1.5;
-              if (wx2 === 0) ctx.moveTo(x, wy2); else ctx.lineTo(x + wx2, wy2);
+            for (var sx2 = 0; sx2 <= ww; sx2 += 6) {
+              var swy2 = wy + Math.sin(t * 3 + (wx + sx2) * 0.05) * 3 + Math.sin(t * 1.7 + (wx + sx2) * 0.09) * 2;
+              if (sx2 === 0) ctx.moveTo(wx, swy2); else ctx.lineTo(wx + sx2, swy2);
             }
             ctx.stroke();
           }
           ctx.restore();
         }
-      }
-      // Occasional bubbles
-      if (Math.random() < 0.02) {
-        var br = rStart + Math.floor(Math.random() * (rEnd - rStart));
-        var bc = Math.floor(Math.random() * COLS);
-        var bCell = getCell(br, bc);
-        if (bCell && bCell.t === WATER) {
+        // Bubbles
+        if (Math.random() < 0.03 && wb.length > 0) {
+          var bRow = wb[Math.floor(Math.random() * wb.length)];
           parts.push({
-            x: bc * TILE + Math.random() * TILE,
-            y: br * TILE + Math.random() * TILE,
+            x: (bRow.left + Math.random() * (bRow.right - bRow.left)) * TILE + TILE / 2,
+            y: bRow.row * TILE + TILE * 0.5,
             vx: (Math.random() - 0.5) * 0.3,
             vy: -0.5 - Math.random() * 0.8,
             life: 25 + Math.random() * 25,
@@ -2548,7 +2493,7 @@
       for (var r = rStart; r <= rEnd; r++) {
         for (var c = 0; c < COLS; c++) {
           var cell = getCell(r, c);
-          if (!cell || cell.t === E || cell.t === WATER) continue;
+          if (!cell || cell.t === E) continue;
           var x = c * TILE;
           var y = r * TILE;
           var tex = BTEX[cell.t];
@@ -3718,7 +3663,7 @@
         var footCol = Math.floor(z.x / TILE);
         var groundCell = getCell(footRow, footCol);
         z.grounded = false;
-        if (groundCell && groundCell.t !== E && groundCell.t !== WATER && z.vy >= 0) {
+        if (groundCell && groundCell.t !== E && z.vy >= 0) {
           z.y = footRow * TILE - ZOMBIE_SIZE * 0.5;
           z.vy = 0;
           z.grounded = true;
@@ -5598,7 +5543,7 @@
             for (var col = c0; col <= c1; col++) {
               if (col < 0 || col >= COLS) continue;
               var cell = worldMap[row] ? worldMap[row][col] : null;
-              if (cell && cell.t !== E && cell.t !== BEDROCK && cell.t !== WATER) {
+              if (cell && cell.t !== E && cell.t !== BEDROCK) {
                 var pPick = p.pickaxe || currentPickaxe;
                 var dmg = Math.max(3, Math.floor(SPIN_DMG_MULT * (pPick ? pPick.damage : 1)));
                 hitBlock(col, row, dmg, p);
