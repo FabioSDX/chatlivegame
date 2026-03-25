@@ -2343,10 +2343,8 @@
           } else if (insideClearing) {
             if (nr >= qr) { reachable.add(nk); queue.push(nr, nc); }
           } else {
-            if (nr > qr) { reachable.add(nk); queue.push(nr, nc); }
-            else if (nr === qr && worldMap[nr + 1] && worldMap[nr + 1][nc] && worldMap[nr + 1][nc].t === E) {
-              reachable.add(nk); queue.push(nr, nc);
-            }
+            // Outside clearing: ONLY straight down, no lateral movement
+            if (nr > qr && nc === qc) { reachable.add(nk); queue.push(nr, nc); }
           }
         }
       }
