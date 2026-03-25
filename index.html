@@ -1310,28 +1310,42 @@
         }
       }
 
-      // ── Mini-clearing: spawn chest ──
-      var miniStart = zone * CLEARING_INTERVAL + MINI_CLEARING_OFFSET;
-      var miniLastRow = miniStart + MINI_CLEARING_HEIGHT - 1;
+      // ── Mini-clearing: spawn mineral pile ──
+      var miniStart2 = zone * CLEARING_INTERVAL + MINI_CLEARING_OFFSET;
+      var miniLastRow = miniStart2 + MINI_CLEARING_HEIGHT - 1;
       if (r === miniLastRow && zone >= 1 && !miniClearedZones[zone]) {
         var miniEliminated = false;
-        for (var mcr = miniStart - 5; mcr <= miniStart + MINI_CLEARING_HEIGHT + 5; mcr++) {
+        for (var mcr = miniStart2 - 5; mcr <= miniStart2 + MINI_CLEARING_HEIGHT + 5; mcr++) {
           if (isMegaClearingRow(mcr)) { miniEliminated = true; break; }
         }
         if (!miniEliminated) {
           miniClearedZones[zone] = true;
+          // Pick mineral type by weighted random
+          var totalW = 0;
+          for (var mi = 0; mi < MINERAL_PILE_DEFS.length; mi++) totalW += MINERAL_PILE_DEFS[mi].weight;
+          var roll = seededRand(zone * 311) * totalW;
+          var mineralDef = MINERAL_PILE_DEFS[0];
+          var cumW = 0;
+          for (var mi = 0; mi < MINERAL_PILE_DEFS.length; mi++) {
+            cumW += MINERAL_PILE_DEFS[mi].weight;
+            if (roll < cumW) { mineralDef = MINERAL_PILE_DEFS[mi]; break; }
+          }
+          // Place ore blocks inside the mini-clearing
           var mShape = getMiniClearingShape(zone);
-          var mBounds = mShape[0]; // first row (smaller clearing)
-          if (mBounds) {
-            var chestCol = Math.floor((mBounds.left + mBounds.right) / 2);
-            var chestType = CHEST_TYPES[Math.floor(seededRand(zone * 311) * CHEST_TYPES.length)];
-            chests.push({
-              x: chestCol * TILE + TILE / 2,
-              y: miniStart * TILE + TILE / 2,
-              zone: zone,
-              opened: false,
-              type: chestType
-            });
+          var numBlocks = mineralDef.min + Math.floor(seededRand(zone * 499) * (mineralDef.max - mineralDef.min + 1));
+          var placed = 0;
+          for (var mlr = 0; mlr < MINI_CLEARING_HEIGHT && placed < numBlocks; mlr++) {
+            var mb = mShape[mlr];
+            if (!mb) continue;
+            var mrow = miniStart2 + mlr;
+            if (!worldMap[mrow]) continue;
+            for (var mc = mb.left; mc <= mb.right && placed < numBlocks; mc++) {
+              if (worldMap[mrow][mc] && worldMap[mrow][mc].t === E) {
+                var def = BDEF[mineralDef.t];
+                worldMap[mrow][mc] = { t: mineralDef.t, hp: def ? def.hp : 2, cr: 0 };
+                placed++;
+              }
+            }
           }
         }
       }
@@ -1500,13 +1514,17 @@
     var explosions = [];
     var tntBlocks = [];
 
-    // ── Chests in mini-clearings ──
-    var chests = []; // { x, y, zone, opened, type }
-    var CHEST_SIZE = 40;
-    var CHEST_TYPES = [
-      { name: 'Gold',    color: '#ffcc00', glow: '#ffe066', points: 500,  emoji: '💰' },
-      { name: 'Diamond', color: '#44ddff', glow: '#88ffff', points: 1000, emoji: '💎' },
-      { name: 'Ancient', color: '#ff44ff', glow: '#ff88ff', points: 2000, emoji: '👑' }
+    // ── Mineral piles in mini-clearings ──
+    var MINERAL_PILE_DEFS = [
+      // { type, weight (higher = more common), minCount, maxCount }
+      { t: COAL,    weight: 30, min: 6, max: 10 },
+      { t: COPPER,  weight: 20, min: 5, max: 8 },
+      { t: IRON,    weight: 18, min: 4, max: 7 },
+      { t: LAPIS,   weight: 12, min: 3, max: 6 },
+      { t: GOLD,    weight: 10, min: 3, max: 5 },
+      { t: REDSTONE,weight: 8,  min: 2, max: 5 },
+      { t: DIAMOND, weight: 3,  min: 2, max: 4 },
+      { t: EMERALD, weight: 2,  min: 1, max: 3 }
     ];
     var tntFuseSounds = {};
     var shakeAmt = 0;
@@ -2754,36 +2772,6 @@
       }
 
       // blocos TNT caindo
-      // ── Draw chests ──
-      for (var ci = 0; ci < chests.length; ci++) {
-        var ch = chests[ci];
-        if (ch.opened) continue;
-        var chY = ch.y;
-        var chX = ch.x;
-        if (chY < camY - 100 || chY > camY + canvas.height + 100) continue;
-        var t2 = Date.now() * 0.003;
-        var bob = Math.sin(t2 + ci * 2) * 3; // gentle bobbing
-        ctx.save();
-        ctx.translate(chX, chY + bob);
-        // Chest body
-        ctx.fillStyle = '#8B4513';
-        ctx.fillRect(-CHEST_SIZE / 2, -CHEST_SIZE / 2 + 4, CHEST_SIZE, CHEST_SIZE * 0.6);
-        // Chest lid
-        ctx.fillStyle = '#A0522D';
-        ctx.fillRect(-CHEST_SIZE / 2 - 2, -CHEST_SIZE / 2, CHEST_SIZE + 4, CHEST_SIZE * 0.35);
-        // Lock/gem
-        ctx.fillStyle = ch.type.color;
-        ctx.shadowBlur = 8; ctx.shadowColor = ch.type.glow;
-        ctx.fillRect(-5, -CHEST_SIZE / 2 + 6, 10, 10);
-        ctx.shadowBlur = 0;
-        // Sparkle
-        ctx.globalAlpha = 0.4 + Math.sin(t2 * 2 + ci) * 0.3;
-        ctx.fillStyle = ch.type.glow;
-        ctx.font = '16px Arial'; ctx.textAlign = 'center';
-        ctx.fillText('✨', Math.sin(t2 + ci * 3) * 15, -CHEST_SIZE / 2 - 8);
-        ctx.restore();
-      }
-
       for (var i = 0; i < tntBlocks.length; i++) {
         var b = tntBlocks[i];
         var glowSpeed = b.fuse <= 1 ? 8 : b.fuse <= 3 ? 4 : 1.5;
@@ -5736,9 +5724,10 @@
         phase: 'charge',
         timer: SPIN_CHARGE,
         totalTimer: SPIN_CHARGE,
-        origSpin: p.spin
+        origSpin: p.spin,
+        color: p.color || '#ff44ff'
       });
-      spawnText(p.x, p.y - 40, '🌀 SPIN ' + next.direction.toUpperCase() + '!', '#ff44ff');
+      spawnText(p.x, p.y - 40, '🌀 SPIN ' + next.direction.toUpperCase() + '!', p.color || '#ff44ff');
       if (_audioStarted) sfxSpinCharge();
     }
 
@@ -5760,7 +5749,7 @@
           if (s.timer % 3 === 0) {
             var pa = Math.random() * Math.PI * 2;
             var pr = 20 + Math.random() * 20;
-            parts.push({ x: p.x + Math.cos(pa) * pr, y: p.y + Math.sin(pa) * pr, vx: -Math.cos(pa) * 2, vy: -Math.sin(pa) * 2, life: 15, color: '#ff44ff', r: 3 + Math.random() * 3 });
+            parts.push({ x: p.x + Math.cos(pa) * pr, y: p.y + Math.sin(pa) * pr, vx: -Math.cos(pa) * 2, vy: -Math.sin(pa) * 2, life: 15, color: s.color, r: 3 + Math.random() * 3 });
           }
           s.timer--;
           if (s.timer <= 0) {
@@ -5814,7 +5803,7 @@
                 vx: Math.cos(sparkAng) * (3 + Math.random() * 4),
                 vy: Math.sin(sparkAng) * (3 + Math.random() * 4),
                 life: 8 + Math.random() * 6,
-                color: Math.random() < 0.5 ? '#ffaa00' : '#ff44ff',
+                color: Math.random() < 0.5 ? '#ffaa00' : s.color,
                 r: 1.5 + Math.random() * 2
               });
             }
@@ -5841,50 +5830,62 @@
         if (activeSpins[i].pick === p) { spin = activeSpins[i]; break; }
       }
       if (!spin) return;
+      var sc = spin.color || '#ff44ff';
       ctx.save();
       if (spin.phase === 'charge') {
         var prog = 1 - (spin.timer / spin.totalTimer);
         var r = 30 + prog * 20;
-        ctx.globalAlpha = 0.3 + prog * 0.3;
-        ctx.strokeStyle = '#ff44ff';
+        ctx.globalAlpha = 0.3 + prog * 0.4;
+        ctx.strokeStyle = sc;
         ctx.lineWidth = 2 + prog * 3;
+        ctx.shadowBlur = 10 + prog * 15;
+        ctx.shadowColor = sc;
         ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.stroke();
         // Inner spinning ring
-        ctx.globalAlpha = 0.2 + prog * 0.4;
-        ctx.strokeStyle = '#ffaa00';
+        ctx.globalAlpha = 0.3 + prog * 0.5;
+        ctx.strokeStyle = '#fff';
         ctx.lineWidth = 1.5;
-        var ringAng = Date.now() * 0.01;
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = sc;
+        var ringAng = Date.now() * 0.015;
         ctx.beginPath();
         ctx.arc(p.x, p.y, r * 0.6, ringAng, ringAng + Math.PI * 1.2);
         ctx.stroke();
+        // Bright center glow
+        ctx.shadowBlur = 0;
+        var cg = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 0.4);
+        cg.addColorStop(0, sc.replace(')', ',0.3)').replace('rgb', 'rgba').replace('#', ''));
+        cg.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.globalAlpha = prog * 0.5;
+        ctx.fillStyle = 'rgba(255,255,255,' + (prog * 0.3) + ')';
+        ctx.beginPath(); ctx.arc(p.x, p.y, r * 0.4, 0, Math.PI * 2); ctx.fill();
       } else {
-        // Dash: speed lines behind the pick
-        var trailLen = 40;
-        var perpX = -spin.dir.y, perpY = spin.dir.x; // perpendicular
-        ctx.globalAlpha = 0.35;
+        // Dash: speed lines in player color
+        var trailLen = 45;
+        var perpX = -spin.dir.y, perpY = spin.dir.x;
         for (var li = 0; li < 5; li++) {
           var offset = (li - 2) * 10;
           var sx = p.x - spin.dir.x * trailLen + perpX * offset;
           var sy = p.y - spin.dir.y * trailLen + perpY * offset;
-          var grad = ctx.createLinearGradient(sx, sy, p.x + perpX * offset, p.y + perpY * offset);
-          grad.addColorStop(0, 'rgba(255,68,255,0)');
-          grad.addColorStop(0.5, 'rgba(255,170,0,0.4)');
-          grad.addColorStop(1, 'rgba(255,68,255,0.6)');
-          ctx.strokeStyle = grad;
-          ctx.lineWidth = 2;
+          ctx.globalAlpha = 0.15 + (2 - Math.abs(li - 2)) * 0.1;
+          ctx.strokeStyle = sc;
+          ctx.lineWidth = 3 - Math.abs(li - 2) * 0.5;
+          ctx.shadowBlur = 6;
+          ctx.shadowColor = sc;
           ctx.beginPath();
           ctx.moveTo(sx, sy);
           ctx.lineTo(p.x + perpX * offset, p.y + perpY * offset);
           ctx.stroke();
         }
-        // Glow around pick
+        // Bright glow around pick
+        ctx.shadowBlur = 0;
         var pulse = 0.7 + Math.sin(spin.timer * 0.6) * 0.3;
-        var gr = 28 * pulse;
+        var gr = 32 * pulse;
         var grd = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, gr);
-        grd.addColorStop(0, 'rgba(255, 68, 255, 0.3)');
-        grd.addColorStop(0.5, 'rgba(255, 170, 0, 0.15)');
-        grd.addColorStop(1, 'rgba(255, 68, 255, 0)');
-        ctx.globalAlpha = 0.6;
+        grd.addColorStop(0, 'rgba(255,255,255,0.25)');
+        grd.addColorStop(0.4, sc.length === 7 ? sc + '44' : 'rgba(255,68,255,0.25)');
+        grd.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.globalAlpha = 0.7;
         ctx.fillStyle = grd;
         ctx.beginPath(); ctx.arc(p.x, p.y, gr, 0, Math.PI * 2); ctx.fill();
       }
@@ -5895,9 +5896,9 @@
       var ac = getAC(); if (!ac) return;
       var t = ac.currentTime;
       var osc = ac.createOscillator(); var g = ac.createGain();
-      osc.type = 'sawtooth'; osc.frequency.setValueAtTime(200, t);
-      osc.frequency.linearRampToValueAtTime(800, t + 0.4);
-      g.gain.setValueAtTime(0.15, t); g.gain.linearRampToValueAtTime(0, t + 0.5);
+      osc.type = 'triangle'; osc.frequency.setValueAtTime(80, t);
+      osc.frequency.exponentialRampToValueAtTime(300, t + 0.45);
+      g.gain.setValueAtTime(0.18, t); g.gain.linearRampToValueAtTime(0, t + 0.5);
       osc.connect(g); g.connect(ac.destination);
       osc.start(t); osc.stop(t + 0.5);
     }
@@ -5906,11 +5907,11 @@
       var ac = getAC(); if (!ac) return;
       var t = ac.currentTime;
       var osc = ac.createOscillator(); var g = ac.createGain();
-      osc.type = 'square'; osc.frequency.setValueAtTime(600, t);
-      osc.frequency.linearRampToValueAtTime(150, t + 0.3);
-      g.gain.setValueAtTime(0.2, t); g.gain.linearRampToValueAtTime(0, t + 0.4);
+      osc.type = 'triangle'; osc.frequency.setValueAtTime(250, t);
+      osc.frequency.exponentialRampToValueAtTime(60, t + 0.35);
+      g.gain.setValueAtTime(0.22, t); g.gain.linearRampToValueAtTime(0, t + 0.45);
       osc.connect(g); g.connect(ac.destination);
-      osc.start(t); osc.stop(t + 0.4);
+      osc.start(t); osc.stop(t + 0.45);
     }
 
     function updateLeaderboard() {
