@@ -1843,9 +1843,15 @@
       function resetCombo(p) {
         if (p && p.combo > 0) p.combo = 0;
       }
+      function getCanvasCenter() {
+        var rect = canvas.getBoundingClientRect();
+        return { x: rect.left + rect.width / 2, y: rect.top + rect.height * 0.45 };
+      }
+
       function showComboPopup(label, color, userName) {
+        var cc = getCanvasCenter();
         var el = document.createElement('div');
-        el.style.cssText = 'position:fixed;top:45%;left:50%;transform:translate(-50%,-50%);z-index:9998;' +
+        el.style.cssText = 'position:fixed;top:' + cc.y + 'px;left:' + cc.x + 'px;transform:translate(-50%,-50%);z-index:9998;' +
           'width:90vw;max-width:400px;font-size:clamp(20px,12vw,48px);font-weight:900;color:' + color + ';' +
           'text-shadow:0 0 15px ' + color + ',0 0 30px ' + color + ',0 2px 4px #000;' +
           'pointer-events:none;animation:comboPopIn 0.35s ease-out forwards;font-family:Arial,sans-serif;text-align:center;word-wrap:break-word;';
@@ -1884,8 +1890,9 @@
         sfxTormenta();
       }
       function showTormentaPopup() {
+        var cc = getCanvasCenter();
         var el = document.createElement('div');
-        el.style.cssText = 'position:fixed;top:45%;left:50%;transform:translate(-50%,-50%);z-index:9999;' +
+        el.style.cssText = 'position:fixed;top:' + cc.y + 'px;left:' + cc.x + 'px;transform:translate(-50%,-50%);z-index:9999;' +
           'width:90vw;max-width:400px;font-size:clamp(24px,14vw,64px);font-weight:900;color:#ff4400;' +
           'text-shadow:0 0 20px #ff4400,0 0 40px #ff8800,0 0 60px #ffcc00,0 4px 8px #000;' +
           'pointer-events:none;animation:comboPopIn 0.4s ease-out forwards;font-family:Arial,sans-serif;text-align:center;word-wrap:break-word;';
@@ -1910,8 +1917,9 @@
         ];
         var idx = Math.min(Math.floor(meters / 200) - 1, warnings.length - 1);
         var w = warnings[idx] || { text: '💀 ' + meters + 'm... DEEPER INTO MADNESS', color: '#ff0044' };
+        var cc = getCanvasCenter();
         var el = document.createElement('div');
-        el.style.cssText = 'position:fixed;top:40%;left:50%;transform:translate(-50%,-50%);z-index:9999;' +
+        el.style.cssText = 'position:fixed;top:' + cc.y + 'px;left:' + cc.x + 'px;transform:translate(-50%,-50%);z-index:9999;' +
           'width:90vw;max-width:500px;font-size:clamp(18px,8vw,36px);font-weight:900;color:' + w.color + ';' +
           'text-shadow:0 0 20px ' + w.color + ',0 0 40px #000,0 4px 8px #000;' +
           'pointer-events:none;animation:comboPopIn 0.5s ease-out forwards;font-family:Arial,sans-serif;text-align:center;' +
