@@ -955,7 +955,6 @@
     var MAX_BATS_MEGA = 120;
 
     // ── Water Table (underground water level) ──
-    var WATER_TABLE_ROW = 150;  // water starts at depth 150m
     var WATER_DRAG = 0.91;
     var QUEEN_SCALE = 4.0;
     var QUEEN_HP = 30;
@@ -2374,54 +2373,202 @@
       ctx.globalAlpha = 1;
     }
 
-    // ── Water Table Rendering ────────────────────────────────────────────────
+    // ── Water Pools in Clearings ────────────────────────────────────────────
+    // Each even clearing (zone 2,4,6...) has a pool with fixed water volume.
+    // Water fills from bottom up based on current geometry.
+    var WATER_DRAG = 0.91;
+    var poolVolumes = {}; // { zone: totalWaterTiles }
+    var poolCells = {};   // { zone: Set of "r,c" strings that are water this frame }
+
+    function hasPool(zone) {
+      return zone >= 2 && zone % 2 === 0;
+    }
+
+    function initPool(zone) {
+      if (poolVolumes[zone] !== undefined) return;
+      // Calculate initial volume: count CONTAINED empty tiles in bottom 3 rows
+      // A tile is contained if it has solid blocks on both sides and below
+      var shape = getClearingShape(zone);
+      var zoneStart = zone * CLEARING_INTERVAL;
+      var vol = 0;
+      for (var lr = CLEARING_HEIGHT - 3; lr < CLEARING_HEIGHT; lr++) {
+        var b = shape[lr];
+        if (!b) continue;
+        var row = zoneStart + lr;
+        if (!worldMap[row]) continue;
+        var belowRow = row + 1;
+        for (var c = b.left + 1; c < b.right; c++) { // skip edge columns
+          if (!worldMap[row][c] || worldMap[row][c].t !== E) continue;
+          // Check floor: below must be solid (or below clearing = solid terrain)
+          var floorOk = false;
+          if (lr === CLEARING_HEIGHT - 1) {
+            // Bottom row: check actual worldMap below
+            if (worldMap[belowRow] && worldMap[belowRow][c] && worldMap[belowRow][c].t !== E) floorOk = true;
+          } else {
+            floorOk = true; // not bottom row, will be supported by water below
+          }
+          if (!floorOk) continue;
+          // Check walls: left and right neighbors at clearing edge must be solid
+          var leftWall = worldMap[row][b.left] && worldMap[row][b.left].t !== E;
+          var rightWall = worldMap[row][b.right] && worldMap[row][b.right].t !== E;
+          if (!leftWall || !rightWall) continue;
+          vol++;
+        }
+      }
+      poolVolumes[zone] = vol;
+    }
+
+    function computePool(zone) {
+      var shape = getClearingShape(zone);
+      var zoneStart = zone * CLEARING_INTERVAL;
+      var vol = poolVolumes[zone] || 0;
+      var cells = new Set();
+      var remaining = vol;
+
+      // Scan bottom-up, only fill tiles that are contained
+      for (var lr = CLEARING_HEIGHT - 1; lr >= 0 && remaining > 0; lr--) {
+        var b = shape[lr];
+        if (!b) continue;
+        var row = zoneStart + lr;
+        if (!worldMap[row]) continue;
+        var belowRow = row + 1;
+
+        // Collect contained empty cells in this row
+        var contained = [];
+        for (var c = b.left; c <= b.right; c++) {
+          if (!worldMap[row][c] || worldMap[row][c].t !== E) continue;
+          // Floor check: tile below must be solid, or water (already filled), or below clearing
+          var hasFloor = false;
+          if (worldMap[belowRow] && worldMap[belowRow][c]) {
+            if (worldMap[belowRow][c].t !== E) hasFloor = true;
+            else if (cells.has(belowRow + ',' + c)) hasFloor = true; // water below
+          } else {
+            hasFloor = true; // outside worldMap = solid terrain
+          }
+          if (!hasFloor) continue;
+          // Left containment: scan left until solid
+          var leftOk = false;
+          for (var lc = c - 1; lc >= 0; lc--) {
+            if (worldMap[row][lc] && worldMap[row][lc].t !== E) { leftOk = true; break; }
+          }
+          if (!leftOk) continue;
+          // Right containment: scan right until solid
+          var rightOk = false;
+          for (var rc = c + 1; rc < COLS; rc++) {
+            if (worldMap[row][rc] && worldMap[row][rc].t !== E) { rightOk = true; break; }
+          }
+          if (!rightOk) continue;
+          contained.push(c);
+        }
+        if (contained.length === 0) continue;
+
+        if (contained.length <= remaining) {
+          for (var i = 0; i < contained.length; i++) {
+            cells.add(row + ',' + contained[i]);
+          }
+          remaining -= contained.length;
+        } else {
+          // Partial fill: center
+          var start = Math.floor((contained.length - remaining) / 2);
+          for (var i = start; i < start + remaining; i++) {
+            cells.add(row + ',' + contained[i]);
+          }
+          remaining = 0;
+        }
+      }
+
+      // Leak detection: reduce volume if water touches broken walls/floor
+      var leaked = 0;
+      cells.forEach(function(key) {
+        var p = key.split(',');
+        var r = parseInt(p[0]), c = parseInt(p[1]);
+        // Check below
+        if (worldMap[r + 1] && worldMap[r + 1][c] && worldMap[r + 1][c].t === E && !cells.has((r + 1) + ',' + c)) {
+          leaked++;
+        }
+        // Check left
+        if (c > 0 && worldMap[r][c - 1] && worldMap[r][c - 1].t === E && !cells.has(r + ',' + (c - 1))) {
+          // Scan further left — if no solid wall before edge, it's a leak
+          var wallFound = false;
+          for (var lc = c - 1; lc >= 0; lc--) {
+            if (worldMap[r][lc] && worldMap[r][lc].t !== E) { wallFound = true; break; }
+            if (cells.has(r + ',' + lc)) { wallFound = true; break; }
+          }
+          if (!wallFound) leaked++;
+        }
+        // Check right
+        if (c < COLS - 1 && worldMap[r][c + 1] && worldMap[r][c + 1].t === E && !cells.has(r + ',' + (c + 1))) {
+          var wallFound2 = false;
+          for (var rc = c + 1; rc < COLS; rc++) {
+            if (worldMap[r][rc] && worldMap[r][rc].t !== E) { wallFound2 = true; break; }
+            if (cells.has(r + ',' + rc)) { wallFound2 = true; break; }
+          }
+          if (!wallFound2) leaked++;
+        }
+      });
+      if (leaked > 0) {
+        poolVolumes[zone] = Math.max(0, poolVolumes[zone] - Math.ceil(leaked * 0.3));
+      }
+      poolCells[zone] = cells;
+    }
+
     function isInWater(px, py) {
       var r = Math.floor(py / TILE);
-      if (r < WATER_TABLE_ROW) return false;
       var c = Math.floor(px / TILE);
-      var cell = getCell(r, c);
-      return cell && cell.t === E;
+      if (isMegaClearingRow(r)) return false;
+      var zone = Math.floor(r / CLEARING_INTERVAL);
+      if (!hasPool(zone)) return false;
+      var cells = poolCells[zone];
+      return cells && cells.has(r + ',' + c);
     }
 
     function drawWaterTable() {
       var t = Date.now() * 0.003;
-      var rStart = Math.max(WATER_TABLE_ROW, Math.floor(camY / TILE));
+      var rStart = Math.floor(camY / TILE);
       var rEnd = Math.ceil((camY + canvas.height) / TILE) + 1;
-      if (rStart > rEnd) return;
+      var zoneMin = Math.max(2, Math.floor(rStart / CLEARING_INTERVAL));
+      var zoneMax = Math.ceil(rEnd / CLEARING_INTERVAL);
 
-      for (var r = rStart; r <= rEnd; r++) {
-        if (!worldMap[r]) continue;
-        for (var c = 0; c < COLS; c++) {
-          var cell = worldMap[r][c];
-          if (!cell || cell.t !== E) continue;
+      for (var zone = zoneMin; zone <= zoneMax; zone++) {
+        if (!hasPool(zone)) continue;
+        initPool(zone);
+        computePool(zone);
+        var cells = poolCells[zone];
+        if (!cells || cells.size === 0) continue;
+
+        var zoneStart = zone * CLEARING_INTERVAL;
+        // Find top water row for surface wave
+        var topWaterRow = Infinity;
+        cells.forEach(function(key) {
+          var row = parseInt(key.split(',')[0]);
+          if (row < topWaterRow) topWaterRow = row;
+        });
+
+        cells.forEach(function(key) {
+          var parts2 = key.split(',');
+          var r = parseInt(parts2[0]);
+          var c = parseInt(parts2[1]);
           var x = c * TILE;
           var y = r * TILE;
-          // Depth below water table
-          var depth = r - WATER_TABLE_ROW;
-          var alpha = Math.min(0.45, 0.15 + depth * 0.003);
+          var depthFromTop = r - topWaterRow;
+          var alpha = 0.2 + depthFromTop * 0.06;
 
           ctx.save();
-          ctx.globalAlpha = alpha;
+          ctx.globalAlpha = Math.min(0.45, alpha);
           ctx.fillStyle = '#0a3a6a';
           ctx.fillRect(x, y, TILE, TILE);
 
-          // Caustic light ripples
+          // Caustic shimmer
           ctx.globalAlpha = alpha * 0.25;
           ctx.fillStyle = '#4488cc';
           var cx1 = Math.sin(t * 1.5 + c * 0.8 + r * 0.3) * TILE * 0.3;
           var cy1 = Math.cos(t * 1.1 + r * 0.6 + c * 0.5) * TILE * 0.25;
           ctx.beginPath();
-          ctx.arc(x + TILE * 0.5 + cx1, y + TILE * 0.5 + cy1, 12, 0, Math.PI * 2);
+          ctx.arc(x + TILE * 0.5 + cx1, y + TILE * 0.5 + cy1, 11, 0, Math.PI * 2);
           ctx.fill();
 
-          // Surface wave — only on tiles where the tile above is NOT water (solid or above water table)
-          var aboveRow = r - 1;
-          var isAboveWater = false;
-          if (aboveRow >= WATER_TABLE_ROW && worldMap[aboveRow]) {
-            var aboveCell = worldMap[aboveRow][c];
-            if (aboveCell && aboveCell.t === E) isAboveWater = true;
-          }
-          if (!isAboveWater) {
+          // Surface wave on top row
+          if (r === topWaterRow) {
             ctx.globalAlpha = 0.5;
             ctx.beginPath();
             ctx.moveTo(x, y);
@@ -2436,17 +2583,15 @@
             ctx.fill();
           }
           ctx.restore();
-        }
-      }
+        });
 
-      // Bubbles
-      if (Math.random() < 0.04) {
-        var br = rStart + Math.floor(Math.random() * (rEnd - rStart));
-        var bc = Math.floor(Math.random() * COLS);
-        if (worldMap[br] && worldMap[br][bc] && worldMap[br][bc].t === E) {
+        // Bubbles
+        if (Math.random() < 0.03 && cells.size > 0) {
+          var arr = Array.from(cells);
+          var rk = arr[Math.floor(Math.random() * arr.length)].split(',');
           parts.push({
-            x: bc * TILE + Math.random() * TILE,
-            y: br * TILE + Math.random() * TILE,
+            x: parseInt(rk[1]) * TILE + Math.random() * TILE,
+            y: parseInt(rk[0]) * TILE + Math.random() * TILE,
             vx: (Math.random() - 0.5) * 0.3,
             vy: -0.6 - Math.random() * 0.8,
             life: 20 + Math.random() * 25,
