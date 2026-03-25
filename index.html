@@ -1838,21 +1838,25 @@
           }
           spawnText(enemyX, enemyY - 40, label, color);
           spawnText(enemyX, enemyY - 70, '+' + bonus, '#ffffff');
-          showComboPopup(label, color, p.userName || '');
+          showComboPopup(label, color, p.userName || '', p.userAvatarUrl || '');
           sfxCombo(c);
         }
       }
       function resetCombo(p) {
         if (p && p.combo > 0) p.combo = 0;
       }
-      function showComboPopup(label, color, userName) {
+      function showComboPopup(label, color, userName, avatarUrl) {
         var overlay = document.getElementById('announceOverlay');
         var card = document.createElement('div');
         card.className = 'announce-card';
         card.style.border = '2px solid ' + color;
         card.style.boxShadow = '0 0 30px ' + color;
+        var avatarHtml = '';
+        if (avatarUrl) {
+          avatarHtml = '<img class="announce-avatar" src="' + avatarUrl + '" style="border-color:' + color + ';box-shadow:0 0 12px ' + color + '" />';
+        }
         card.innerHTML =
-          '<div class="announce-icon" style="font-size:32px;">' + label.split(' ')[0] + '</div>' +
+          avatarHtml +
           '<div class="announce-title" style="color:' + color + ';text-shadow:0 0 12px ' + color + ';font-size:clamp(18px,8vw,36px);">' + label + '</div>' +
           (userName ? '<div class="announce-name">' + userName + '</div>' : '');
         overlay.appendChild(card);
