@@ -2349,12 +2349,10 @@
             }
         }
 
+        // Only show important announcements — skip all small/medium texts for performance
+        var _importantTexts = /JOINED|MEGA|FIRESTORM|TORMENTA|THOR|NUKE|CLONE|BLACK HOLE|PASSAGE|ZOMBIE|COMBO|BOSS|BABY|ARMY|SHOCK|SPIN|PING|ACTIVATED|WARNING|DARKNESS|HELL|MADNESS|RETURNS|WATCHES/i;
         function spawnText(x, y, txt, color) {
-            // Skip small point texts (+5, +10, -1) for performance — only show big events
-            if (txt.charAt(0) === '+' || txt.charAt(0) === '-') {
-                var val = parseInt(txt.replace(/[^0-9]/g, ''));
-                if (val < 50) return; // skip small values
-            }
+            if (!_importantTexts.test(txt)) return;
             if (texts.length > MAX_TEXTS) return;
             texts.push({ x: x, y: y, txt: txt, c: color, life: 1, vy: -1.4 });
         }
