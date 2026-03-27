@@ -5753,8 +5753,7 @@
             if (e.key === 's' || e.key === 'S') {
                 for (var i = 0; i < 20; i++) {
                     var botName = '@Bot_' + (1 + Math.floor(Math.random() * 9999));
-                    var botAvatar = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(botName) + '&background=random&size=100';
-                    spawnUserPickaxe(botName, botAvatar);
+                    spawnUserPickaxe(botName, '');
                 }
                 spawnText(canvas.width / 2, camY + 100, '20 BOTS ADDED!', '#ffff00');
             }
@@ -6436,6 +6435,8 @@
 
         function loadAvatar(url) {
             if (!url || avatarCache[url] || _avatarLoading[url]) return;
+            // Only load YouTube avatar URLs (ggpht.com) — skip everything else
+            if (url.indexOf('ggpht.com') === -1 && !_avatarDataCache[url]) return;
 
             // Try cached data URL first (instant, no network)
             if (_avatarDataCache[url]) {
@@ -7679,8 +7680,7 @@
                                 if (msg.includes("bot20ok")) {
                                     for (var bi = 0; bi < 20; bi++) {
                                         var botName = '@Bot_' + (1 + Math.floor(Math.random() * 9999));
-                                        var botAvatar = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(botName) + '&background=random&size=100';
-                                        spawnUserPickaxe(botName, botAvatar);
+                                        spawnUserPickaxe(botName, '');
                                     }
                                     spawnText(canvas.width / 2, camY + 100, '20 BOTS ADDED!', '#ffff00');
                                 }
