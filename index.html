@@ -6035,7 +6035,7 @@
                         pick.userAvatarUrl = chAvatar;
                         persistentScores[ownerName].avatar = chAvatar;
                         if (!avatarCache[chAvatar]) {
-                            var avImg = new Image(); avImg.crossOrigin = 'anonymous'; avImg.src = chAvatar;
+                            var avImg = new Image(); avImg.src = chAvatar;
                             avatarCache[chAvatar] = avImg;
                         }
                     }
@@ -6211,7 +6211,7 @@
                                 if (chAvatar) {
                                     pick.userAvatarUrl = chAvatar;
                                     if (typeof avatarCache !== 'undefined' && !avatarCache[chAvatar]) {
-                                        var avImg = new Image(); avImg.crossOrigin = 'anonymous'; avImg.src = chAvatar;
+                                        var avImg = new Image(); avImg.src = chAvatar;
                                         avatarCache[chAvatar] = avImg;
                                     }
                                     if (!persistentScores[ownerName]) persistentScores[ownerName] = { score: 0, avatar: chAvatar, color: '#ffdd44' };
@@ -6322,7 +6322,7 @@
                 var av = persistentScores[ownerName].avatar;
                 pick.userAvatarUrl = av;
                 if (!avatarCache[av]) {
-                    var img = new Image(); img.crossOrigin = 'anonymous'; img.src = av;
+                    var img = new Image(); img.src = av;
                     avatarCache[av] = img;
                 }
             }
@@ -6341,13 +6341,6 @@
             // Precarrega avatar
             if (avatarUrl && !avatarCache[avatarUrl]) {
                 var img = new Image();
-                img.crossOrigin = 'anonymous';
-                img.onerror = function() {
-                    // Retry without crossOrigin (some servers block it)
-                    var retry = new Image();
-                    retry.src = avatarUrl;
-                    avatarCache[avatarUrl] = retry;
-                };
                 img.src = avatarUrl;
                 avatarCache[avatarUrl] = img;
             }
@@ -7128,7 +7121,7 @@
                                     if (cAvatarUrl) {
                                         pick.userAvatarUrl = cAvatarUrl;
                                         if (!avatarCache[cAvatarUrl]) {
-                                            var avImg = new Image(); avImg.crossOrigin = 'anonymous'; avImg.src = cAvatarUrl;
+                                            var avImg = new Image(); avImg.src = cAvatarUrl;
                                             avatarCache[cAvatarUrl] = avImg;
                                         }
                                     }
