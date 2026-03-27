@@ -61,7 +61,6 @@
             -webkit-user-select: none;
             user-select: none;
             -webkit-touch-callout: none;
-            image-rendering: crisp-edges;
             /* escala para preencher a tela mantendo proporção 1080x1920 */
             max-width: 100vw;
             max-height: 100vh;
@@ -862,7 +861,7 @@
     </div>
     <script>
         var canvas = document.getElementById('gameCanvas');
-        var ctx = canvas.getContext('2d', { desynchronized: true, alpha: false });
+        var ctx = canvas.getContext('2d');
         var COLS = 15, TILE = 72;
         var VIS = 27;
         canvas.width = COLS * TILE;
@@ -4081,9 +4080,6 @@
         var fpsUpdateInterval = 1000;
 
         function loop() {
-            // Skip when tab is hidden — saves CPU and prevents frame accumulation
-            if (document.hidden) { requestAnimationFrame(loop); return; }
-
             var now = performance.now();
             fpsFrameCount++;
             if (now - fpsLastTime >= fpsUpdateInterval) {
@@ -4097,11 +4093,6 @@
             updateFX();
             draw();
             requestAnimationFrame(loop);
-        }
-
-        // Request high-priority scheduling if available
-        if (navigator.scheduling && navigator.scheduling.isInputPending) {
-            // Hint to browser that this is a high-priority animation
         }
 
         // ── ZOMBIES ────────────────────────────────────────────────────────────────
