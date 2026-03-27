@@ -4895,10 +4895,9 @@
 
                 // ── Zombie Boss: dynamic movement — patrol + chase + jump ──
                 if (z.isZBoss && !z._bhCaptured) {
-                    // Apply gravity
                     z.vy += ZG;
                     // Find nearest pick to chase
-                    var nearPick = null, nearDist = 300;
+                    var nearPick = null, nearDist = 400;
                     var allP = [pick].concat(userPicks);
                     for (var np = 0; np < allP.length; np++) {
                         if (!allP[np] || allP[np].stuck) continue;
@@ -4906,27 +4905,56 @@
                         var nd = Math.sqrt(ndx * ndx + ndy * ndy);
                         if (nd < nearDist) { nearDist = nd; nearPick = allP[np]; }
                     }
-                    // Chase or patrol
                     var moveSpeed = z.speed * 2.0;
-                    if (nearPick) {
-                        z.dir = nearPick.x > z.x ? 1 : -1;
-                        z.vx += z.dir * 0.15;
-                        // Jump toward pick if it's above
-                        if (nearPick.y < z.y - TILE && z.grounded) {
-                            z.vy = -6 - Math.random() * 3;
-                            z.grounded = false;
+                    var pickClose = nearDist < ZOMBIE_SIZE * ZBOSS_SCALE * 0.8;
+
+                    // ── Boss state machine ──
+                    if (!z.grounded && z.state !== 'hurt' && z.state !== 'dead') {
+                        // Airborne — use jump animation
+                        z.state = 'jump';
+                        z.animTimer += ZOMBIE_ANIMS.jump.speed;
+                        if (z.animTimer >= ZOMBIE_ANIMS.jump.count) z.animTimer = ZOMBIE_ANIMS.jump.count - 0.01;
+                        z.vx *= 0.98;
+                    } else if (z.grounded) {
+                        if (pickClose && nearPick) {
+                            // Attack when very close
+                            if (z.state !== 'attack') { z.state = 'attack'; z.animTimer = 0; }
+                            z.animTimer += ZOMBIE_ANIMS.attack.speed;
+                            if (z.animTimer >= ZOMBIE_ANIMS.attack.count) z.animTimer = 0;
+                            z.dir = nearPick.x > z.x ? 1 : -1;
+                            z.vx *= 0.8;
+                        } else if (nearPick) {
+                            // Run toward target
+                            z.state = 'run';
+                            z.dir = nearPick.x > z.x ? 1 : -1;
+                            z.vx += z.dir * 0.2;
+                            z.animTimer += ZOMBIE_ANIMS.run.speed;
+                            if (z.animTimer >= ZOMBIE_ANIMS.run.count) z.animTimer = 0;
+                            // Jump toward pick if it's above
+                            if (nearPick.y < z.y - TILE * 1.5) {
+                                z.vy = -8 - Math.random() * 3;
+                                z.grounded = false;
+                                z.state = 'jump'; z.animTimer = 0;
+                            }
+                        } else {
+                            // Patrol — walk
+                            z.state = 'walk';
+                            z.vx = z.dir * moveSpeed;
+                            z.animTimer += ZOMBIE_ANIMS.walk.speed;
+                            if (z.animTimer >= ZOMBIE_ANIMS.walk.count) z.animTimer = 0;
+                            // Random jump while patrolling
+                            if (Math.random() < 0.01) {
+                                z.vy = -6 - Math.random() * 3;
+                                z.grounded = false;
+                                z.state = 'jump'; z.animTimer = 0;
+                            }
                         }
-                        z.animTimer += ZOMBIE_ANIMS.run.speed;
-                        if (z.animTimer >= ZOMBIE_ANIMS.run.count) z.animTimer = 0;
-                    } else {
-                        z.vx = z.dir * moveSpeed;
-                        z.animTimer += ZOMBIE_ANIMS.walk.speed;
-                        if (z.animTimer >= ZOMBIE_ANIMS.walk.count) z.animTimer = 0;
                     }
+
                     // Speed limit
                     var bSpd = Math.abs(z.vx);
-                    if (bSpd > moveSpeed * 2) z.vx = z.dir * moveSpeed * 2;
-                    z.vx *= 0.95; // friction
+                    if (bSpd > moveSpeed * 3) z.vx = z.dir * moveSpeed * 3;
+                    z.vx *= 0.95;
                     z.x += z.vx;
                     z.y += z.vy;
                     // Wall bounce
@@ -4943,11 +4971,8 @@
                         if (z.vy > 0) z.vy = 0;
                         z.grounded = true;
                     }
-                    // Random jump while patrolling
-                    if (z.grounded && !nearPick && Math.random() < 0.008) {
-                        z.vy = -5 - Math.random() * 2;
-                        z.grounded = false;
-                    }
+                    // Random groan
+                    if (Math.random() < 0.004) sfxZombieGroan();
                     continue;
                 }
 
