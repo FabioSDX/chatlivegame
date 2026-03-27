@@ -6538,10 +6538,11 @@
             for (var i = activeBlackHoles.length - 1; i >= 0; i--) {
                 var bh = activeBlackHoles[i];
                 bh.timer--;
-                if (bh.timer <= 0) { activeBlackHoles.splice(i, 1); continue; }
+                var expired = bh.timer <= 0;
 
                 var R = BLACKHOLE_RADIUS;
-                var progress = 1 - bh.timer / BLACKHOLE_DURATION; // 0→1
+                var progress = 1 - Math.max(0, bh.timer) / BLACKHOLE_DURATION;
+                var hasCaptured = false; // track if any enemy is still being sucked
 
                 // ── Suck bats: pull, shrink, spin, devour ──
                 for (var bi = bats.length - 1; bi >= 0; bi--) {
@@ -6549,14 +6550,21 @@
                     if (b.state === 'dead') continue;
                     var dx = bh.x - b.x, dy = bh.y - b.y;
                     var dist = Math.sqrt(dx * dx + dy * dy);
-                    if (dist < R) {
-                        var pull = 0.5 * Math.pow(1 - dist / R, 1.5);
-                        b.vx += (dx / (dist || 1)) * pull * 4;
-                        b.vy += (dy / (dist || 1)) * pull * 4;
-                        // Shrink and spin as they get closer
+                    var alreadyCaptured = b._bhScale !== undefined && b._bhScale < 0.95;
+                    if (dist < R || alreadyCaptured) {
+                        hasCaptured = true;
+                        // Stronger pull for already-captured enemies
+                        var pullMult = alreadyCaptured ? 6 : 4;
+                        var pull = 0.5 * Math.pow(1 - Math.min(dist, R) / R, 1.2);
+                        b.vx += (dx / (dist || 1)) * pull * pullMult;
+                        b.vy += (dy / (dist || 1)) * pull * pullMult;
+                        // Override normal movement — lock onto black hole
+                        if (alreadyCaptured) {
+                            b.vx = b.vx * 0.8 + (dx / (dist || 1)) * 5 * 0.2;
+                            b.vy = b.vy * 0.8 + (dy / (dist || 1)) * 5 * 0.2;
+                        }
                         b._bhScale = Math.max(0.05, dist / R);
-                        b._bhSpin = (b._bhSpin || 0) + 0.15 * (1 - dist / R);
-                        // Devour when very close to center
+                        b._bhSpin = (b._bhSpin || 0) + 0.2 * (1 - Math.min(dist, R) / R);
                         if (dist < 20) {
                             b.hp = 0; b.state = 'dead'; b.anim = 0; b.deadTimer = 80; // skip most death anim
                             b._bhScale = 0;
@@ -6580,12 +6588,19 @@
                     if (z.state === 'dead') continue;
                     var zdx = bh.x - z.x, zdy = bh.y - z.y;
                     var zdist = Math.sqrt(zdx * zdx + zdy * zdy);
-                    if (zdist < R) {
-                        var zpull = 0.4 * Math.pow(1 - zdist / R, 1.5);
-                        z.vx += (zdx / (zdist || 1)) * zpull * 3;
-                        z.vy += (zdy / (zdist || 1)) * zpull * 3;
+                    var zCaptured = z._bhScale !== undefined && z._bhScale < 0.95;
+                    if (zdist < R || zCaptured) {
+                        hasCaptured = true;
+                        var zpullMult = zCaptured ? 5 : 3;
+                        var zpull = 0.4 * Math.pow(1 - Math.min(zdist, R) / R, 1.2);
+                        z.vx += (zdx / (zdist || 1)) * zpull * zpullMult;
+                        z.vy += (zdy / (zdist || 1)) * zpull * zpullMult;
+                        if (zCaptured) {
+                            z.vx = z.vx * 0.8 + (zdx / (zdist || 1)) * 4 * 0.2;
+                            z.vy = z.vy * 0.8 + (zdy / (zdist || 1)) * 4 * 0.2;
+                        }
                         z._bhScale = Math.max(0.05, zdist / R);
-                        z._bhSpin = (z._bhSpin || 0) + 0.12 * (1 - zdist / R);
+                        z._bhSpin = (z._bhSpin || 0) + 0.15 * (1 - Math.min(zdist, R) / R);
                         if (zdist < 25) {
                             z.hp = 0; z.state = 'dead'; z.animTimer = 0; z.deadTimer = 80;
                             z._bhScale = 0;
@@ -6602,42 +6617,43 @@
                     }
                 }
 
-                // ── Gradual block destruction: expands from center outward ──
-                var destroyR = R * progress; // grows over time
-                if (bh.timer % 6 === 0) {
-                    var cr = Math.floor(bh.y / TILE), cc = Math.floor(bh.x / TILE);
-                    var tileR = Math.ceil(destroyR / TILE);
-                    var pts = 0;
-                    for (var r = cr - tileR; r <= cr + tileR; r++) {
-                        for (var c = cc - tileR; c <= cc + tileR; c++) {
-                            var cell = getCell(r, c);
-                            if (!cell || cell.t === E || cell.t === BEDROCK) continue;
-                            var bx2 = (c + 0.5) * TILE - bh.x, by2 = (r + 0.5) * TILE - bh.y;
-                            var blockDist = Math.sqrt(bx2 * bx2 + by2 * by2);
-                            if (blockDist < destroyR) {
-                                // Damage blocks gradually — closer = more damage
-                                var dmg = Math.max(1, Math.floor(3 * (1 - blockDist / destroyR)));
-                                cell.hp -= dmg;
-                                cell.cr = Math.min(1, 1 - cell.hp / BDEF[cell.t].hp);
-                                if (cell.hp <= 0) {
-                                    pts += (BDEF[cell.t].pts || 0);
-                                    spawnParts(c * TILE + TILE / 2, r * TILE + TILE / 2, BDEF[cell.t].glow, 2);
-                                    cell.t = E; cell.hp = 0; cell.cr = 0;
+                // ── Gradual block destruction: expands from center outward (only while active) ──
+                if (!expired) {
+                    var destroyR = R * progress;
+                    if (bh.timer % 6 === 0) {
+                        var cr = Math.floor(bh.y / TILE), cc = Math.floor(bh.x / TILE);
+                        var tileR = Math.ceil(destroyR / TILE);
+                        var pts = 0;
+                        for (var r = cr - tileR; r <= cr + tileR; r++) {
+                            for (var c = cc - tileR; c <= cc + tileR; c++) {
+                                var cell = getCell(r, c);
+                                if (!cell || cell.t === E || cell.t === BEDROCK) continue;
+                                var bx2 = (c + 0.5) * TILE - bh.x, by2 = (r + 0.5) * TILE - bh.y;
+                                var blockDist = Math.sqrt(bx2 * bx2 + by2 * by2);
+                                if (blockDist < destroyR) {
+                                    var dmg = Math.max(1, Math.floor(3 * (1 - blockDist / destroyR)));
+                                    cell.hp -= dmg;
+                                    cell.cr = Math.min(1, 1 - cell.hp / BDEF[cell.t].hp);
+                                    if (cell.hp <= 0) {
+                                        pts += (BDEF[cell.t].pts || 0);
+                                        spawnParts(c * TILE + TILE / 2, r * TILE + TILE / 2, BDEF[cell.t].glow, 2);
+                                        cell.t = E; cell.hp = 0; cell.cr = 0;
+                                    }
                                 }
                             }
                         }
-                    }
-                    if (pts > 0) {
-                        score += pts;
-                        if (bh.userName) {
-                            if (!persistentScores[bh.userName]) persistentScores[bh.userName] = { score: 0, avatar: '' };
-                            persistentScores[bh.userName].score += pts;
+                        if (pts > 0) {
+                            score += pts;
+                            if (bh.userName) {
+                                if (!persistentScores[bh.userName]) persistentScores[bh.userName] = { score: 0, avatar: '' };
+                                persistentScores[bh.userName].score += pts;
+                            }
                         }
                     }
                 }
 
-                // ── Spiral particles being sucked in ──
-                if (bh.timer % 2 === 0) {
+                // ── Spiral particles (only while active) ──
+                if (!expired && bh.timer % 2 === 0) {
                     for (var pi = 0; pi < 3; pi++) {
                         var angle = Math.random() * Math.PI * 2;
                         var pr = R * (0.4 + Math.random() * 0.6);
@@ -6649,6 +6665,11 @@
                         });
                     }
                 }
+
+                // Remove only when expired AND no captured enemies remain
+                if (expired && !hasCaptured) { activeBlackHoles.splice(i, 1); }
+                // Safety: force remove after 3 extra seconds to prevent infinite loop
+                if (bh.timer < -180) { activeBlackHoles.splice(i, 1); }
             }
         }
 
