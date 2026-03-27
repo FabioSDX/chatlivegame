@@ -1487,7 +1487,6 @@
         var QUEEN_SCALE = 4.0;
         var QUEEN_HP = 30;
         var QUEEN_COUNT = 3;
-        var QUEEN_IMMUNE = true; // Queens only die to Tormenta
 
         // ── Zombie Boss Gate (alternates with Queen Gate) ──
         var ZBOSS_SCALE = 3.5;
@@ -2951,7 +2950,6 @@
                 }
             }
             checkPickBatCollisions();
-            checkQueenBarrierCollisions();
             shakeAmt *= shakeDec;
             if (shakeAmt < 0.3) shakeAmt = 0;
         }
@@ -3903,7 +3901,6 @@
 
             // bats
             drawBats();
-            drawQueenBarrier();
 
             // textos flutuantes
             for (var j = 0; j < texts.length; j++) {
@@ -4487,18 +4484,6 @@
                         p.x = b.x + nx * (PICK_R + BR + 1);
                         p.y = b.y + ny * (PICK_R + BR + 1);
 
-                        // Queens are immune to normal hits — only Tormenta can kill them
-                        if (b.isQueen && QUEEN_IMMUNE) {
-                            // Strong bounce but no damage
-                            p.vx *= 1.5; p.vy *= 1.5;
-                            sfxBatHurt();
-                            spawnText(b.x, b.y - BAT_SIZE * 0.4, '🛡️ IMMUNE!', '#ff4444');
-                            registerComboHit(p, b.x, b.y);
-                            // Visual shake on queen
-                            b.x += (Math.random() - 0.5) * 6;
-                            break;
-                        }
-
                         b.hp -= 1;
                         b.hurtTimer = 10;
                         b.anim = 0;
@@ -4526,51 +4511,6 @@
         }
 
         // ── Queen Barrier Physical Collision ──────────────────────────────────
-        function checkQueenBarrierCollisions() {
-            var queens = [];
-            for (var i = 0; i < bats.length; i++) {
-                if (bats[i].isQueen && bats[i].state !== 'dead') queens.push(bats[i]);
-            }
-            if (queens.length === 0) return;
-            queens.sort(function (a, b) { return a.x - b.x; });
-            // Build barrier segments: wall-to-queen, queen-to-queen, queen-to-wall
-            var segments = [];
-            var wallL = TILE, wallR = (COLS - 1) * TILE;
-            segments.push({ x1: wallL, y1: queens[0].y, x2: queens[0].x, y2: queens[0].y });
-            for (var qi = 0; qi < queens.length - 1; qi++) {
-                segments.push({ x1: queens[qi].x, y1: queens[qi].y, x2: queens[qi + 1].x, y2: queens[qi + 1].y });
-            }
-            segments.push({ x1: queens[queens.length - 1].x, y1: queens[queens.length - 1].y, x2: wallR, y2: queens[queens.length - 1].y });
-            var BARRIER_THICK = 30;
-            var allPicks = [pick].concat(userPicks, extraPicks);
-            for (var pi = 0; pi < allPicks.length; pi++) {
-                var p = allPicks[pi];
-                if (!p || p.stuck) continue;
-                for (var si = 0; si < segments.length; si++) {
-                    var seg = segments[si];
-                    // Simple horizontal-ish barrier: check if pick is near the line Y
-                    var minX = Math.min(seg.x1, seg.x2), maxX = Math.max(seg.x1, seg.x2);
-                    if (p.x < minX - 20 || p.x > maxX + 20) continue;
-                    // Interpolate Y at pick's X position
-                    var frac = (maxX - minX) > 0 ? (p.x - minX) / (maxX - minX) : 0.5;
-                    frac = Math.max(0, Math.min(1, frac));
-                    var lineY = seg.y1 + (seg.y2 - seg.y1) * frac;
-                    var dy = p.y - lineY;
-                    if (Math.abs(dy) < BARRIER_THICK && p.vy > 0.5) {
-                        // Bounce pick upward
-                        p.vy = -Math.abs(p.vy) * 0.7 - 2;
-                        p.y = lineY - BARRIER_THICK;
-                        p.spin += (Math.random() - 0.5) * 0.3;
-                        spawnText(p.x, p.y - 20, '⚡', '#ff4444');
-                        // Spark particles
-                        for (var sp = 0; sp < 3; sp++) {
-                            parts.push({ x: p.x, y: lineY, vx: (Math.random() - 0.5) * 4, vy: -1 - Math.random() * 2, life: 1, dec: 0.08, c: '#ff4400', r: 2 + Math.random() * 2 });
-                        }
-                    }
-                }
-            }
-        }
-
         function drawBats() {
             var viewTop = camY - TILE * 2;
             var viewBot = camY + canvas.height + TILE * 2;
@@ -4647,54 +4587,6 @@
                 ctx.globalAlpha = 1;
                 ctx.restore();
             }
-        }
-
-        // ── Queen Energy Barrier ──────────────────────────────────────────────
-        function drawQueenBarrier() {
-            // Collect alive queens
-            var queens = [];
-            for (var i = 0; i < bats.length; i++) {
-                if (bats[i].isQueen && bats[i].state !== 'dead') queens.push(bats[i]);
-            }
-            if (queens.length < 2) return;
-            // Sort by X for consistent line drawing
-            queens.sort(function (a, b) { return a.x - b.x; });
-            var t = Date.now() * 0.003;
-            ctx.save();
-            // Draw barrier lines between adjacent queens
-            for (var qi = 0; qi < queens.length - 1; qi++) {
-                var q1 = queens[qi], q2 = queens[qi + 1];
-                var pulse = 0.5 + Math.sin(t + qi) * 0.3;
-                // Main energy beam
-                ctx.strokeStyle = 'rgba(255, 0, 80, ' + (0.4 * pulse) + ')';
-                ctx.lineWidth = 12 + Math.sin(t * 2 + qi) * 4;
-                ctx.beginPath(); ctx.moveTo(q1.x, q1.y); ctx.lineTo(q2.x, q2.y); ctx.stroke();
-                // Inner bright core
-                ctx.strokeStyle = 'rgba(255, 100, 150, ' + (0.6 * pulse) + ')';
-                ctx.lineWidth = 4 + Math.sin(t * 3) * 2;
-                ctx.beginPath(); ctx.moveTo(q1.x, q1.y); ctx.lineTo(q2.x, q2.y); ctx.stroke();
-                // Electric sparks along the line
-                for (var s = 0; s < 5; s++) {
-                    var frac = (s + 0.5) / 5 + Math.sin(t * 4 + s * 1.3) * 0.05;
-                    var sx = q1.x + (q2.x - q1.x) * frac;
-                    var sy = q1.y + (q2.y - q1.y) * frac + Math.sin(t * 5 + s * 2) * 15;
-                    ctx.fillStyle = 'rgba(255, 200, 100, ' + (0.7 * pulse) + ')';
-                    ctx.beginPath(); ctx.arc(sx, sy, 3 + Math.random() * 3, 0, Math.PI * 2); ctx.fill();
-                }
-            }
-            // Extend barrier to walls (left of first queen, right of last queen)
-            var leftQ = queens[0], rightQ = queens[queens.length - 1];
-            var wallLeft = TILE, wallRight = (COLS - 1) * TILE;
-            var pL = 0.5 + Math.sin(t + 10) * 0.3;
-            ctx.strokeStyle = 'rgba(255, 0, 80, ' + (0.3 * pL) + ')';
-            ctx.lineWidth = 10 + Math.sin(t * 2 + 5) * 3;
-            ctx.beginPath(); ctx.moveTo(wallLeft, leftQ.y); ctx.lineTo(leftQ.x, leftQ.y); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(rightQ.x, rightQ.y); ctx.lineTo(wallRight, rightQ.y); ctx.stroke();
-            ctx.strokeStyle = 'rgba(255, 100, 150, ' + (0.5 * pL) + ')';
-            ctx.lineWidth = 3;
-            ctx.beginPath(); ctx.moveTo(wallLeft, leftQ.y); ctx.lineTo(leftQ.x, leftQ.y); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(rightQ.x, rightQ.y); ctx.lineTo(wallRight, rightQ.y); ctx.stroke();
-            ctx.restore();
         }
 
         // Bat sound effects (high-pitched squeaks)
