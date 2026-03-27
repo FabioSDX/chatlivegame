@@ -4257,7 +4257,8 @@
                     b.vy += 0.05;
                     b.y += b.vy;
                     b.x += b.vx * 0.9;
-                    // Block collision while hurt
+                    // Block collision while hurt (skip if being sucked by black hole)
+                    if (!b._bhCaptured) {
                     var hHalf = BAT_SIZE * 0.35 * (b.isQueen ? QUEEN_SCALE : (b.isMother ? MOTHER_SCALE : 1));
                     var hCol = Math.floor(b.x / TILE), hRow = Math.floor(b.y / TILE);
                     for (var hr = hRow - 1; hr <= hRow + 1; hr++) {
@@ -4276,6 +4277,7 @@
                             }
                         }
                     }
+                    } // end bhCaptured check
                     if (b.hurtTimer <= 0) {
                         b.state = 'fly'; b.anim = 0;
                     }
@@ -4341,7 +4343,8 @@
                 b.x += b.vx;
                 b.y += b.vy;
 
-                // ── Block collision: push out of solid tiles ──
+                // ── Block collision: push out of solid tiles (skip if black hole captured) ──
+                if (!b._bhCaptured) {
                 var bHalf = BAT_SIZE * 0.35 * (b.isQueen ? QUEEN_SCALE : (b.isMother ? MOTHER_SCALE : 1));
                 var bCol = Math.floor(b.x / TILE), bRow = Math.floor(b.y / TILE);
                 // Check a small grid around the bat
@@ -4374,12 +4377,15 @@
                         }
                     }
                 }
+                } // end bhCaptured block collision check
 
-                // Clamp to bounds
+                // Clamp to bounds (skip if captured by black hole)
+                if (!b._bhCaptured) {
                 if (b.x < b.boundsMinX) { b.x = b.boundsMinX; b.vx = Math.abs(b.vx); }
                 if (b.x > b.boundsMaxX) { b.x = b.boundsMaxX; b.vx = -Math.abs(b.vx); }
                 if (b.y < b.boundsMinY) { b.y = b.boundsMinY; b.vy = Math.abs(b.vy); }
                 if (b.y > b.boundsMaxY) { b.y = b.boundsMaxY; b.vy = -Math.abs(b.vy); }
+                }
 
                 // Direction based on velocity
                 if (Math.abs(b.vx) > 0.3) b.dir = b.vx > 0 ? 1 : -1;
@@ -4836,7 +4842,7 @@
                 }
 
                 // ── Zombie Boss: dynamic movement — patrol + chase + jump ──
-                if (z.isZBoss) {
+                if (z.isZBoss && !z._bhCaptured) {
                     // Apply gravity
                     z.vy += ZG;
                     // Find nearest pick to chase
@@ -4893,7 +4899,11 @@
                     continue;
                 }
 
-                // ── Physics ──
+                // ── Physics (skip if captured by black hole) ──
+                if (z._bhCaptured) {
+                    z.x += z.vx; z.y += z.vy;
+                    continue;
+                }
                 var wasGrounded = z.grounded;
                 z.vy += ZG;
                 // Water interaction: zombies slow down and float
@@ -6599,6 +6609,7 @@
                         b.vy += ny * pullStr - nx * orbitStr;
                         b.vx *= 0.94; b.vy *= 0.94;
                         b._bhScale = Math.max(0.05, dist / R);
+                        b._bhCaptured = true;
                         b._bhSpin = (b._bhSpin || 0) + 0.25 * closeness;
                         if (dist < 18) {
                             b.hp = 0; b.state = 'dead'; b.anim = 0; b.deadTimer = 80;
@@ -6633,6 +6644,7 @@
                         z.vy += zny * zpull - znx * zorbit;
                         z.vx *= 0.93; z.vy *= 0.93;
                         z._bhScale = Math.max(0.05, zdist / R);
+                        z._bhCaptured = true;
                         z._bhSpin = (z._bhSpin || 0) + 0.15 * (1 - Math.min(zdist, R) / R);
                         if (zdist < 25) {
                             z.hp = 0; z.state = 'dead'; z.animTimer = 0; z.deadTimer = 80;
@@ -6718,10 +6730,27 @@
                 // Remove only when expired AND no captured enemies remain
                 if (expired && !hasCaptured && !bh._collapsing) {
                     bh._collapsing = true;
-                    bh._collapseTimer = 60; // 1 second collapse
+                    bh._collapseTimer = 60;
                     sfxBlackHoleClose();
                 }
+                // Force-kill any remaining captured enemies when collapsing
                 if (bh._collapsing) {
+                    for (var fbi = bats.length - 1; fbi >= 0; fbi--) {
+                        var fb = bats[fbi];
+                        if (fb._bhCaptured && fb.state !== 'dead') {
+                            fb.hp = 0; fb.state = 'dead'; fb.anim = 0; fb.deadTimer = 80; fb._bhScale = 0;
+                            score += fb.pts;
+                            if (bh.userName && persistentScores[bh.userName]) persistentScores[bh.userName].score += fb.pts;
+                        }
+                    }
+                    for (var fzi = zombies.length - 1; fzi >= 0; fzi--) {
+                        var fz = zombies[fzi];
+                        if (fz._bhCaptured && fz.state !== 'dead') {
+                            fz.hp = 0; fz.state = 'dead'; fz.animTimer = 0; fz.deadTimer = 80; fz._bhScale = 0;
+                            score += fz.pts;
+                            if (bh.userName && persistentScores[bh.userName]) persistentScores[bh.userName].score += fz.pts;
+                        }
+                    }
                     bh._collapseTimer--;
                     if (bh._collapseTimer <= 0) {
                         // Final flash burst
