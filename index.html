@@ -2997,6 +2997,25 @@
             for (var d = debris.length - 1; d >= 0; d--) {
                 var db = debris[d];
                 db.age++; db.ang += db.spin;
+
+                // Black hole debris: spiral toward center, shrink, spin faster
+                if (db._bhTarget) {
+                    var bht = db._bhTarget;
+                    var bdx = bht.x - db.x, bdy = bht.y - db.y;
+                    var bdist = Math.sqrt(bdx * bdx + bdy * bdy) || 1;
+                    // Pull toward center + perpendicular spiral
+                    var pullStr = 0.6;
+                    db.vx += (bdx / bdist) * pullStr + (bdy / bdist) * 1.5;
+                    db.vy += (bdy / bdist) * pullStr - (bdx / bdist) * 1.5;
+                    db.vx *= 0.92; db.vy *= 0.92;
+                    db.spin *= 1.04; // spin faster as it approaches
+                    db.size *= 0.985; // shrink
+                    db.x += db.vx; db.y += db.vy;
+                    db.life = Math.max(0, bdist / 300);
+                    if (bdist < 15 || db.size < 1) { debris.splice(d, 1); continue; }
+                    continue;
+                }
+
                 if (db.age < db.followFrames) {
                     var dTarget = db.owner || pick;
                     var dx = (dTarget ? dTarget.x : db.x) - db.x, dy = (dTarget ? dTarget.y : db.y) - db.y;
@@ -6636,7 +6655,23 @@
                                     cell.cr = Math.min(1, 1 - cell.hp / BDEF[cell.t].hp);
                                     if (cell.hp <= 0) {
                                         pts += (BDEF[cell.t].pts || 0);
-                                        spawnParts(c * TILE + TILE / 2, r * TILE + TILE / 2, BDEF[cell.t].glow, 2);
+                                        // Spawn debris that spirals into the black hole center
+                                        var dbx = c * TILE + TILE / 2, dby = r * TILE + TILE / 2;
+                                        var dAng = Math.atan2(bh.y - dby, bh.x - dbx);
+                                        for (var di = 0; di < 3; di++) {
+                                            var spread = (Math.random() - 0.5) * 1.5;
+                                            debris.push({
+                                                x: dbx + (Math.random() - 0.5) * TILE * 0.4,
+                                                y: dby + (Math.random() - 0.5) * TILE * 0.4,
+                                                vx: Math.cos(dAng + spread) * (2 + Math.random() * 2) + Math.sin(dAng) * 3,
+                                                vy: Math.sin(dAng + spread) * (2 + Math.random() * 2) - Math.cos(dAng) * 3,
+                                                t: cell.t, size: 6 + Math.random() * 6,
+                                                ang: Math.random() * Math.PI * 2,
+                                                spin: (Math.random() - 0.5) * 0.5,
+                                                age: 0, followFrames: 0, life: 1,
+                                                _bhTarget: bh
+                                            });
+                                        }
                                         cell.t = E; cell.hp = 0; cell.cr = 0;
                                     }
                                 }
