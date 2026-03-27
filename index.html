@@ -3921,7 +3921,7 @@
                         pick.userAvatarUrl = persistentScores[pick.userName].avatar;
                         loadAvatar(pick.userAvatarUrl);
                     }
-                    var ownerAvImg = avatarCache[pick.userAvatarUrl];
+                    var ownerAvImg = (pick.userAvatarUrl && avatarCache[pick.userAvatarUrl]) || null;
                     var oAvSize = isMobile ? 32 : 48;
                     var oAvY = pick.y - PICK_HALF - (isMobile ? 30 : 44);
                     if (ownerAvImg && ownerAvImg.complete && ownerAvImg.naturalWidth > 0) {
@@ -4045,7 +4045,7 @@
                     up.userAvatarUrl = persistentScores[up.userName].avatar;
                     loadAvatar(up.userAvatarUrl);
                 }
-                var avImg = avatarCache[up.userAvatarUrl];
+                var avImg = (up.userAvatarUrl && avatarCache[up.userAvatarUrl]) || null;
                 var avSize = isMobile ? 32 : 48;
                 var avY = up.y - PICK_HALF - (isMobile ? 30 : 44);
                 if (avImg && avImg.complete && avImg.naturalWidth > 0) {
@@ -4097,7 +4097,7 @@
 
             update();
             updateFX();
-            draw();
+            try { draw(); } catch(e) { console.warn('draw error:', e.message); }
             requestAnimationFrame(loop);
         }
 
