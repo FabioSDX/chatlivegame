@@ -1992,6 +1992,10 @@
         var nukeCooldown = 3600;    // 60 seconds at 60fps
         var cloneCooldown = 900;    // 15 seconds at 60fps
         var stormCooldown = 900;    // 15 seconds at 60fps
+        var blackholeCooldown = 1800; // 30 seconds at 60fps
+        var BLACKHOLE_RADIUS = 250;   // suction + destroy radius in pixels
+        var BLACKHOLE_DURATION = 300; // 5 seconds at 60fps
+        var activeBlackHoles = [];    // { x, y, timer, userName }
 
         var skillCooldowns = {};    // { userName_skillName: framesLeft }
         var activeThorAttacks = []; // { userName, x, y, hitsLeft, timer, lastX, lastY }
@@ -2744,6 +2748,7 @@
             updateExplosions();
             updateStorm();
             updateTormenta();
+            updateBlackHoles();
             updateSpins();
 
             // ── Mechanics updates ──
@@ -3470,9 +3475,10 @@
                 { id: '_nuke', color: '#ff4400', label: '☢', maxKey: 'nuke' },
                 { id: '_thor', color: '#00ffff', label: '⚡', maxKey: 'thor' },
                 { id: '_clone', color: '#44ffaa', label: '👥', maxKey: 'clone' },
-                { id: '_storm', color: '#ff88ff', label: '🏓', maxKey: 'storm' }
+                { id: '_storm', color: '#ff88ff', label: '🏓', maxKey: 'storm' },
+                { id: '_blackhole', color: '#8800ff', label: '🕳️', maxKey: 'blackhole' }
             ];
-            var maxMap = { nuke: nukeCooldown, thor: thorCooldown, clone: cloneCooldown, storm: stormCooldown };
+            var maxMap = { nuke: nukeCooldown, thor: thorCooldown, clone: cloneCooldown, storm: stormCooldown, blackhole: blackholeCooldown };
 
             context.save();
             var anyActive = false;
@@ -3831,6 +3837,7 @@
 
             // zombies
             drawZombies();
+            drawBlackHoles();
 
             // bats
             drawBats();
@@ -5660,6 +5667,7 @@
             if (e.key === '4') activateThor(pick ? pick.x : undefined, pick ? pick.y : undefined, me);
             if (e.key === '5') activateNuke(pick ? pick.x : undefined, pick ? pick.y : undefined, me);
             if (e.key === '6') activateStorm(pick); // Ping-Pong mode
+            if (e.key === '7') activateBlackHole(pick ? pick.x : undefined, pick ? pick.y : undefined, me);
             if (e.key === '8') activateTormenta(pick);
             if (e.key === 'u' || e.key === 'U') triggerBotrixEvent('follow', '@fabiosdx');
             if (e.key === 'i' || e.key === 'I') triggerBotrixEvent('superchat', '@fabiosdx');
@@ -6468,6 +6476,177 @@
             shakeAmt = Math.max(shakeAmt, 10);
             if (typeof sfxTNT === 'function') sfxTNT();
         }
+
+        function activateBlackHole(tx, ty, userName) {
+            var cdKey = userName + '_blackhole';
+            if (skillCooldowns[cdKey] && skillCooldowns[cdKey] > 0) return;
+
+            var sourcePlayer = (ownerName && userName === ownerName) ? pick : userPicks.find(function(up) { return up.userName === userName; });
+            if (!sourcePlayer) sourcePlayer = pick;
+
+            var bx = tx !== undefined ? tx : sourcePlayer.x;
+            var by = ty !== undefined ? ty : sourcePlayer.y;
+
+            skillCooldowns[cdKey] = blackholeCooldown;
+            activeBlackHoles.push({ x: bx, y: by, timer: BLACKHOLE_DURATION, userName: userName });
+            spawnText(bx, by - 40, '🕳️ BLACK HOLE!', '#8800ff');
+            shakeAmt = Math.max(shakeAmt, 12);
+            sfxBlackHole();
+        }
+
+        function sfxBlackHole() {
+            var ac = getAC(); if (!ac) return;
+            var t = ac.currentTime;
+            // Deep descending rumble
+            var osc = ac.createOscillator(), g = ac.createGain();
+            osc.type = 'sine'; osc.frequency.setValueAtTime(120, t);
+            osc.frequency.exponentialRampToValueAtTime(20, t + 2);
+            g.gain.setValueAtTime(0.0001, t);
+            g.gain.linearRampToValueAtTime(0.5, t + 0.1);
+            g.gain.exponentialRampToValueAtTime(0.0001, t + 2);
+            osc.connect(g); g.connect(ac.destination); osc.start(t); osc.stop(t + 2.1);
+            // Whoosh
+            var nLen = Math.ceil(ac.sampleRate * 1.5);
+            var buf = ac.createBuffer(1, nLen, ac.sampleRate);
+            var d = buf.getChannelData(0);
+            for (var j = 0; j < nLen; j++) d[j] = (Math.random() * 2 - 1) * Math.pow(1 - j / nLen, 2);
+            var src = ac.createBufferSource(); src.buffer = buf;
+            var filt = ac.createBiquadFilter(); filt.type = 'bandpass'; filt.frequency.value = 200; filt.Q.value = 2;
+            var ng = ac.createGain(); ng.gain.setValueAtTime(0.3, t); ng.gain.exponentialRampToValueAtTime(0.0001, t + 1.5);
+            src.connect(filt); filt.connect(ng); ng.connect(ac.destination); src.start(t);
+        }
+
+        function updateBlackHoles() {
+            for (var i = activeBlackHoles.length - 1; i >= 0; i--) {
+                var bh = activeBlackHoles[i];
+                bh.timer--;
+                if (bh.timer <= 0) { activeBlackHoles.splice(i, 1); continue; }
+
+                var R = BLACKHOLE_RADIUS;
+                var progress = 1 - bh.timer / BLACKHOLE_DURATION;
+                var killR = R * 0.3; // inner kill zone
+
+                // Suck and kill bats
+                for (var bi = bats.length - 1; bi >= 0; bi--) {
+                    var b = bats[bi];
+                    if (b.state === 'dead') continue;
+                    var dx = bh.x - b.x, dy = bh.y - b.y;
+                    var dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < R) {
+                        var pull = 0.3 * (1 - dist / R);
+                        b.vx += (dx / (dist || 1)) * pull * 3;
+                        b.vy += (dy / (dist || 1)) * pull * 3;
+                        if (dist < killR) {
+                            b.hp = 0; b.state = 'dead'; b.anim = 0; b.deadTimer = 0;
+                            score += b.pts;
+                            if (bh.userName) {
+                                if (!persistentScores[bh.userName]) persistentScores[bh.userName] = { score: 0, avatar: '' };
+                                persistentScores[bh.userName].score += b.pts;
+                            }
+                            spawnText(b.x, b.y - 20, '+' + b.pts, '#8800ff');
+                            sfxBatDeath();
+                        }
+                    }
+                }
+
+                // Suck and kill zombies
+                for (var zi = zombies.length - 1; zi >= 0; zi--) {
+                    var z = zombies[zi];
+                    if (z.state === 'dead') continue;
+                    var zdx = bh.x - z.x, zdy = bh.y - z.y;
+                    var zdist = Math.sqrt(zdx * zdx + zdy * zdy);
+                    if (zdist < R) {
+                        var zpull = 0.25 * (1 - zdist / R);
+                        z.vx += (zdx / (zdist || 1)) * zpull * 2;
+                        z.vy += (zdy / (zdist || 1)) * zpull * 2;
+                        if (zdist < killR) {
+                            z.hp = 0; z.state = 'dead'; z.animTimer = 0; z.deadTimer = 0;
+                            score += z.pts;
+                            if (bh.userName) {
+                                if (!persistentScores[bh.userName]) persistentScores[bh.userName] = { score: 0, avatar: '' };
+                                persistentScores[bh.userName].score += z.pts;
+                            }
+                            spawnText(z.x, z.y - 20, '+' + z.pts, '#8800ff');
+                            sfxZombieDeath();
+                        }
+                    }
+                }
+
+                // Destroy blocks in radius (every 10 frames)
+                if (bh.timer % 10 === 0) {
+                    var cr = Math.floor(bh.y / TILE), cc = Math.floor(bh.x / TILE);
+                    var tileR = Math.ceil(R / TILE);
+                    var pts = 0;
+                    for (var r = cr - tileR; r <= cr + tileR; r++) {
+                        for (var c = cc - tileR; c <= cc + tileR; c++) {
+                            var cell = getCell(r, c);
+                            if (!cell || cell.t === E || cell.t === BEDROCK) continue;
+                            var bx2 = (c + 0.5) * TILE - bh.x, by2 = (r + 0.5) * TILE - bh.y;
+                            if (bx2 * bx2 + by2 * by2 < R * R * progress) {
+                                pts += (BDEF[cell.t].pts || 0);
+                                spawnParts(c * TILE + TILE / 2, r * TILE + TILE / 2, BDEF[cell.t].glow, 3);
+                                cell.t = E; cell.hp = 0; cell.cr = 0;
+                            }
+                        }
+                    }
+                    if (pts > 0) {
+                        score += pts;
+                        if (bh.userName) {
+                            if (!persistentScores[bh.userName]) persistentScores[bh.userName] = { score: 0, avatar: '' };
+                            persistentScores[bh.userName].score += pts;
+                        }
+                    }
+                }
+
+                // Particles
+                if (bh.timer % 2 === 0) {
+                    var angle = Math.random() * Math.PI * 2;
+                    var pr = R * (0.3 + Math.random() * 0.7);
+                    parts.push({
+                        x: bh.x + Math.cos(angle) * pr, y: bh.y + Math.sin(angle) * pr,
+                        vx: -Math.cos(angle) * 3, vy: -Math.sin(angle) * 3,
+                        life: 1, dec: 0.05, c: Math.random() < 0.5 ? '#8800ff' : '#cc44ff', r: 2 + Math.random() * 3
+                    });
+                }
+            }
+        }
+
+        function drawBlackHoles() {
+            for (var i = 0; i < activeBlackHoles.length; i++) {
+                var bh = activeBlackHoles[i];
+                var progress = 1 - bh.timer / BLACKHOLE_DURATION;
+                var R = BLACKHOLE_RADIUS * (0.5 + progress * 0.5);
+                var pulse = 0.7 + Math.sin(bh.timer * 0.2) * 0.3;
+
+                ctx.save();
+                // Outer suction ring
+                var grad = ctx.createRadialGradient(bh.x, bh.y, 0, bh.x, bh.y, R);
+                grad.addColorStop(0, 'rgba(0, 0, 0, 0.8)');
+                grad.addColorStop(0.2, 'rgba(60, 0, 120, 0.5)');
+                grad.addColorStop(0.5, 'rgba(136, 0, 255, ' + (0.2 * pulse) + ')');
+                grad.addColorStop(0.8, 'rgba(200, 68, 255, ' + (0.08 * pulse) + ')');
+                grad.addColorStop(1, 'rgba(136, 0, 255, 0)');
+                ctx.fillStyle = grad;
+                ctx.beginPath(); ctx.arc(bh.x, bh.y, R, 0, Math.PI * 2); ctx.fill();
+
+                // Spinning accretion ring
+                ctx.strokeStyle = 'rgba(200, 100, 255, ' + (0.6 * pulse) + ')';
+                ctx.lineWidth = 3;
+                var ringAng = Date.now() * 0.008;
+                for (var ri = 0; ri < 3; ri++) {
+                    var rr = R * (0.3 + ri * 0.15);
+                    ctx.beginPath();
+                    ctx.arc(bh.x, bh.y, rr, ringAng + ri * 2, ringAng + ri * 2 + Math.PI * 1.3);
+                    ctx.stroke();
+                }
+
+                // Core
+                ctx.fillStyle = '#000';
+                ctx.beginPath(); ctx.arc(bh.x, bh.y, R * 0.12, 0, Math.PI * 2); ctx.fill();
+                ctx.restore();
+            }
+        }
+
         function activateThor(tx, ty, userName) {
             var cdKey = userName + '_thor';
             if (skillCooldowns[cdKey] && skillCooldowns[cdKey] > 0) return;
@@ -7218,6 +7397,8 @@
                                     activateNuke(tx, ty, cUser);
                                 } else if (msg.includes("clone")) {
                                     spawnClone(cUser, cAvatarUrl);
+                                } else if (msg.includes("black hole") || msg.includes("blackhole") || msg.includes("bh")) {
+                                    activateBlackHole(tx, ty, cUser);
                                 } else if (msg.includes("ping pong") || msg.includes("pingpong") || msg.includes(" pp") || msg === "pp") {
                                     // Auto-spawn pickaxe if user hasn't joined yet
                                     if (!isOwner && !userPick) {
