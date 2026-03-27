@@ -5769,14 +5769,45 @@
         var _tapCount = 0;
         var _tapTimer = null;
         var _TAP_DELAY = 350;
+        var _swipeStartX = 0, _swipeStartY = 0, _swipeStartTime = 0;
+        var _SWIPE_MIN = 40; // minimum distance in pixels
+        var _SWIPE_MAX_TIME = 400; // max time in ms
 
         canvas.addEventListener('touchstart', function (e) {
-            // no long press action
+            if (e.touches.length === 1) {
+                _swipeStartX = e.touches[0].clientX;
+                _swipeStartY = e.touches[0].clientY;
+                _swipeStartTime = Date.now();
+            }
         }, { passive: true });
 
         canvas.addEventListener('touchend', function (e) {
             e.preventDefault();
             ensureAudio();
+
+            // Check for swipe
+            var touch = e.changedTouches[0];
+            var dx = touch.clientX - _swipeStartX;
+            var dy = touch.clientY - _swipeStartY;
+            var dist = Math.sqrt(dx * dx + dy * dy);
+            var elapsed = Date.now() - _swipeStartTime;
+
+            if (dist > _SWIPE_MIN && elapsed < _SWIPE_MAX_TIME) {
+                // It's a swipe — determine direction
+                var dir;
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    dir = dx > 0 ? 'right' : 'left';
+                } else {
+                    dir = dy > 0 ? 'down' : 'up';
+                }
+                var me = ownerName || pick.userName || '@owner';
+                activateSpin(me, dir);
+                _tapCount = 0;
+                if (_tapTimer) { clearTimeout(_tapTimer); _tapTimer = null; }
+                return;
+            }
+
+            // Not a swipe — handle as tap
             _tapCount++;
             if (_tapTimer) clearTimeout(_tapTimer);
             _tapTimer = setTimeout(function () {
