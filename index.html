@@ -61,8 +61,6 @@
             -webkit-user-select: none;
             user-select: none;
             -webkit-touch-callout: none;
-            will-change: contents;
-            image-rendering: -webkit-optimize-contrast;
             image-rendering: crisp-edges;
             /* escala para preencher a tela mantendo proporção 1080x1920 */
             max-width: 100vw;
@@ -3583,20 +3581,14 @@
                         ctx.fillStyle = BDEF[cell.t].color;
                         ctx.fillRect(x - 0.5, y - 0.5, TILE + 1, TILE + 1);
                     }
-                    // Ore shimmer — only brightens the colored mineral spots, not the grey stone
+                    // Ore shimmer — subtle glow overlay (lightweight)
                     if (_oreShimmer[cell.t]) {
                         var phase = _shimmerTime + r * 0.7 + c * 0.5;
                         var glow = (Math.sin(phase) + 1) * 0.5;
-                        var alpha = 0.05 + glow * 0.2;
-                        ctx.save();
-                        ctx.globalCompositeOperation = 'lighter';
-                        ctx.globalAlpha = alpha;
-                        // Re-draw the block texture — 'lighter' adds to existing pixels
-                        // Colored mineral pixels get brighter, grey stone stays dim
-                        if (tex && tex.complete && tex.naturalWidth > 0) {
-                            ctx.drawImage(tex, x - 0.5, y - 0.5, TILE + 1, TILE + 1);
-                        }
-                        ctx.restore();
+                        ctx.globalAlpha = 0.06 + glow * 0.12;
+                        ctx.fillStyle = BDEF[cell.t].glow;
+                        ctx.fillRect(x + 2, y + 2, TILE - 4, TILE - 4);
+                        ctx.globalAlpha = 1;
                     }
                     if (cell.cr > 0.01) {
                         var stage = Math.min(9, Math.floor(cell.cr * 10));
