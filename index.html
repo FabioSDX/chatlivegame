@@ -2411,8 +2411,6 @@
                     if (!persistentScores[p.userName]) persistentScores[p.userName] = { score: 0, avatar: p.userAvatarUrl || '' };
                     persistentScores[p.userName].score += bonus;
                 }
-                spawnText(enemyX, enemyY - 40, label, color);
-                spawnText(enemyX, enemyY - 70, '+' + bonus, '#ffffff');
                 showComboPopup(label, color, p.userName || '', p.userAvatarUrl || '');
                 sfxCombo(c);
             }
