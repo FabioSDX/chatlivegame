@@ -1993,8 +1993,8 @@
         var cloneCooldown = 900;    // 15 seconds at 60fps
         var stormCooldown = 900;    // 15 seconds at 60fps
         var blackholeCooldown = 1800; // 30 seconds at 60fps
-        var BLACKHOLE_RADIUS = 250;   // suction + destroy radius in pixels
-        var BLACKHOLE_DURATION = 300; // 5 seconds at 60fps
+        var BLACKHOLE_RADIUS = 400;   // suction radius in pixels
+        var BLACKHOLE_DURATION = 360; // 6 seconds at 60fps
         var activeBlackHoles = [];    // { x, y, timer, userName }
 
         var skillCooldowns = {};    // { userName_skillName: framesLeft }
@@ -4521,6 +4521,15 @@
                 if (b.isQueen) { w *= QUEEN_SCALE; h *= QUEEN_SCALE; }
                 else if (b.isMother) { w *= MOTHER_SCALE; h *= MOTHER_SCALE; }
 
+                // Black hole suction effect: shrink and spin
+                if (b._bhScale !== undefined && b._bhScale < 1) {
+                    var sc = Math.max(0.05, b._bhScale);
+                    w *= sc; h *= sc;
+                    if (b.dir < 0) ctx.scale(-1, 1);
+                    ctx.rotate(b._bhSpin || 0);
+                    if (b.dir < 0) ctx.scale(-1, 1);
+                }
+
                 // Queen aura glow
                 if (b.isQueen && b.state !== 'dead') {
                     if (b.dir < 0) ctx.scale(-1, 1);
@@ -5200,6 +5209,15 @@
 
                 var w = ZOMBIE_SIZE, h = ZOMBIE_SIZE;
                 if (z.isZBoss) { w *= ZBOSS_SCALE; h *= ZBOSS_SCALE; }
+
+                // Black hole suction effect: shrink and spin
+                if (z._bhScale !== undefined && z._bhScale < 1) {
+                    var zsc = Math.max(0.05, z._bhScale);
+                    w *= zsc; h *= zsc;
+                    if (z.dir < 0) ctx.scale(-1, 1);
+                    ctx.rotate(z._bhSpin || 0);
+                    if (z.dir < 0) ctx.scale(-1, 1);
+                }
 
                 // Zombie boss aura glow
                 if (z.isZBoss && z.state !== 'dead') {
@@ -6523,69 +6541,89 @@
                 if (bh.timer <= 0) { activeBlackHoles.splice(i, 1); continue; }
 
                 var R = BLACKHOLE_RADIUS;
-                var progress = 1 - bh.timer / BLACKHOLE_DURATION;
-                var killR = R * 0.3; // inner kill zone
+                var progress = 1 - bh.timer / BLACKHOLE_DURATION; // 0→1
 
-                // Suck and kill bats
+                // ── Suck bats: pull, shrink, spin, devour ──
                 for (var bi = bats.length - 1; bi >= 0; bi--) {
                     var b = bats[bi];
                     if (b.state === 'dead') continue;
                     var dx = bh.x - b.x, dy = bh.y - b.y;
                     var dist = Math.sqrt(dx * dx + dy * dy);
                     if (dist < R) {
-                        var pull = 0.3 * (1 - dist / R);
-                        b.vx += (dx / (dist || 1)) * pull * 3;
-                        b.vy += (dy / (dist || 1)) * pull * 3;
-                        if (dist < killR) {
-                            b.hp = 0; b.state = 'dead'; b.anim = 0; b.deadTimer = 0;
+                        var pull = 0.5 * Math.pow(1 - dist / R, 1.5);
+                        b.vx += (dx / (dist || 1)) * pull * 4;
+                        b.vy += (dy / (dist || 1)) * pull * 4;
+                        // Shrink and spin as they get closer
+                        b._bhScale = Math.max(0.05, dist / R);
+                        b._bhSpin = (b._bhSpin || 0) + 0.15 * (1 - dist / R);
+                        // Devour when very close to center
+                        if (dist < 20) {
+                            b.hp = 0; b.state = 'dead'; b.anim = 0; b.deadTimer = 80; // skip most death anim
+                            b._bhScale = 0;
                             score += b.pts;
                             if (bh.userName) {
                                 if (!persistentScores[bh.userName]) persistentScores[bh.userName] = { score: 0, avatar: '' };
                                 persistentScores[bh.userName].score += b.pts;
                             }
-                            spawnText(b.x, b.y - 20, '+' + b.pts, '#8800ff');
+                            spawnText(bh.x, bh.y - 30, '+' + b.pts, '#cc44ff');
                             sfxBatDeath();
                         }
+                    } else {
+                        // Outside radius: restore scale
+                        if (b._bhScale !== undefined) { b._bhScale = undefined; b._bhSpin = 0; }
                     }
                 }
 
-                // Suck and kill zombies
+                // ── Suck zombies: pull, shrink, spin, devour ──
                 for (var zi = zombies.length - 1; zi >= 0; zi--) {
                     var z = zombies[zi];
                     if (z.state === 'dead') continue;
                     var zdx = bh.x - z.x, zdy = bh.y - z.y;
                     var zdist = Math.sqrt(zdx * zdx + zdy * zdy);
                     if (zdist < R) {
-                        var zpull = 0.25 * (1 - zdist / R);
-                        z.vx += (zdx / (zdist || 1)) * zpull * 2;
-                        z.vy += (zdy / (zdist || 1)) * zpull * 2;
-                        if (zdist < killR) {
-                            z.hp = 0; z.state = 'dead'; z.animTimer = 0; z.deadTimer = 0;
+                        var zpull = 0.4 * Math.pow(1 - zdist / R, 1.5);
+                        z.vx += (zdx / (zdist || 1)) * zpull * 3;
+                        z.vy += (zdy / (zdist || 1)) * zpull * 3;
+                        z._bhScale = Math.max(0.05, zdist / R);
+                        z._bhSpin = (z._bhSpin || 0) + 0.12 * (1 - zdist / R);
+                        if (zdist < 25) {
+                            z.hp = 0; z.state = 'dead'; z.animTimer = 0; z.deadTimer = 80;
+                            z._bhScale = 0;
                             score += z.pts;
                             if (bh.userName) {
                                 if (!persistentScores[bh.userName]) persistentScores[bh.userName] = { score: 0, avatar: '' };
                                 persistentScores[bh.userName].score += z.pts;
                             }
-                            spawnText(z.x, z.y - 20, '+' + z.pts, '#8800ff');
+                            spawnText(bh.x, bh.y - 30, '+' + z.pts, '#cc44ff');
                             sfxZombieDeath();
                         }
+                    } else {
+                        if (z._bhScale !== undefined) { z._bhScale = undefined; z._bhSpin = 0; }
                     }
                 }
 
-                // Destroy blocks in radius (every 10 frames)
-                if (bh.timer % 10 === 0) {
+                // ── Gradual block destruction: expands from center outward ──
+                var destroyR = R * progress; // grows over time
+                if (bh.timer % 6 === 0) {
                     var cr = Math.floor(bh.y / TILE), cc = Math.floor(bh.x / TILE);
-                    var tileR = Math.ceil(R / TILE);
+                    var tileR = Math.ceil(destroyR / TILE);
                     var pts = 0;
                     for (var r = cr - tileR; r <= cr + tileR; r++) {
                         for (var c = cc - tileR; c <= cc + tileR; c++) {
                             var cell = getCell(r, c);
                             if (!cell || cell.t === E || cell.t === BEDROCK) continue;
                             var bx2 = (c + 0.5) * TILE - bh.x, by2 = (r + 0.5) * TILE - bh.y;
-                            if (bx2 * bx2 + by2 * by2 < R * R * progress) {
-                                pts += (BDEF[cell.t].pts || 0);
-                                spawnParts(c * TILE + TILE / 2, r * TILE + TILE / 2, BDEF[cell.t].glow, 3);
-                                cell.t = E; cell.hp = 0; cell.cr = 0;
+                            var blockDist = Math.sqrt(bx2 * bx2 + by2 * by2);
+                            if (blockDist < destroyR) {
+                                // Damage blocks gradually — closer = more damage
+                                var dmg = Math.max(1, Math.floor(3 * (1 - blockDist / destroyR)));
+                                cell.hp -= dmg;
+                                cell.cr = Math.min(1, 1 - cell.hp / BDEF[cell.t].hp);
+                                if (cell.hp <= 0) {
+                                    pts += (BDEF[cell.t].pts || 0);
+                                    spawnParts(c * TILE + TILE / 2, r * TILE + TILE / 2, BDEF[cell.t].glow, 2);
+                                    cell.t = E; cell.hp = 0; cell.cr = 0;
+                                }
                             }
                         }
                     }
@@ -6598,15 +6636,18 @@
                     }
                 }
 
-                // Particles
+                // ── Spiral particles being sucked in ──
                 if (bh.timer % 2 === 0) {
-                    var angle = Math.random() * Math.PI * 2;
-                    var pr = R * (0.3 + Math.random() * 0.7);
-                    parts.push({
-                        x: bh.x + Math.cos(angle) * pr, y: bh.y + Math.sin(angle) * pr,
-                        vx: -Math.cos(angle) * 3, vy: -Math.sin(angle) * 3,
-                        life: 1, dec: 0.05, c: Math.random() < 0.5 ? '#8800ff' : '#cc44ff', r: 2 + Math.random() * 3
-                    });
+                    for (var pi = 0; pi < 3; pi++) {
+                        var angle = Math.random() * Math.PI * 2;
+                        var pr = R * (0.4 + Math.random() * 0.6);
+                        parts.push({
+                            x: bh.x + Math.cos(angle) * pr, y: bh.y + Math.sin(angle) * pr,
+                            vx: -Math.cos(angle) * 4 + Math.sin(angle) * 2,
+                            vy: -Math.sin(angle) * 4 - Math.cos(angle) * 2,
+                            life: 1, dec: 0.04, c: Math.random() < 0.3 ? '#ffffff' : (Math.random() < 0.5 ? '#8800ff' : '#cc44ff'), r: 2 + Math.random() * 3
+                        });
+                    }
                 }
             }
         }
@@ -6615,34 +6656,47 @@
             for (var i = 0; i < activeBlackHoles.length; i++) {
                 var bh = activeBlackHoles[i];
                 var progress = 1 - bh.timer / BLACKHOLE_DURATION;
-                var R = BLACKHOLE_RADIUS * (0.5 + progress * 0.5);
-                var pulse = 0.7 + Math.sin(bh.timer * 0.2) * 0.3;
+                var R = BLACKHOLE_RADIUS;
+                var pulse = 0.7 + Math.sin(bh.timer * 0.15) * 0.3;
+                var t = Date.now() * 0.006;
 
                 ctx.save();
-                // Outer suction ring
+                // Outer distortion field
                 var grad = ctx.createRadialGradient(bh.x, bh.y, 0, bh.x, bh.y, R);
-                grad.addColorStop(0, 'rgba(0, 0, 0, 0.8)');
-                grad.addColorStop(0.2, 'rgba(60, 0, 120, 0.5)');
-                grad.addColorStop(0.5, 'rgba(136, 0, 255, ' + (0.2 * pulse) + ')');
-                grad.addColorStop(0.8, 'rgba(200, 68, 255, ' + (0.08 * pulse) + ')');
+                grad.addColorStop(0, 'rgba(0, 0, 0, 0.9)');
+                grad.addColorStop(0.15, 'rgba(30, 0, 80, 0.6)');
+                grad.addColorStop(0.35, 'rgba(100, 0, 200, ' + (0.25 * pulse) + ')');
+                grad.addColorStop(0.6, 'rgba(160, 40, 255, ' + (0.1 * pulse) + ')');
                 grad.addColorStop(1, 'rgba(136, 0, 255, 0)');
                 ctx.fillStyle = grad;
                 ctx.beginPath(); ctx.arc(bh.x, bh.y, R, 0, Math.PI * 2); ctx.fill();
 
-                // Spinning accretion ring
-                ctx.strokeStyle = 'rgba(200, 100, 255, ' + (0.6 * pulse) + ')';
-                ctx.lineWidth = 3;
-                var ringAng = Date.now() * 0.008;
-                for (var ri = 0; ri < 3; ri++) {
-                    var rr = R * (0.3 + ri * 0.15);
+                // Spinning accretion rings
+                for (var ri = 0; ri < 4; ri++) {
+                    var rr = R * (0.15 + ri * 0.12);
+                    var ringAlpha = (0.5 - ri * 0.1) * pulse;
+                    ctx.strokeStyle = 'rgba(200, 100, 255, ' + ringAlpha + ')';
+                    ctx.lineWidth = 3 - ri * 0.5;
                     ctx.beginPath();
-                    ctx.arc(bh.x, bh.y, rr, ringAng + ri * 2, ringAng + ri * 2 + Math.PI * 1.3);
+                    ctx.arc(bh.x, bh.y, rr, t + ri * 1.5, t + ri * 1.5 + Math.PI * 1.2);
+                    ctx.stroke();
+                    // Counter-rotating inner ring
+                    ctx.strokeStyle = 'rgba(255, 200, 255, ' + (ringAlpha * 0.5) + ')';
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.arc(bh.x, bh.y, rr * 0.8, -t * 1.3 + ri, -t * 1.3 + ri + Math.PI * 0.8);
                     ctx.stroke();
                 }
 
-                // Core
-                ctx.fillStyle = '#000';
-                ctx.beginPath(); ctx.arc(bh.x, bh.y, R * 0.12, 0, Math.PI * 2); ctx.fill();
+                // Event horizon core
+                var coreR = 12 + Math.sin(t * 2) * 3;
+                var coreGrad = ctx.createRadialGradient(bh.x, bh.y, 0, bh.x, bh.y, coreR);
+                coreGrad.addColorStop(0, '#000000');
+                coreGrad.addColorStop(0.7, 'rgba(0, 0, 0, 0.95)');
+                coreGrad.addColorStop(1, 'rgba(80, 0, 160, 0.5)');
+                ctx.fillStyle = coreGrad;
+                ctx.beginPath(); ctx.arc(bh.x, bh.y, coreR, 0, Math.PI * 2); ctx.fill();
+
                 ctx.restore();
             }
         }
