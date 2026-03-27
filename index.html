@@ -2420,7 +2420,12 @@
             var overlay = document.getElementById('announceOverlay');
             var card = document.createElement('div');
             card.className = 'announce-card';
+            var avatarHtml = '';
+            if (avatarUrl) {
+                avatarHtml = '<img class="announce-avatar" src="' + avatarUrl + '" style="border-color:' + color + ';" />';
+            }
             card.innerHTML =
+                avatarHtml +
                 '<div class="announce-title" style="color:' + color + ';text-shadow:0 0 15px ' + color + ',0 1px 4px #000;font-size:clamp(16px,6vw,28px);">' + label + '</div>' +
                 (userName ? '<div class="announce-name" style="color:' + color + ';opacity:0.7;">' + userName + '</div>' : '');
             overlay.appendChild(card);
