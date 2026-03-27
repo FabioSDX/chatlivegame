@@ -6330,15 +6330,18 @@
         var avatarCache = {};
         var _firstFetchDone = false; // skip commands on first fetch
 
-        // Restore owner avatar now that both persistentScores and avatarCache are ready
+        // Restore ALL avatars from persistentScores into avatarCache on load
         (function () {
-            if (ownerName && persistentScores[ownerName] && persistentScores[ownerName].avatar) {
-                var av = persistentScores[ownerName].avatar;
-                pick.userAvatarUrl = av;
-                if (!avatarCache[av]) {
+            var keys = Object.keys(persistentScores);
+            for (var i = 0; i < keys.length; i++) {
+                var av = persistentScores[keys[i]].avatar;
+                if (av && !avatarCache[av]) {
                     var img = new Image(); img.src = av;
                     avatarCache[av] = img;
                 }
+            }
+            if (ownerName && persistentScores[ownerName] && persistentScores[ownerName].avatar) {
+                pick.userAvatarUrl = persistentScores[ownerName].avatar;
             }
         })();
 
