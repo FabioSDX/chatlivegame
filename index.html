@@ -6343,14 +6343,14 @@
         })();
 
         function spawnUserPickaxe(userName, avatarUrl) {
-            // Higieniza o nome para evitar "@" duplicado
             userName = userName.replace(/^@@+/, '@');
-
-            // Owner controls the main pickaxe, not a separate one
             if (ownerName && userName === ownerName) return;
-
-            // Ignora se o usuário já tem uma picareta ativa
             if (userPicks.some(up => up.userName === userName)) return;
+
+            // Fallback: get avatar from persistentScores if not provided
+            if (!avatarUrl && persistentScores[userName] && persistentScores[userName].avatar) {
+                avatarUrl = persistentScores[userName].avatar;
+            }
 
             // Precarrega avatar
             if (avatarUrl && !avatarCache[avatarUrl]) {
