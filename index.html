@@ -35,22 +35,23 @@
             color: #fff;
             text-align: center;
             padding: 4px 0 8px;
-            text-shadow: 0 0 8px rgba(0, 200, 255, 0.8);
-            background: linear-gradient(to bottom, rgba(0, 0, 0, 0.5), transparent);
+            text-shadow: 0 1px 3px #000, 0 0 10px rgba(0, 200, 255, 0.8);
+            background: linear-gradient(to bottom, rgba(0, 0, 0, 0.7), transparent);
         }
 
         #ui .depth {
             font-size: 18px;
-            opacity: 0.8;
+            opacity: 1;
             margin-top: -2px;
-            color: #aaa;
+            color: #ddd;
+            text-shadow: 0 1px 4px #000, 0 0 6px rgba(0,0,0,0.8);
         }
 
         .score-display {
             font-size: 22px;
             font-weight: bold;
             color: #ffdd44;
-            text-shadow: 0 0 8px rgba(255, 221, 68, 0.5);
+            text-shadow: 0 1px 3px #000, 0 0 10px rgba(255, 221, 68, 0.6);
             margin-top: 2px;
         }
 
@@ -365,15 +366,15 @@
             top: 60px;
             right: 12px;
             z-index: 100;
-            background: rgba(255, 255, 255, 0.12);
+            background: rgba(0, 0, 0, 0.55);
             backdrop-filter: blur(12px);
             padding: 12px;
             width: fit-content;
             min-width: 120px;
             max-width: 280px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.15);
             border-radius: 12px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
         }
 
         #commandBox .panel-title {
@@ -382,10 +383,10 @@
             font-weight: 700;
             letter-spacing: 1.5px;
             text-transform: uppercase;
-            color: rgba(255, 255, 255, 0.35);
+            color: rgba(255, 255, 255, 0.55);
             margin-bottom: 7px;
             padding-bottom: 5px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         .cmd-row {
@@ -535,7 +536,7 @@
             left: 12px;
             right: auto;
             z-index: 100;
-            background: rgba(255, 255, 255, 0.12);
+            background: rgba(0, 0, 0, 0.55);
             backdrop-filter: blur(12px);
             padding: 12px;
             color: #fff;
@@ -3867,8 +3868,11 @@
             // textos flutuantes
             for (var j = 0; j < texts.length; j++) {
                 var t = texts[j];
-                ctx.globalAlpha = t.life; ctx.font = 'bold 13px Arial';
-                ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = t.c;
+                ctx.globalAlpha = t.life; ctx.font = 'bold 14px Arial';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.strokeStyle = 'rgba(0,0,0,' + (t.life * 0.8) + ')'; ctx.lineWidth = 3; ctx.lineJoin = 'round';
+                ctx.strokeText(t.txt, t.x, t.y);
+                ctx.fillStyle = t.c;
                 ctx.fillText(t.txt, t.x, t.y);
             }
             ctx.globalAlpha = 1; ctx.shadowBlur = 0;
@@ -3920,7 +3924,9 @@
                         ctx.restore();
                     }
                     ctx.fillStyle = '#ffdd44'; ctx.font = isMobile ? 'bold 16px Arial' : 'bold 24px Arial'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-                    if (SHADOW_ENABLED) { ctx.shadowBlur = 6; ctx.shadowColor = '#000'; }
+                    ctx.strokeStyle = '#000'; ctx.lineWidth = isMobile ? 3 : 4; ctx.lineJoin = 'round';
+                    ctx.strokeText(pick.userName, pick.x + 10, oAvY);
+                    if (SHADOW_ENABLED) { ctx.shadowBlur = 8; ctx.shadowColor = '#000'; }
                     ctx.fillText(pick.userName, pick.x + 10, oAvY);
 
                     drawPlayerCooldowns(ctx, pick.x - 10 - oAvSize / 2, oAvY, pick.userName);
@@ -3974,7 +3980,9 @@
                     ctx.save();
                     ctx.globalAlpha = cloneAlpha * 0.85;
                     ctx.fillStyle = '#fff'; ctx.font = isMobile ? 'bold 16px Arial' : 'bold 24px Arial'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-                    if (SHADOW_ENABLED) { ctx.shadowBlur = 6; ctx.shadowColor = '#000'; }
+                    ctx.strokeStyle = '#000'; ctx.lineWidth = isMobile ? 3 : 4; ctx.lineJoin = 'round';
+                    ctx.strokeText(ep.cloneOwner || '', ep.x + 10, cloneAvY);
+                    if (SHADOW_ENABLED) { ctx.shadowBlur = 8; ctx.shadowColor = '#000'; }
                     ctx.fillText(ep.cloneOwner || '', ep.x + 10, cloneAvY);
                     ctx.restore();
                 } else {
@@ -4040,7 +4048,9 @@
                     ctx.restore();
                 }
                 ctx.fillStyle = '#fff'; ctx.font = isMobile ? 'bold 16px Arial' : 'bold 24px Arial'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-                if (SHADOW_ENABLED) { ctx.shadowBlur = 6; ctx.shadowColor = '#000'; }
+                ctx.strokeStyle = '#000'; ctx.lineWidth = isMobile ? 3 : 4; ctx.lineJoin = 'round';
+                ctx.strokeText(up.userName, up.x + 10, avY);
+                if (SHADOW_ENABLED) { ctx.shadowBlur = 8; ctx.shadowColor = '#000'; }
                 ctx.fillText(up.userName, up.x + 10, avY);
 
                 drawPlayerCooldowns(ctx, up.x - 10 - avSize / 2, avY, up.userName);
