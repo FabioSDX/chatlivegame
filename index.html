@@ -876,8 +876,8 @@
         // ── Mobile detection & performance scaling ──
         var isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 
-        var COLS = 15, TILE = isMobile ? 48 : 72;
-        var VIS = isMobile ? 40 : 27; // more rows visible at smaller tile size
+        var COLS = 15, TILE = 72;
+        var VIS = 27;
         canvas.width = COLS * TILE;
         canvas.height = VIS * TILE;
 
@@ -3139,7 +3139,7 @@
             if (BG_DETAIL === 0) {
                 var pal = bgPalette(Math.floor(camY / TILE));
                 var sg = ctx.createLinearGradient(0, 0, 0, H);
-                sg.addColorStop(0, pal.top); sg.addColorStop(1, pal.bot);
+                sg.addColorStop(0, pal.bg1); sg.addColorStop(1, pal.bg2);
                 ctx.fillStyle = sg; ctx.fillRect(0, 0, W, H);
                 return;
             }
