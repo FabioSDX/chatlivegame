@@ -1474,7 +1474,6 @@
         var ZBOSS_SCALE = 3.5;
         var ZBOSS_HP = 25;
         var ZBOSS_COUNT = 4;
-        var ZBOSS_IMMUNE = true; // Zombie bosses only die to Tormenta
         var MAX_ZOMBIES_MEGA = 40;
 
         // ── Crystal types for clearings ──
@@ -2931,7 +2930,6 @@
             }
             checkPickBatCollisions();
             checkQueenBarrierCollisions();
-            checkZombieBossBarrierCollisions();
             shakeAmt *= shakeDec;
             if (shakeAmt < 0.3) shakeAmt = 0;
         }
@@ -3833,7 +3831,6 @@
 
             // zombies
             drawZombies();
-            drawZombieBossBarrier();
 
             // bats
             drawBats();
@@ -4490,35 +4487,6 @@
             }
         }
 
-        // ── Zombie Boss Barrier Physical Collision ───────────────────────────
-        function checkZombieBossBarrierCollisions() {
-            var bosses = [];
-            for (var i = 0; i < zombies.length; i++) {
-                if (zombies[i].isZBoss && zombies[i].state !== 'dead') bosses.push(zombies[i]);
-            }
-            if (bosses.length === 0) return;
-            // All bosses share the same Y — use a single horizontal barrier line
-            var floorY = bosses[0].y;
-            var wallL = TILE, wallR = (COLS - 1) * TILE;
-            var BARRIER_THICK = 35;
-            var allPicks = [pick].concat(userPicks, extraPicks);
-            for (var pi = 0; pi < allPicks.length; pi++) {
-                var p = allPicks[pi];
-                if (!p || p.stuck) continue;
-                if (p.x < wallL || p.x > wallR) continue;
-                var dy = p.y - floorY;
-                if (Math.abs(dy) < BARRIER_THICK && p.vy > 0.5) {
-                    p.vy = -Math.abs(p.vy) * 0.7 - 2;
-                    p.y = floorY - BARRIER_THICK;
-                    p.spin += (Math.random() - 0.5) * 0.3;
-                    spawnText(p.x, p.y - 20, '⚡', '#44ff00');
-                    for (var sp = 0; sp < 3; sp++) {
-                        parts.push({ x: p.x, y: floorY, vx: (Math.random() - 0.5) * 4, vy: -1 - Math.random() * 2, life: 1, dec: 0.08, c: '#44ff00', r: 2 + Math.random() * 2 });
-                    }
-                }
-            }
-        }
-
         function drawBats() {
             var viewTop = camY - TILE * 2;
             var viewBot = camY + canvas.height + TILE * 2;
@@ -4633,52 +4601,6 @@
             ctx.lineWidth = 3;
             ctx.beginPath(); ctx.moveTo(wallLeft, leftQ.y); ctx.lineTo(leftQ.x, leftQ.y); ctx.stroke();
             ctx.beginPath(); ctx.moveTo(rightQ.x, rightQ.y); ctx.lineTo(wallRight, rightQ.y); ctx.stroke();
-            ctx.restore();
-        }
-
-        // ── Zombie Boss Energy Barrier ───────────────────────────────────────
-        function drawZombieBossBarrier() {
-            var bosses = [];
-            for (var i = 0; i < zombies.length; i++) {
-                if (zombies[i].isZBoss && zombies[i].state !== 'dead') bosses.push(zombies[i]);
-            }
-            if (bosses.length === 0) return;
-            bosses.sort(function (a, b) { return a.x - b.x; });
-            var t = Date.now() * 0.003;
-            var floorY = bosses[0].y + ZOMBIE_SIZE * ZBOSS_SCALE * 0.5;
-            var wallLeft = TILE, wallRight = (COLS - 1) * TILE;
-            ctx.save();
-            // Energy barrier between bosses (at body center height)
-            if (bosses.length >= 2) {
-                for (var qi = 0; qi < bosses.length - 1; qi++) {
-                    var q1 = bosses[qi], q2 = bosses[qi + 1];
-                    var pulse = 0.5 + Math.sin(t + qi) * 0.3;
-                    ctx.strokeStyle = 'rgba(0, 255, 80, ' + (0.4 * pulse) + ')';
-                    ctx.lineWidth = 12 + Math.sin(t * 2 + qi) * 4;
-                    ctx.beginPath(); ctx.moveTo(q1.x, q1.y); ctx.lineTo(q2.x, q2.y); ctx.stroke();
-                    ctx.strokeStyle = 'rgba(100, 255, 150, ' + (0.6 * pulse) + ')';
-                    ctx.lineWidth = 4 + Math.sin(t * 3) * 2;
-                    ctx.beginPath(); ctx.moveTo(q1.x, q1.y); ctx.lineTo(q2.x, q2.y); ctx.stroke();
-                    for (var s = 0; s < 5; s++) {
-                        var frac = (s + 0.5) / 5 + Math.sin(t * 4 + s * 1.3) * 0.05;
-                        var sx = q1.x + (q2.x - q1.x) * frac;
-                        var sy = q1.y + Math.sin(t * 5 + s * 2) * 15;
-                        ctx.fillStyle = 'rgba(200, 255, 100, ' + (0.7 * pulse) + ')';
-                        ctx.beginPath(); ctx.arc(sx, sy, 3 + Math.random() * 3, 0, Math.PI * 2); ctx.fill();
-                    }
-                }
-                // Extend barrier to walls
-                var leftB = bosses[0], rightB = bosses[bosses.length - 1];
-                var pL = 0.5 + Math.sin(t + 10) * 0.3;
-                ctx.strokeStyle = 'rgba(0, 255, 80, ' + (0.3 * pL) + ')';
-                ctx.lineWidth = 10 + Math.sin(t * 2 + 5) * 3;
-                ctx.beginPath(); ctx.moveTo(wallLeft, leftB.y); ctx.lineTo(leftB.x, leftB.y); ctx.stroke();
-                ctx.beginPath(); ctx.moveTo(rightB.x, rightB.y); ctx.lineTo(wallRight, rightB.y); ctx.stroke();
-                ctx.strokeStyle = 'rgba(100, 255, 150, ' + (0.5 * pL) + ')';
-                ctx.lineWidth = 3;
-                ctx.beginPath(); ctx.moveTo(wallLeft, leftB.y); ctx.lineTo(leftB.x, leftB.y); ctx.stroke();
-                ctx.beginPath(); ctx.moveTo(rightB.x, rightB.y); ctx.lineTo(wallRight, rightB.y); ctx.stroke();
-            }
             ctx.restore();
         }
 
@@ -4809,16 +4731,6 @@
                         p.x = z.x + nx * (PICK_R + ZR + 1);
                         p.y = z.y + ny * (PICK_R + ZR + 1);
 
-                        // Zombie bosses are immune to normal hits — only Tormenta kills
-                        if (z.isZBoss && ZBOSS_IMMUNE) {
-                            p.vx *= 1.5; p.vy *= 1.5;
-                            sfxZombieHurt();
-                            spawnText(z.x, z.y - ZOMBIE_SIZE * 0.5, '🛡️ IMMUNE!', '#44ff44');
-                            registerComboHit(p, z.x, z.y);
-                            z.x += (Math.random() - 0.5) * 6;
-                            break;
-                        }
-
                         // Damage zombie (1 hp)
                         z.hp -= 1;
                         z.state = 'hurt'; z.hurtTimer = 12; z.animTimer = 0;
@@ -4888,21 +4800,61 @@
                     continue;
                 }
 
-                // ── Zombie Boss: patrol left-right on brick floor ──
+                // ── Zombie Boss: dynamic movement — patrol + chase + jump ──
                 if (z.isZBoss) {
-                    z.animTimer += ZOMBIE_ANIMS.walk.speed;
-                    if (z.animTimer >= ZOMBIE_ANIMS.walk.count) z.animTimer = 0;
-                    // Walk in current direction
-                    z.vx = z.dir * z.speed * 1.2;
+                    // Apply gravity
+                    z.vy += ZG;
+                    // Find nearest pick to chase
+                    var nearPick = null, nearDist = 300;
+                    var allP = [pick].concat(userPicks);
+                    for (var np = 0; np < allP.length; np++) {
+                        if (!allP[np] || allP[np].stuck) continue;
+                        var ndx = allP[np].x - z.x, ndy = allP[np].y - z.y;
+                        var nd = Math.sqrt(ndx * ndx + ndy * ndy);
+                        if (nd < nearDist) { nearDist = nd; nearPick = allP[np]; }
+                    }
+                    // Chase or patrol
+                    var moveSpeed = z.speed * 2.0;
+                    if (nearPick) {
+                        z.dir = nearPick.x > z.x ? 1 : -1;
+                        z.vx += z.dir * 0.15;
+                        // Jump toward pick if it's above
+                        if (nearPick.y < z.y - TILE && z.grounded) {
+                            z.vy = -6 - Math.random() * 3;
+                            z.grounded = false;
+                        }
+                        z.animTimer += ZOMBIE_ANIMS.run.speed;
+                        if (z.animTimer >= ZOMBIE_ANIMS.run.count) z.animTimer = 0;
+                    } else {
+                        z.vx = z.dir * moveSpeed;
+                        z.animTimer += ZOMBIE_ANIMS.walk.speed;
+                        if (z.animTimer >= ZOMBIE_ANIMS.walk.count) z.animTimer = 0;
+                    }
+                    // Speed limit
+                    var bSpd = Math.abs(z.vx);
+                    if (bSpd > moveSpeed * 2) z.vx = z.dir * moveSpeed * 2;
+                    z.vx *= 0.95; // friction
                     z.x += z.vx;
-                    // Reverse at patrol limits (2 tiles from walls)
+                    z.y += z.vy;
+                    // Wall bounce
                     var bwL = TILE * 2, bwR = (COLS - 2) * TILE;
-                    if (z.x <= bwL) { z.x = bwL; z.dir = 1; }
-                    if (z.x >= bwR) { z.x = bwR; z.dir = -1; }
-                    // Lock to flat floor Y
-                    z.y = z.homeY;
-                    z.vy = 0;
-                    z.grounded = true;
+                    if (z.x <= bwL) { z.x = bwL; z.dir = 1; z.vx = Math.abs(z.vx); }
+                    if (z.x >= bwR) { z.x = bwR; z.dir = -1; z.vx = -Math.abs(z.vx); }
+                    // Ground collision
+                    var bFootRow = Math.floor((z.y + ZOMBIE_SIZE * ZBOSS_SCALE * 0.5) / TILE);
+                    var bFootCol = Math.floor(z.x / TILE);
+                    var bGround = getCell(bFootRow, bFootCol);
+                    z.grounded = false;
+                    if (bGround && bGround.t !== E) {
+                        z.y = bFootRow * TILE - ZOMBIE_SIZE * ZBOSS_SCALE * 0.5;
+                        if (z.vy > 0) z.vy = 0;
+                        z.grounded = true;
+                    }
+                    // Random jump while patrolling
+                    if (z.grounded && !nearPick && Math.random() < 0.008) {
+                        z.vy = -5 - Math.random() * 2;
+                        z.grounded = false;
+                    }
                     continue;
                 }
 
