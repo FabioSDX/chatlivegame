@@ -2397,7 +2397,7 @@
         }
 
         // Only show important announcements — skip all small/medium texts for performance
-        var _importantTexts = /JOINED|MEGA|FIRESTORM|TORMENTA|THOR|NUKE|CLONE|BLACK HOLE|PASSAGE|ZOMBIE|COMBO|BOSS|BABY|ARMY|SHOCK|SPIN|PING|ACTIVATED|WARNING|DARKNESS|HELL|MADNESS|RETURNS|WATCHES/i;
+        var _importantTexts = /JOINED|MEGA|SUPER BURST|TORMENTA|THOR|NUKE|CLONE|BLACK HOLE|PASSAGE|ZOMBIE|COMBO|BOSS|ARMY|SHOCK|SPIN|PING|ACTIVATED|NICE|GREAT|AMAZING|FANTASTIC|LEGENDARY|CHAMPION|HERO|LEGEND/i;
         function spawnText(x, y, txt, color) {
             if (!_importantTexts.test(txt)) return;
             if (texts.length > MAX_TEXTS) return;
@@ -2407,34 +2407,34 @@
         // ── Combo System ──────────────────────────────────────────────────────────
         var COMBO_LABELS = [
             '', '', '', '', '',
-            '🔥 COMBO x5!',
+            '⭐ NICE x5!',
             '', '', '', '',
-            '⚡ COMBO x10!',
+            '🌟 GREAT x10!',
             '', '', '', '',
-            '💀 COMBO x15!',
+            '✨ AMAZING x15!',
             '', '', '', '',
-            '🌟 COMBO x20!',
+            '🎉 FANTASTIC x20!',
             '', '', '', '',
-            '☠️ COMBO x25!'
+            '🏆 LEGENDARY x25!'
         ];
         var COMBO_COLORS = {
-            5: '#ff8800',
-            10: '#ff00ff',
-            15: '#ff2222',
+            5: '#ffaa00',
+            10: '#ff44ff',
+            15: '#44ddff',
             20: '#ffdd00',
-            25: '#00ffff'
+            25: '#00ffcc'
         };
 
         function getComboLabel(count) {
-            if (count >= 25 && count % 5 === 0) return '☠️ COMBO x' + count + '!';
+            if (count >= 25 && count % 5 === 0) return '🏆 LEGENDARY x' + count + '!';
             if (count < COMBO_LABELS.length) return COMBO_LABELS[count];
-            if (count % 5 === 0) return '☠️ COMBO x' + count + '!';
+            if (count % 5 === 0) return '🏆 COMBO x' + count + '!';
             return '';
         }
         function getComboColor(count) {
-            if (count >= 25) return '#00ffff';
+            if (count >= 25) return '#00ffcc';
             var tier = Math.floor(count / 5) * 5;
-            return COMBO_COLORS[tier] || '#ff8800';
+            return COMBO_COLORS[tier] || '#ffaa00';
         }
         function getComboBonus(count) {
             var tier = Math.floor(count / 5);
@@ -2519,9 +2519,9 @@
             var card = document.createElement('div');
             card.className = 'announce-card';
             card.innerHTML =
-                '<div style="font-size:20px;">🔥</div>' +
-                '<div class="announce-title" style="color:#ff4400;text-shadow:0 0 15px #ff4400,0 0 30px #ff8800,0 1px 4px #000;font-size:clamp(18px,8vw,32px);">FIRESTORM</div>' +
-                '<div class="announce-pts" style="color:#ffcc00;text-shadow:0 0 8px #ff8800,0 1px 3px #000;">TOTAL DESTRUCTION</div>';
+                '<div style="font-size:20px;">🌈</div>' +
+                '<div class="announce-title" style="color:#ff44ff;text-shadow:0 0 15px #ff44ff,0 0 30px #ff88ff,0 1px 4px #000;font-size:clamp(18px,8vw,32px);">SUPER BURST!</div>' +
+                '<div class="announce-pts" style="color:#ffcc00;text-shadow:0 0 8px #ffaa00,0 1px 3px #000;">UNSTOPPABLE!</div>';
             overlay.appendChild(card);
             setTimeout(function () {
                 card.classList.add('fade-out');
@@ -2530,68 +2530,65 @@
         }
         function showDepthWarning(meters) {
             var warnings = [
-                { text: '☠️ 200m... THE DARKNESS GROWS', color: '#ff8844' },
-                { text: '💀 400m... TURN BACK NOW', color: '#ff4444' },
-                { text: '🔥 600m... NO ONE RETURNS', color: '#ff2222' },
-                { text: '👁️ 800m... IT WATCHES YOU', color: '#cc00ff' },
-                { text: '⚰️ 1000m... WELCOME TO HELL', color: '#ff0000' },
-                { text: '🕷️ 1200m... SPIDERS IN THE WALLS', color: '#884400' },
-                { text: '💎 1400m... DIAMONDS BLEED HERE', color: '#00ccff' },
-                { text: '🌋 1600m... THE EARTH TREMBLES', color: '#ff6600' },
-                { text: '👻 1800m... GHOSTS OF MINERS PAST', color: '#aaaaff' },
-                { text: '🐉 2000m... SOMETHING STIRS BELOW', color: '#ff0066' },
-                { text: '⚡ 2200m... LIGHTNING IN THE DEEP', color: '#00ffff' },
-                { text: '🦴 2400m... BONES EVERYWHERE', color: '#ccccaa' },
-                { text: '🔮 2600m... REALITY BENDS', color: '#bb44ff' },
-                { text: '🌑 2800m... LIGHT DIES HERE', color: '#666688' },
-                { text: '💀 3000m... THE ABYSS STARES BACK', color: '#ff0000' },
-                { text: '🕳️ 3200m... GRAVITY SHIFTS', color: '#8800ff' },
-                { text: '🧊 3400m... FROZEN SCREAMS', color: '#88ddff' },
-                { text: '🩸 3600m... THE WALLS BLEED', color: '#cc0000' },
-                { text: '👁️ 3800m... A THOUSAND EYES', color: '#ffaa00' },
-                { text: '☄️ 4000m... CORE OF THE WORLD', color: '#ff4400' },
-                { text: '🌀 4200m... TIME LOOPS HERE', color: '#44ffaa' },
-                { text: '💀 4400m... DEATH IS A FRIEND NOW', color: '#ff2266' },
-                { text: '🔥 4600m... MAGMA VEINS PULSE', color: '#ff5500' },
-                { text: '🕸️ 4800m... TRAPPED FOREVER', color: '#886644' },
-                { text: '⚰️ 5000m... HALFWAY TO OBLIVION', color: '#ff0044' },
-                { text: '👻 5200m... ECHOES OF THE FALLEN', color: '#9999cc' },
-                { text: '🌋 5400m... VOLCANIC FURY', color: '#ff3300' },
-                { text: '🐍 5600m... SERPENTS IN STONE', color: '#44aa44' },
-                { text: '💎 5800m... CURSED GEMS GLOW', color: '#ff44ff' },
-                { text: '🌑 6000m... ETERNAL NIGHT', color: '#334466' },
-                { text: '⚡ 6200m... ELECTRIC TOMBS', color: '#00ddff' },
-                { text: '🦷 6400m... TEETH IN THE DARK', color: '#eeeecc' },
-                { text: '🔮 6600m... VISIONS OF MADNESS', color: '#cc22ff' },
-                { text: '🩸 6800m... CRIMSON DEPTHS', color: '#bb0000' },
-                { text: '☠️ 7000m... FORGOTTEN BY GOD', color: '#ff0000' },
-                { text: '🕳️ 7200m... THE VOID HUNGERS', color: '#6600cc' },
-                { text: '🧊 7400m... ABSOLUTE ZERO', color: '#66ccff' },
-                { text: '👁️ 7600m... IT KNOWS YOUR NAME', color: '#ff8800' },
-                { text: '💀 7800m... NO SOUL SURVIVES', color: '#ff2244' },
-                { text: '🔥 8000m... HELLFIRE ETERNAL', color: '#ff4400' },
-                { text: '🌀 8200m... DIMENSIONS COLLAPSE', color: '#22ffcc' },
-                { text: '⚰️ 8400m... BURIAL GROUND OF WORLDS', color: '#aa6644' },
-                { text: '🐉 8600m... ANCIENT ONES AWAKEN', color: '#ff0088' },
-                { text: '☄️ 8800m... STARS DIE HERE', color: '#ffcc00' },
-                { text: '🌑 9000m... BEYOND ALL LIGHT', color: '#222244' },
-                { text: '💎 9200m... DIAMOND TEARS', color: '#44ddff' },
-                { text: '👻 9400m... WHISPERS OF INFINITY', color: '#aabbff' },
-                { text: '🩸 9600m... BLOOD OF THE EARTH', color: '#cc0022' },
-                { text: '☠️ 9800m... THE FINAL DESCENT', color: '#ff0000' },
-                { text: '💀 10000m... YOU REACHED THE END OF EVERYTHING', color: '#ffffff' }
+                { text: '⭐ 200m... GREAT START!', color: '#ffaa00' },
+                { text: '🌟 400m... KEEP GOING!', color: '#ffdd44' },
+                { text: '🎯 600m... ON FIRE!', color: '#ff8844' },
+                { text: '🚀 800m... UNSTOPPABLE!', color: '#44ddff' },
+                { text: '🏆 1000m... CHAMPION!', color: '#ffdd00' },
+                { text: '💎 1200m... DIAMOND HUNTER!', color: '#44ccff' },
+                { text: '🌈 1400m... RAINBOW DEPTHS!', color: '#ff44ff' },
+                { text: '⚡ 1600m... LIGHTNING FAST!', color: '#00ffcc' },
+                { text: '🎪 1800m... PARTY TIME!', color: '#ff88ff' },
+                { text: '🎉 2000m... INCREDIBLE!', color: '#ffaa44' },
+                { text: '🧲 2200m... MAGNETIC!', color: '#44aaff' },
+                { text: '🎸 2400m... ROCK STAR!', color: '#ff4488' },
+                { text: '🌊 2600m... DEEP DIVER!', color: '#4488ff' },
+                { text: '🔮 2800m... MYSTIC MINER!', color: '#bb44ff' },
+                { text: '👑 3000m... ROYALTY!', color: '#ffdd00' },
+                { text: '🎯 3200m... SHARPSHOOTER!', color: '#00ffaa' },
+                { text: '❄️ 3400m... ICE BREAKER!', color: '#88ddff' },
+                { text: '🌸 3600m... BLOSSOM!', color: '#ff88aa' },
+                { text: '🎵 3800m... RHYTHM MASTER!', color: '#ffaa00' },
+                { text: '☄️ 4000m... METEOR!', color: '#ff6644' },
+                { text: '🌀 4200m... WHIRLWIND!', color: '#44ffaa' },
+                { text: '🎭 4400m... SHOWTIME!', color: '#ff44dd' },
+                { text: '🌋 4600m... VOLCANIC!', color: '#ff5500' },
+                { text: '🕹️ 4800m... PRO GAMER!', color: '#44ff88' },
+                { text: '🏅 5000m... HALFWAY HERO!', color: '#ffcc00' },
+                { text: '🎆 5200m... FIREWORKS!', color: '#ff88cc' },
+                { text: '🌟 5400m... SUPERSTAR!', color: '#ffdd44' },
+                { text: '🐬 5600m... DEEP SEA!', color: '#44aaff' },
+                { text: '💫 5800m... COSMIC!', color: '#cc88ff' },
+                { text: '🌍 6000m... WORLD RECORD!', color: '#44ff44' },
+                { text: '⚡ 6200m... ELECTRIFYING!', color: '#00ddff' },
+                { text: '🎪 6400m... SPECTACULAR!', color: '#ffaa88' },
+                { text: '🔮 6600m... ENCHANTED!', color: '#cc44ff' },
+                { text: '🌺 6800m... TROPICAL!', color: '#ff6688' },
+                { text: '🏆 7000m... LEGEND!', color: '#ffdd00' },
+                { text: '🎯 7200m... BULLSEYE!', color: '#44ffcc' },
+                { text: '❄️ 7400m... FROZEN GLORY!', color: '#66ccff' },
+                { text: '🌈 7600m... PRISMATIC!', color: '#ff88ff' },
+                { text: '🎸 7800m... ENCORE!', color: '#ff4488' },
+                { text: '🔥 8000m... BLAZING!', color: '#ff8844' },
+                { text: '🌀 8200m... VORTEX!', color: '#22ffcc' },
+                { text: '👑 8400m... EMPEROR!', color: '#ffcc44' },
+                { text: '🐉 8600m... DRAGON SLAYER!', color: '#ff4488' },
+                { text: '☄️ 8800m... SUPERNOVA!', color: '#ffcc00' },
+                { text: '🌌 9000m... GALACTIC!', color: '#8888ff' },
+                { text: '💎 9200m... DIAMOND SOUL!', color: '#44ddff' },
+                { text: '🎵 9400m... SYMPHONY!', color: '#aabbff' },
+                { text: '🌸 9600m... ETERNAL BLOOM!', color: '#ff88aa' },
+                { text: '🏅 9800m... ALMOST THERE!', color: '#ffdd44' },
+                { text: '🏆 10000m... YOU ARE THE GREATEST!', color: '#ffffff' }
             ];
             var idx = Math.min(Math.floor(meters / 200) - 1, warnings.length - 1);
-            var w = warnings[idx] || { text: '💀 ' + meters + 'm... DEEPER INTO MADNESS', color: '#ff0044' };
+            var w = warnings[idx] || { text: '🌟 ' + meters + 'm... BEYOND AMAZING!', color: '#ffdd44' };
             var overlay = document.getElementById('announceOverlay');
             var card = document.createElement('div');
             card.className = 'announce-card';
-            card.style.border = '2px solid ' + w.color;
-            card.style.boxShadow = '0 0 40px ' + w.color;
             card.innerHTML =
-                '<div class="announce-icon">💀</div>' +
-                '<div class="announce-title" style="color:' + w.color + ';text-shadow:0 0 15px ' + w.color + ';font-size:clamp(16px,7vw,30px);">' + w.text + '</div>' +
-                '<div class="announce-pts" style="color:#888;">— ' + meters + ' meters deep —</div>';
+                '<div class="announce-title" style="color:' + w.color + ';text-shadow:0 0 15px ' + w.color + ',0 1px 4px #000;font-size:clamp(16px,7vw,28px);">' + w.text + '</div>' +
+                '<div class="announce-pts" style="color:#ccc;text-shadow:0 1px 3px #000;">— ' + meters + ' meters deep —</div>';
             overlay.appendChild(card);
             shakeAmt = Math.max(shakeAmt, 12);
             setTimeout(function () {
@@ -2964,7 +2961,7 @@
                                 var zbX = TILE + zbSpacing * (zbi + 1);
                                 spawnZombieBoss(zbX, zbY, mz);
                             }
-                            spawnText(canvas.width / 2, pick.y - 60, '⚠️ ZOMBIE HORDE!', '#44ff00');
+                            spawnText(canvas.width / 2, pick.y - 60, '⚠️ JELLY ARENA!', '#44ff00');
                         } else {
                             // ── QUEEN GATE: spawn bats + queens (original) ──
                             var megaNum = Math.min(MAX_BATS_MEGA, 100 + Math.floor(mz * 10));
@@ -2982,7 +2979,7 @@
                                 var queenX = TILE + spacing * (qi + 1);
                                 spawnQueen(queenX, queenY, mz, qi);
                             }
-                            spawnText(canvas.width / 2, pick.y - 60, '⚠️ MEGA ZONE!', '#ff4444');
+                            spawnText(canvas.width / 2, pick.y - 60, '⚠️ MEGA ARENA!', '#ff4444');
                         }
                     }
                     // Check if all gate bosses for this zone are dead → passage opened
