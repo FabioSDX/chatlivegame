@@ -1809,35 +1809,18 @@
                 }
                 if (!miniEliminated) {
                     miniClearedZones[zone] = true;
-                    // Pick mineral type by weighted random
-                    var totalW = 0;
-                    for (var mi = 0; mi < MINERAL_PILE_DEFS.length; mi++) totalW += MINERAL_PILE_DEFS[mi].weight;
-                    var roll = seededRand(zone * 311) * totalW;
-                    var mineralDef = MINERAL_PILE_DEFS[0];
-                    var cumW = 0;
-                    for (var mi = 0; mi < MINERAL_PILE_DEFS.length; mi++) {
-                        cumW += MINERAL_PILE_DEFS[mi].weight;
-                        if (roll < cumW) { mineralDef = MINERAL_PILE_DEFS[mi]; break; }
-                    }
-                    // Spawn collectible items scattered in the mini-clearing
                     var mShape = getMiniClearingShape(zone);
-                    var numItems = mineralDef.min + Math.floor(seededRand(zone * 499) * (mineralDef.max - mineralDef.min + 1));
                     var mb = mShape[0];
                     if (mb) {
                         var cx = Math.floor((mb.left + mb.right) / 2) * TILE + TILE / 2;
                         var cy = miniStart2 * TILE + TILE / 2;
-                        for (var ii = 0; ii < numItems; ii++) {
-                            items.push({
-                                x: cx + (seededRand(zone * 700 + ii * 13) - 0.5) * (mb.right - mb.left) * TILE * 0.7,
-                                y: cy + (seededRand(zone * 800 + ii * 17) - 0.5) * TILE * 0.8,
-                                vx: 0, vy: 0,
-                                t: mineralDef.t,
-                                wait: 9999, // stays still until player approaches
-                                ang: seededRand(zone * 900 + ii) * Math.PI * 2,
-                                spin: (seededRand(zone * 1000 + ii) - 0.5) * 0.05,
-                                owner: null, // no owner yet — assigned when player gets close
-                                isGrotta: true // mark as grotto item
-                            });
+                        // Spawn spider webs as decoration
+                        var numWebs = 3 + Math.floor(seededRand(zone * 555) * 4);
+                        for (var wi = 0; wi < numWebs; wi++) {
+                            var wx = cx + (seededRand(zone * 600 + wi * 19) - 0.5) * (mb.right - mb.left) * TILE * 0.8;
+                            var wy = cy + (seededRand(zone * 650 + wi * 23) - 0.5) * TILE * 1.5;
+                            if (!spiderWebs) spiderWebs = [];
+                            spiderWebs.push({ x: wx, y: wy, size: 20 + seededRand(zone * 700 + wi) * 30, alpha: 0.15 + seededRand(zone * 750 + wi) * 0.2 });
                         }
                     }
                     // Spawn spiders in mini-clearing — first one is Mother
@@ -2057,7 +2040,7 @@
         function restart() {
             score = 0; maxDepth = 0; parts = []; texts = []; debris = []; announcements = [];
             var ov = document.getElementById('announceOverlay'); if (ov) ov.innerHTML = '';
-            worldMap = {}; explosions = []; tntBlocks = []; items = []; zombies = []; bats = []; spiders = []; clearedZones = {}; clearingShapes = {}; crystalDecoList = []; torchList = []; clearingCrystals = {}; megaClearedZones = {};
+            worldMap = {}; explosions = []; tntBlocks = []; items = []; zombies = []; bats = []; spiders = []; spiderWebs = []; clearedZones = {}; clearingShapes = {}; crystalDecoList = []; torchList = []; clearingCrystals = {}; megaClearedZones = {};
             miniClearedZones = {};
             extraPicks = []; userPicks = []; lastActivity = {};
             doublePickActive = false; doublePickTimer = 0; updateDoublePickHUD();
@@ -3985,6 +3968,37 @@
 
             // zombies
             drawZombies();
+            // Spider webs
+            if (spiderWebs.length > 0) {
+                var wvTop = camY - TILE * 2, wvBot = camY + canvas.height + TILE * 2;
+                for (var wi = 0; wi < spiderWebs.length; wi++) {
+                    var web = spiderWebs[wi];
+                    if (web.y < wvTop || web.y > wvBot) continue;
+                    ctx.save();
+                    ctx.globalAlpha = web.alpha;
+                    ctx.strokeStyle = '#cccccc';
+                    ctx.lineWidth = 0.8;
+                    var ws = web.size;
+                    // Draw web pattern: radial lines + concentric rings
+                    for (var ri = 0; ri < 6; ri++) {
+                        var a = ri * Math.PI / 3;
+                        ctx.beginPath(); ctx.moveTo(web.x, web.y);
+                        ctx.lineTo(web.x + Math.cos(a) * ws, web.y + Math.sin(a) * ws);
+                        ctx.stroke();
+                    }
+                    for (var ci = 1; ci <= 3; ci++) {
+                        var cr = ws * ci / 3;
+                        ctx.beginPath();
+                        for (var ai = 0; ai <= 6; ai++) {
+                            var a2 = ai * Math.PI / 3 + Math.sin(ci * 0.5) * 0.15;
+                            var px = web.x + Math.cos(a2) * cr, py = web.y + Math.sin(a2) * cr;
+                            if (ai === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+                        }
+                        ctx.stroke();
+                    }
+                    ctx.restore();
+                }
+            }
             drawSpiders();
             drawBlackHoles();
 
@@ -4274,9 +4288,10 @@
         // ── SPIDER SYSTEM (mini-clearings) ──────────────────────────────────────
         var spiders = [];
         var MAX_SPIDERS = 12;
-        var SPIDER_SIZE = TILE * 0.8;
+        var SPIDER_SIZE = TILE * 1.6;
         var SPIDER_MOTHER_SCALE = 2.0;
         var SPIDER_MOTHER_SPAWN_MS = 5000;
+        var spiderWebs = [];
 
         var SPIDER_ANIMS = {
             idle:   { folder: 'Idle_Nervous', count: 24, speed: 0.12 },
@@ -4323,14 +4338,16 @@
                 vx: 0, vy: 0,
                 hp: motherFlag ? 8 : 2,
                 maxHp: motherFlag ? 8 : 2,
-                speed: 0.5 + Math.random() * 0.4 + Math.min(depth / 150, 0.5),
+                speed: 0.6 + Math.random() * 0.4 + Math.min(depth / 150, 0.5),
                 dir: Math.random() < 0.5 ? -1 : 1,
-                state: 'idle',
-                animTimer: 0,
+                surface: 'floor', // floor, ceiling, wallL, wallR
+                surfaceAng: 0, // rotation for drawing on surfaces
+                state: 'walk',
+                animTimer: Math.random() * 10,
                 hurtTimer: 0,
                 deadTimer: 0,
                 idleTimer: 0,
-                grounded: false,
+                grounded: true,
                 isMother: motherFlag,
                 lastSpawnTime: Date.now(),
                 pts: motherFlag ? 80 + depth * 2 : 25 + depth
@@ -4339,6 +4356,7 @@
 
         function updateSpiders() {
             var SG = 0.35;
+            var HS = SPIDER_SIZE * 0.3; // half-size for collision
             for (var i = spiders.length - 1; i >= 0; i--) {
                 var s = spiders[i];
                 if (s.y < camY - 400) { spiders.splice(i, 1); continue; }
@@ -4349,9 +4367,10 @@
                     s.animTimer += SPIDER_ANIMS.dead.speed;
                     if (s.animTimer >= SPIDER_ANIMS.dead.count) s.animTimer = SPIDER_ANIMS.dead.count - 0.01;
                     s.vy += SG; s.y += s.vy;
-                    var dRow = Math.floor((s.y + SPIDER_SIZE * 0.5) / TILE);
+                    s.surfaceAng = 0;
+                    var dRow = Math.floor((s.y + HS) / TILE);
                     var dG = getCell(dRow, Math.floor(s.x / TILE));
-                    if (dG && dG.t !== E) { s.y = dRow * TILE - SPIDER_SIZE * 0.5; s.vy = 0; }
+                    if (dG && dG.t !== E) { s.y = dRow * TILE - HS; s.vy = 0; }
                     if (s.deadTimer > 100) spiders.splice(i, 1);
                     continue;
                 }
@@ -4360,107 +4379,109 @@
                 if (s.state === 'hurt') {
                     s.hurtTimer--;
                     s.animTimer += SPIDER_ANIMS.hurt.speed;
-                    s.vy += SG; s.y += s.vy;
-                    var hRow = Math.floor((s.y + SPIDER_SIZE * 0.5) / TILE);
-                    var hG = getCell(hRow, Math.floor(s.x / TILE));
-                    if (hG && hG.t !== E) { s.y = hRow * TILE - SPIDER_SIZE * 0.5; s.vy = 0; }
-                    if (s.hurtTimer <= 0) { s.state = 'idle'; s.animTimer = 0; }
+                    if (s.hurtTimer <= 0) { s.state = 'walk'; s.animTimer = 0; }
                     else if (s.animTimer >= SPIDER_ANIMS.hurt.count) s.animTimer = 0;
                     continue;
                 }
 
-                // Physics
-                s.vy += SG;
-                s.x += s.vx;
-                s.y += s.vy;
-                if (!isFinite(s.x) || !isFinite(s.y)) { spiders.splice(i, 1); continue; }
+                // ── Surface crawling movement ──
+                var col = Math.floor(s.x / TILE);
+                var row = Math.floor(s.y / TILE);
+                var spd = s.speed * 1.2;
 
-                // Ground
-                var fRow = Math.floor((s.y + SPIDER_SIZE * 0.5) / TILE);
-                var fCol = Math.floor(s.x / TILE);
-                var ground = getCell(fRow, fCol);
-                s.grounded = false;
-                if (ground && ground.t !== E) {
-                    s.y = fRow * TILE - SPIDER_SIZE * 0.5;
-                    if (s.vy > 0) s.vy = 0;
-                    s.grounded = true;
-                }
+                // Check adjacent blocks
+                var below = getCell(row + 1, col);
+                var above = getCell(row - 1, col);
+                var left = getCell(row, col - 1);
+                var right = getCell(row, col + 1);
+                var hasFloor = below && below.t !== E;
+                var hasCeiling = above && above.t !== E;
+                var hasWallL = left && left.t !== E;
+                var hasWallR = right && right.t !== E;
 
-                // Not grounded → fall
-                if (!s.grounded && s.state !== 'jump') {
-                    s.state = 'jump'; s.animTimer = 0;
-                    continue;
-                }
-
-                // Jump anim
-                if (s.state === 'jump') {
-                    s.animTimer += SPIDER_ANIMS.jump.speed;
-                    if (s.animTimer >= SPIDER_ANIMS.jump.count) s.animTimer = SPIDER_ANIMS.jump.count - 0.01;
-                    if (s.grounded) { s.state = 'idle'; s.animTimer = 0; }
-                    continue;
-                }
-
-                // Find nearest pick
-                var nearPick = null, nearDist = 200;
-                var allP = [pick].concat(userPicks);
-                for (var np = 0; np < allP.length; np++) {
-                    if (!allP[np] || allP[np].stuck) continue;
-                    var dx = allP[np].x - s.x, dy = allP[np].y - s.y;
-                    var nd = Math.sqrt(dx * dx + dy * dy);
-                    if (nd < nearDist) { nearDist = nd; nearPick = allP[np]; }
-                }
-                var pickClose = nearDist < SPIDER_SIZE * 1.5;
-
-                // State machine
-                if (s.state === 'idle') {
-                    s.vx = 0;
-                    s.animTimer += SPIDER_ANIMS.idle.speed;
-                    if (s.animTimer >= SPIDER_ANIMS.idle.count) s.animTimer = 0;
-                    s.idleTimer++;
-                    if (pickClose && nearPick) {
-                        s.dir = nearPick.x > s.x ? 1 : -1;
-                        s.state = 'attack'; s.animTimer = 0;
-                    } else if (nearPick) {
-                        s.dir = nearPick.x > s.x ? 1 : -1;
-                        s.state = 'run'; s.animTimer = 0;
-                    } else if (s.idleTimer > 60 + Math.random() * 80) {
-                        s.state = 'walk'; s.animTimer = 0; s.idleTimer = 0;
-                        s.dir = Math.random() < 0.5 ? -1 : 1;
+                // Move along current surface
+                if (s.surface === 'floor') {
+                    s.surfaceAng = 0;
+                    s.x += s.dir * spd;
+                    s.y = (row + 1) * TILE - HS;
+                    // Check if floor still exists
+                    var fCol = Math.floor(s.x / TILE);
+                    var fBelow = getCell(row + 1, fCol);
+                    if (!fBelow || fBelow.t === E) {
+                        // Floor ended — try to transition to wall going down
+                        var wallCell = getCell(row + 1, col);
+                        if (s.dir > 0 && right && right.t !== E) { s.surface = 'wallR'; s.surfaceAng = -Math.PI / 2; }
+                        else if (s.dir < 0 && left && left.t !== E) { s.surface = 'wallL'; s.surfaceAng = Math.PI / 2; }
+                        else { s.dir *= -1; } // reverse
                     }
-                } else if (s.state === 'run') {
-                    if (nearPick) s.dir = nearPick.x > s.x ? 1 : -1;
-                    s.vx = s.dir * s.speed * 2;
-                    s.animTimer += SPIDER_ANIMS.run.speed;
-                    if (s.animTimer >= SPIDER_ANIMS.run.count) s.animTimer = 0;
-                    if (pickClose) { s.state = 'attack'; s.animTimer = 0; s.vx = 0; }
-                    else if (!nearPick) { s.state = 'idle'; s.animTimer = 0; }
-                    // Random jump while chasing
-                    if (nearPick && nearPick.y < s.y - TILE && s.grounded && Math.random() < 0.03) {
-                        s.vy = -7; s.grounded = false; s.state = 'jump'; s.animTimer = 0;
+                    // Hit a wall — climb it
+                    var fWall = getCell(row, Math.floor((s.x + s.dir * HS) / TILE));
+                    if (fWall && fWall.t !== E) {
+                        if (s.dir > 0) { s.surface = 'wallR'; s.surfaceAng = -Math.PI / 2; s.x = Math.floor(s.x / TILE) * TILE + TILE - HS; }
+                        else { s.surface = 'wallL'; s.surfaceAng = Math.PI / 2; s.x = Math.floor(s.x / TILE) * TILE + HS; }
                     }
-                } else if (s.state === 'attack') {
-                    s.animTimer += SPIDER_ANIMS.attack.speed;
-                    if (s.animTimer >= SPIDER_ANIMS.attack.count) { s.state = 'idle'; s.animTimer = 0; }
-                    s.vx *= 0.8;
-                } else if (s.state === 'walk') {
-                    s.vx = s.dir * s.speed;
-                    s.animTimer += SPIDER_ANIMS.walk.speed;
-                    if (s.animTimer >= SPIDER_ANIMS.walk.count) s.animTimer = 0;
-                    s.idleTimer++;
-                    if (nearPick) { s.dir = nearPick.x > s.x ? 1 : -1; s.state = 'run'; s.animTimer = 0; }
-                    else if (s.idleTimer > 100 + Math.random() * 120) { s.state = 'idle'; s.animTimer = 0; s.idleTimer = 0; }
-                    if (Math.random() < 0.01 && s.grounded) {
-                        s.vy = -5 - Math.random() * 2; s.grounded = false; s.state = 'jump'; s.animTimer = 0;
+                } else if (s.surface === 'ceiling') {
+                    s.surfaceAng = Math.PI;
+                    s.x += s.dir * spd;
+                    s.y = row * TILE + HS;
+                    var cCol = Math.floor(s.x / TILE);
+                    var cAbove = getCell(row - 1, cCol);
+                    if (!cAbove || cAbove.t === E) {
+                        if (s.dir > 0 && right && right.t !== E) { s.surface = 'wallR'; s.surfaceAng = -Math.PI / 2; }
+                        else if (s.dir < 0 && left && left.t !== E) { s.surface = 'wallL'; s.surfaceAng = Math.PI / 2; }
+                        else { s.dir *= -1; }
+                    }
+                    var cWall = getCell(row, Math.floor((s.x + s.dir * HS) / TILE));
+                    if (cWall && cWall.t !== E) {
+                        if (s.dir > 0) { s.surface = 'wallR'; s.surfaceAng = -Math.PI / 2; }
+                        else { s.surface = 'wallL'; s.surfaceAng = Math.PI / 2; }
+                    }
+                } else if (s.surface === 'wallR') {
+                    s.surfaceAng = -Math.PI / 2;
+                    s.y += s.dir * spd;
+                    var wrCol = Math.floor(s.x / TILE);
+                    s.x = (wrCol + 1) * TILE - HS;
+                    var wrRight = getCell(Math.floor(s.y / TILE), wrCol + 1);
+                    if (!wrRight || wrRight.t === E) {
+                        // Wall ended — transition to floor or ceiling
+                        if (s.dir > 0) { s.surface = 'floor'; s.dir = 1; }
+                        else { s.surface = 'ceiling'; s.dir = 1; }
+                    }
+                    var wrBlock = getCell(Math.floor((s.y + s.dir * HS) / TILE), wrCol);
+                    if (wrBlock && wrBlock.t !== E) {
+                        if (s.dir > 0) { s.surface = 'floor'; s.dir = -1; }
+                        else { s.surface = 'ceiling'; s.dir = -1; }
+                    }
+                } else if (s.surface === 'wallL') {
+                    s.surfaceAng = Math.PI / 2;
+                    s.y += s.dir * spd;
+                    var wlCol = Math.floor(s.x / TILE);
+                    s.x = wlCol * TILE + HS;
+                    var wlLeft = getCell(Math.floor(s.y / TILE), wlCol - 1);
+                    if (!wlLeft || wlLeft.t === E) {
+                        if (s.dir > 0) { s.surface = 'floor'; s.dir = -1; }
+                        else { s.surface = 'ceiling'; s.dir = -1; }
+                    }
+                    var wlBlock = getCell(Math.floor((s.y + s.dir * HS) / TILE), wlCol);
+                    if (wlBlock && wlBlock.t !== E) {
+                        if (s.dir > 0) { s.surface = 'floor'; s.dir = 1; }
+                        else { s.surface = 'ceiling'; s.dir = 1; }
                     }
                 }
+
+                // Animation
+                s.animTimer += SPIDER_ANIMS.walk.speed;
+                if (s.animTimer >= SPIDER_ANIMS.walk.count) s.animTimer = 0;
+
+                // Random surface switch
+                if (Math.random() < 0.005) s.dir *= -1;
 
                 // Wall clamp
-                if (s.x < TILE * 2) { s.x = TILE * 2; s.dir = 1; }
-                if (s.x > (COLS - 2) * TILE) { s.x = (COLS - 2) * TILE; s.dir = -1; }
-                if (s.grounded) s.vx *= 0.85;
+                if (s.x < TILE * 1.5) { s.x = TILE * 1.5; s.dir = 1; }
+                if (s.x > (COLS - 1.5) * TILE) { s.x = (COLS - 1.5) * TILE; s.dir = -1; }
 
                 // Mother spawns babies
-                if (s.isMother && s.state !== 'dead' && s.grounded) {
+                if (s.isMother && s.state !== 'dead') {
                     var now = Date.now();
                     if (now - s.lastSpawnTime >= SPIDER_MOTHER_SPAWN_MS && spiders.length < MAX_SPIDERS) {
                         s.lastSpawnTime = now;
@@ -4533,6 +4554,7 @@
 
                 ctx.save();
                 ctx.translate(s.x, s.y);
+                ctx.rotate(s.surfaceAng || 0);
                 if (s.dir < 0) ctx.scale(-1, 1);
                 if (s.state === 'hurt' && s.hurtTimer % 4 < 2) ctx.globalAlpha = 0.5;
                 if (s.state === 'dead') ctx.globalAlpha = Math.max(0, 1 - s.deadTimer / 100);
