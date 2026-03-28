@@ -5813,100 +5813,137 @@
             }
         }
 
+        // Jelly colors — cycle per zombie type
+        var JELLY_COLORS = [
+            { r: 50, g: 200, b: 80 },   // green
+            { r: 200, g: 80, b: 180 },  // purple
+            { r: 80, g: 150, b: 220 },  // blue
+            { r: 220, g: 160, b: 50 }   // orange
+        ];
+
         function drawZombies() {
             var viewTop = camY - TILE * 2;
             var viewBot = camY + canvas.height + TILE * 2;
+            var t = Date.now() * 0.004;
             for (var i = 0; i < zombies.length; i++) {
                 var z = zombies[i];
                 if (z.y < viewTop || z.y > viewBot) continue;
-                var animKey = z.state;
-                if (animKey === 'sleep') animKey = 'idle'; // sleep uses idle sprites
-                var animDef = ZOMBIE_ANIMS[animKey];
-                if (!animDef) { animKey = 'idle'; animDef = ZOMBIE_ANIMS.idle; }
-                var sprites = zombieSprites[z.type][animKey];
-                if (!sprites || sprites.length === 0) continue;
-                var frame = Math.min(Math.floor(z.animTimer), sprites.length - 1);
-                if (frame < 0) frame = 0;
-                var img = sprites[frame];
-                if (!img || !img.complete || !img.naturalWidth) continue;
+
+                var baseW = ZOMBIE_SIZE * 0.9;
+                var baseH = ZOMBIE_SIZE * 0.8;
+                if (z.isZBoss) { baseW *= ZBOSS_SCALE; baseH *= ZBOSS_SCALE; }
+
+                // Black hole shrink
+                if (z._bhScale !== undefined && z._bhScale < 1) {
+                    var zsc = Math.max(0.05, z._bhScale);
+                    baseW *= zsc; baseH *= zsc;
+                }
+
+                // Squash & stretch based on velocity
+                var speedY = Math.abs(z.vy || 0);
+                var speedX = Math.abs(z.vx || 0);
+                var squashX = 1 + speedY * 0.04 - speedX * 0.02;
+                var squashY = 1 - speedY * 0.03 + speedX * 0.02;
+                squashX = Math.max(0.7, Math.min(1.3, squashX));
+                squashY = Math.max(0.7, Math.min(1.3, squashY));
+
+                // Idle wobble
+                var wobble = Math.sin(t + i * 1.7) * 0.04;
+                squashX += wobble;
+                squashY -= wobble;
+
+                var w = baseW * squashX;
+                var h = baseH * squashY;
+
+                // Jelly color
+                var jc = JELLY_COLORS[i % JELLY_COLORS.length];
+                if (z.isZBoss) jc = { r: 255, g: 60, b: 60 }; // boss = red
 
                 ctx.save();
                 var dx = z.x, dy = z.y;
-                if (z.isSwimming) {
-                    dy += Math.sin(Date.now() * 0.008) * 5; // swimming bobbing
-                }
                 ctx.translate(dx, dy);
-                if (z.dir < 0) ctx.scale(-1, 1);
 
-                // Sleep uses idle sprites at full opacity
-                // Hurt flash
-                if (z.state === 'hurt' && z.hurtTimer % 4 < 2) ctx.globalAlpha = 0.5;
-                // Dead fade
+                // Black hole spin
+                if (z._bhScale !== undefined && z._bhScale < 1) {
+                    ctx.rotate(z._bhSpin || 0);
+                }
+
+                if (z.state === 'hurt' && z.hurtTimer % 4 < 2) ctx.globalAlpha = 0.6;
                 if (z.state === 'dead') ctx.globalAlpha = Math.max(0, 1 - z.deadTimer / 120);
 
-                var w = ZOMBIE_SIZE, h = ZOMBIE_SIZE;
-                if (z.isZBoss) { w *= ZBOSS_SCALE; h *= ZBOSS_SCALE; }
+                // ── Draw jelly body (ellipse, flat bottom) ──
+                ctx.beginPath();
+                // Top half: smooth arc
+                ctx.ellipse(0, -h * 0.1, w / 2, h * 0.5, 0, Math.PI, 0);
+                // Bottom: flatter, wider (sitting on ground)
+                ctx.ellipse(0, -h * 0.1, w / 2 * 1.1, h * 0.3, 0, 0, Math.PI);
+                ctx.closePath();
 
-                // Black hole suction effect: shrink and spin
-                if (z._bhScale !== undefined && z._bhScale < 1) {
-                    var zsc = Math.max(0.05, z._bhScale);
-                    w *= zsc; h *= zsc;
-                    if (z.dir < 0) ctx.scale(-1, 1);
-                    ctx.rotate(z._bhSpin || 0);
-                    if (z.dir < 0) ctx.scale(-1, 1);
-                }
+                // Gradient fill
+                var grad = ctx.createRadialGradient(-w * 0.15, -h * 0.25, 0, 0, 0, w * 0.6);
+                grad.addColorStop(0, 'rgba(' + Math.min(255, jc.r + 80) + ',' + Math.min(255, jc.g + 80) + ',' + Math.min(255, jc.b + 80) + ',0.5)');
+                grad.addColorStop(0.5, 'rgba(' + jc.r + ',' + jc.g + ',' + jc.b + ',0.35)');
+                grad.addColorStop(1, 'rgba(' + Math.max(0, jc.r - 40) + ',' + Math.max(0, jc.g - 40) + ',' + Math.max(0, jc.b - 40) + ',0.25)');
+                ctx.fillStyle = grad;
+                ctx.fill();
 
-                // Zombie boss aura glow
+                // Outline
+                ctx.strokeStyle = 'rgba(' + jc.r + ',' + jc.g + ',' + jc.b + ',0.5)';
+                ctx.lineWidth = z.isZBoss ? 3 : 1.5;
+                ctx.stroke();
+
+                // Highlight (top-left shine)
+                ctx.beginPath();
+                ctx.ellipse(-w * 0.12, -h * 0.3, w * 0.18, h * 0.12, -0.3, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255,255,255,0.5)';
+                ctx.fill();
+
+                // Small secondary highlight
+                ctx.beginPath();
+                ctx.arc(-w * 0.05, -h * 0.45, w * 0.06, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255,255,255,0.35)';
+                ctx.fill();
+
+                // Eyes (two dots)
+                var eyeY = -h * 0.15;
+                var eyeSpacing = w * 0.15;
+                var eyeR = z.isZBoss ? 5 : 3;
+                // White
+                ctx.fillStyle = 'rgba(255,255,255,0.8)';
+                ctx.beginPath(); ctx.arc(-eyeSpacing, eyeY, eyeR, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(eyeSpacing, eyeY, eyeR, 0, Math.PI * 2); ctx.fill();
+                // Pupils (look in movement direction)
+                var pupilOff = (z.dir || 1) * eyeR * 0.3;
+                ctx.fillStyle = 'rgba(0,0,0,0.7)';
+                ctx.beginPath(); ctx.arc(-eyeSpacing + pupilOff, eyeY, eyeR * 0.5, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(eyeSpacing + pupilOff, eyeY, eyeR * 0.5, 0, Math.PI * 2); ctx.fill();
+
+                // Boss glow
                 if (z.isZBoss && z.state !== 'dead') {
-                    if (z.dir < 0) ctx.scale(-1, 1);
-                    var zbPulse = 0.6 + Math.sin(Date.now() * 0.004) * 0.4;
-                    var zbGrad = ctx.createRadialGradient(0, 0, w * 0.2, 0, 0, w * 0.7);
-                    zbGrad.addColorStop(0, 'rgba(0, 255, 80, ' + (0.2 * zbPulse) + ')');
-                    zbGrad.addColorStop(0.6, 'rgba(50, 255, 0, ' + (0.1 * zbPulse) + ')');
-                    zbGrad.addColorStop(1, 'rgba(0, 255, 0, 0)');
-                    ctx.fillStyle = zbGrad;
-                    ctx.beginPath(); ctx.arc(0, 0, w * 0.7, 0, Math.PI * 2); ctx.fill();
-                    if (z.dir < 0) ctx.scale(-1, 1);
+                    var bPulse = 0.3 + Math.sin(t * 2 + i) * 0.2;
+                    ctx.beginPath();
+                    ctx.ellipse(0, -h * 0.1, w / 2 + 8, h * 0.5 + 8, 0, 0, Math.PI * 2);
+                    ctx.strokeStyle = 'rgba(' + jc.r + ',' + jc.g + ',' + jc.b + ',' + bPulse + ')';
+                    ctx.lineWidth = 4;
+                    ctx.stroke();
                 }
 
-                ctx.drawImage(img, -w / 2, -h / 2, w, h);
-
-                // Zzz floating text for sleeping zombies
+                // Sleep Zzz
                 if (z.state === 'sleep') {
                     ctx.globalAlpha = 0.5 + 0.3 * Math.sin((z.sleepZzz || 0) * 0.04);
-                    ctx.font = '14px monospace';
-                    ctx.fillStyle = '#aaddff';
+                    ctx.font = '14px monospace'; ctx.fillStyle = '#aaddff';
                     var zzOff = Math.sin((z.sleepZzz || 0) * 0.03) * 6;
-                    // Reset scale for text (dir flip)
-                    if (z.dir < 0) ctx.scale(-1, 1);
                     ctx.fillText('Z', 8, -h / 2 - 6 + zzOff);
-                    ctx.font = '11px monospace';
-                    ctx.fillText('z', 18, -h / 2 - 14 + zzOff * 0.7);
-                    ctx.font = '9px monospace';
-                    ctx.fillText('z', 26, -h / 2 - 20 + zzOff * 0.5);
-                    if (z.dir < 0) ctx.scale(-1, 1);
+                    ctx.font = '11px monospace'; ctx.fillText('z', 18, -h / 2 - 14 + zzOff * 0.7);
                 }
 
                 // HP bar
                 if (z.state !== 'dead' && z.hp < z.maxHp) {
                     ctx.globalAlpha = 0.8;
-                    var barW = z.isZBoss ? 90 : 40, barH = z.isZBoss ? 8 : 5;
-                    var barX = -barW / 2, barY = -h / 2 - 10;
-                    if (z.dir < 0) ctx.scale(-1, 1);
-                    ctx.fillStyle = '#333'; ctx.fillRect(barX, barY, barW, barH);
-                    ctx.fillStyle = z.isZBoss ? '#44ff00' : '#44ff44'; ctx.fillRect(barX, barY, barW * (z.hp / z.maxHp), barH);
-                    if (z.dir < 0) ctx.scale(-1, 1);
-                }
-
-                // Zombie boss skull indicator
-                if (z.isZBoss && z.state !== 'dead') {
-                    ctx.globalAlpha = 0.9;
-                    if (z.dir < 0) ctx.scale(-1, 1);
-                    ctx.font = 'bold 26px Arial';
-                    ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-                    ctx.fillStyle = '#44ff44';
-                    ctx.fillText('💀💀💀', 0, -h / 2 - 12);
-                    if (z.dir < 0) ctx.scale(-1, 1);
+                    var barW = z.isZBoss ? 80 : 35, barH = z.isZBoss ? 6 : 4;
+                    ctx.fillStyle = '#333'; ctx.fillRect(-barW / 2, -h / 2 - 10, barW, barH);
+                    ctx.fillStyle = 'rgba(' + jc.r + ',' + jc.g + ',' + jc.b + ',0.9)';
+                    ctx.fillRect(-barW / 2, -h / 2 - 10, barW * (z.hp / z.maxHp), barH);
                 }
 
                 ctx.globalAlpha = 1;
