@@ -2176,7 +2176,7 @@
         function restart() {
             score = 0; maxDepth = 0; parts = []; texts = []; debris = []; announcements = [];
             var ov = document.getElementById('announceOverlay'); if (ov) ov.innerHTML = '';
-            worldMap = {}; explosions = []; tntBlocks = []; items = []; zombies = []; bats = []; spiders = []; spiderWebs = []; clearedZones = {}; clearingShapes = {}; crystalDecoList = []; torchList = []; clearingCrystals = {}; megaClearedZones = {};
+            worldMap = {}; explosions = []; tntBlocks = []; items = []; zombies = []; bats = []; spiders = []; spiderWebs = []; fallingBlocks = []; clearedZones = {}; clearingShapes = {}; crystalDecoList = []; torchList = []; clearingCrystals = {}; megaClearedZones = {};
             miniClearedZones = {};
             extraPicks = []; userPicks = []; lastActivity = {};
             doublePickActive = false; doublePickTimer = 0; updateDoublePickHUD();
@@ -2875,6 +2875,112 @@
             ctx.restore();
         }
 
+        // ── Falling Blocks System ──
+        var fallingBlocks = [];
+
+        function _hasSupport(r, c) {
+            // A block has support if any neighbor is solid (not counting itself)
+            var below = getCell(r + 1, c);
+            if (below && below.t !== E) return true;
+            var left = getCell(r, c - 1);
+            if (left && left.t !== E) return true;
+            var right = getCell(r, c + 1);
+            if (right && right.t !== E) return true;
+            var above = getCell(r - 1, c);
+            if (above && above.t !== E) return true;
+            return false;
+        }
+
+        function checkFallingBlocks(col, row) {
+            // Check the 4 neighbors of the destroyed block
+            var neighbors = [[row - 1, col], [row + 1, col], [row, col - 1], [row, col + 1]];
+            for (var ni = 0; ni < neighbors.length; ni++) {
+                var nr = neighbors[ni][0], nc = neighbors[ni][1];
+                var cell = getCell(nr, nc);
+                if (!cell || cell.t === E || cell.t === BEDROCK) continue;
+                if (!_hasSupport(nr, nc)) {
+                    // This block is unsupported — make it fall
+                    var bt = cell.t;
+                    fallingBlocks.push({
+                        x: nc * TILE + TILE / 2,
+                        y: nr * TILE + TILE / 2,
+                        vx: (Math.random() - 0.5) * 2,
+                        vy: -1,
+                        t: bt,
+                        size: TILE,
+                        ang: 0,
+                        spin: (Math.random() - 0.5) * 0.1,
+                        hp: BDEF[bt].hp,
+                        bounces: 0
+                    });
+                    cell.t = E; cell.hp = 0; cell.cr = 0;
+                }
+            }
+        }
+
+        function updateFallingBlocks() {
+            for (var i = fallingBlocks.length - 1; i >= 0; i--) {
+                var fb = fallingBlocks[i];
+                fb.vy += 0.25; // gravity
+                fb.x += fb.vx;
+                fb.y += fb.vy;
+                fb.ang += fb.spin;
+                fb.vx *= 0.99;
+
+                // Ground collision
+                var fRow = Math.floor((fb.y + fb.size * 0.4) / TILE);
+                var fCol = Math.floor(fb.x / TILE);
+                var ground = getCell(fRow, fCol);
+                if (ground && ground.t !== E) {
+                    fb.y = fRow * TILE - fb.size * 0.4;
+                    fb.bounces++;
+                    if (fb.bounces >= 3 || Math.abs(fb.vy) < 1) {
+                        // Break into debris
+                        var pts = BDEF[fb.t] ? BDEF[fb.t].pts || 0 : 0;
+                        score += pts;
+                        spawnParts(fb.x, fb.y, BDEF[fb.t] ? BDEF[fb.t].glow : '#888', 4);
+                        sfxBreak(fb.t);
+                        fallingBlocks.splice(i, 1);
+                        continue;
+                    }
+                    fb.vy = -Math.abs(fb.vy) * 0.5; // bounce
+                    fb.vx += (Math.random() - 0.5) * 2;
+                    fb.spin += (Math.random() - 0.5) * 0.15;
+                }
+
+                // Wall collision
+                var wCol = Math.floor((fb.x + (fb.vx > 0 ? fb.size * 0.4 : -fb.size * 0.4)) / TILE);
+                var wall = getCell(Math.floor(fb.y / TILE), wCol);
+                if (wall && wall.t !== E) {
+                    fb.vx = -fb.vx * 0.5;
+                    fb.spin += (Math.random() - 0.5) * 0.1;
+                }
+
+                // Remove if off screen
+                if (fb.y > camY + canvas.height + 400) {
+                    fallingBlocks.splice(i, 1);
+                }
+            }
+        }
+
+        function drawFallingBlocks() {
+            for (var i = 0; i < fallingBlocks.length; i++) {
+                var fb = fallingBlocks[i];
+                if (fb.y < camY - TILE * 2 || fb.y > camY + canvas.height + TILE * 2) continue;
+                var tex = BTEX[fb.t];
+                ctx.save();
+                ctx.translate(fb.x, fb.y);
+                ctx.rotate(fb.ang);
+                if (tex && tex.complete && tex.naturalWidth > 0) {
+                    ctx.drawImage(tex, -fb.size / 2, -fb.size / 2, fb.size, fb.size);
+                } else {
+                    ctx.fillStyle = BDEF[fb.t] ? BDEF[fb.t].color : '#888';
+                    ctx.fillRect(-fb.size / 2, -fb.size / 2, fb.size, fb.size);
+                }
+                ctx.restore();
+            }
+        }
+
         function hitBlock(col, row, force, source) {
             var cell = getCell(row, col);
             if (!cell || cell.t === E) return false;
@@ -2902,6 +3008,8 @@
                 }
                 sfxBreak(cell.t);
                 cell.t = E; cell.cr = 0;
+                // Check neighbors for unsupported blocks → make them fall
+                checkFallingBlocks(col, row);
                 // Chance to spawn zombie — increases with depth
                 var zDepth = row;
                 var zChance = zDepth > 10 ? Math.min(0.04, 0.005 + zDepth * 0.0005) : 0;
@@ -2959,6 +3067,7 @@
             updateUserPicks();
             updateExtraPicks();
             updateTNTBlocks();
+            updateFallingBlocks();
             updateItems();
             updateExplosions();
             updateStorm();
@@ -3928,6 +4037,7 @@
 
             // Water table overlay
             drawWaterTable();
+            drawFallingBlocks();
 
             // Crystal decorations growing from clearing walls
             var viewTop = camY - TILE * 2;
