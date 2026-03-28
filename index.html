@@ -2878,52 +2878,111 @@
         // ── Falling Blocks System ──
         var fallingBlocks = [];
 
-        function _hasSupport(r, c) {
-            // Block needs support below OR connected to bedrock wall
-            if (c <= 0 || c >= COLS - 1) return true; // bedrock walls always supported
+        function _isAnchored(r, c) {
+            // Quick check: bedrock walls always anchored
+            if (c <= 0 || c >= COLS - 1) return true;
+            var cell = getCell(r, c);
+            if (!cell || cell.t === E) return false;
+            if (cell.t === BEDROCK) return true;
+            // Has solid ground below = anchored
             var below = getCell(r + 1, c);
-            if (below && below.t !== E) return true; // has floor
-            // Check if connected laterally to a supported block
-            var left = getCell(r, c - 1);
-            var right = getCell(r, c + 1);
-            if (left && left.t === BEDROCK) return true;
-            if (right && right.t === BEDROCK) return true;
-            // No direct support below — check if lateral neighbors have support below them
-            if (left && left.t !== E) {
-                var leftBelow = getCell(r + 1, c - 1);
-                if (leftBelow && leftBelow.t !== E) return true;
-            }
-            if (right && right.t !== E) {
-                var rightBelow = getCell(r + 1, c + 1);
-                if (rightBelow && rightBelow.t !== E) return true;
-            }
+            if (below && below.t !== E) return true;
             return false;
         }
 
         function checkFallingBlocks(col, row) {
-            // Check 5x5 area around destroyed block for unsupported blocks
-            for (var dr = -2; dr <= 2; dr++) {
-                for (var dc = -2; dc <= 2; dc++) {
+            // Flood-fill from destroyed block: find all connected non-anchored blocks
+            // Scan 10x10 area for candidate blocks
+            var R = 5;
+            var candidates = [];
+            var candSet = {};
+            for (var dr = -R; dr <= R; dr++) {
+                for (var dc = -R; dc <= R; dc++) {
                     var nr = row + dr, nc = col + dc;
-                    if (nr === row && nc === col) continue; // skip destroyed block
+                    if (nr === row && nc === col) continue;
                     var cell = getCell(nr, nc);
                     if (!cell || cell.t === E || cell.t === BEDROCK) continue;
-                    if (!_hasSupport(nr, nc)) {
-                        var bt = cell.t;
-                        fallingBlocks.push({
-                            x: nc * TILE + TILE / 2,
-                            y: nr * TILE + TILE / 2,
-                            vx: (Math.random() - 0.5) * 2,
-                            vy: -1,
-                            t: bt,
-                            size: TILE,
-                            ang: 0,
-                            spin: (Math.random() - 0.5) * 0.1,
-                            hp: BDEF[bt].hp,
-                            bounces: 0
-                        });
-                        cell.t = E; cell.hp = 0; cell.cr = 0;
+                    var key = nr + ',' + nc;
+                    candidates.push({r: nr, c: nc});
+                    candSet[key] = true;
+                }
+            }
+            if (!candidates.length) return;
+
+            // For each candidate, BFS through connected blocks to see if group reaches an anchor
+            var visited = {};
+            var groups = []; // groups of blocks that share connectivity
+
+            for (var i = 0; i < candidates.length; i++) {
+                var ck = candidates[i].r + ',' + candidates[i].c;
+                if (visited[ck]) continue;
+
+                // BFS from this block
+                var queue = [{r: candidates[i].r, c: candidates[i].c}];
+                var group = [];
+                var anchored = false;
+                var head = 0;
+
+                while (head < queue.length) {
+                    var cur = queue[head++];
+                    var curKey = cur.r + ',' + cur.c;
+                    if (visited[curKey]) continue;
+                    visited[curKey] = true;
+
+                    var cc = getCell(cur.r, cur.c);
+                    if (!cc || cc.t === E) continue;
+                    if (cc.t === BEDROCK || cur.c <= 0 || cur.c >= COLS - 1) { anchored = true; continue; }
+
+                    // Check if this block is anchored (has solid ground below that's outside our candidate set)
+                    var belowCell = getCell(cur.r + 1, cur.c);
+                    var belowKey = (cur.r + 1) + ',' + cur.c;
+                    if (belowCell && belowCell.t !== E && !candSet[belowKey]) {
+                        anchored = true; continue;
                     }
+                    // Also anchored if below is bedrock
+                    if (belowCell && belowCell.t === BEDROCK) { anchored = true; continue; }
+
+                    group.push({r: cur.r, c: cur.c, t: cc.t});
+
+                    // Expand to 4 neighbors (up/down/left/right)
+                    var dirs = [{r:-1,c:0},{r:1,c:0},{r:0,c:-1},{r:0,c:1}];
+                    for (var d = 0; d < dirs.length; d++) {
+                        var er = cur.r + dirs[d].r, ec = cur.c + dirs[d].c;
+                        var eKey = er + ',' + ec;
+                        if (visited[eKey]) continue;
+                        var eCell = getCell(er, ec);
+                        if (eCell && eCell.t !== E) {
+                            queue.push({r: er, c: ec});
+                        }
+                    }
+                }
+
+                if (!anchored && group.length > 0) {
+                    groups.push(group);
+                }
+            }
+
+            // Convert unanchored groups to falling blocks
+            for (var g = 0; g < groups.length; g++) {
+                var grp = groups[g];
+                for (var j = 0; j < grp.length; j++) {
+                    var b = grp[j];
+                    var fc = getCell(b.r, b.c);
+                    if (!fc || fc.t === E) continue;
+                    var bt = fc.t;
+                    fallingBlocks.push({
+                        x: b.c * TILE + TILE / 2,
+                        y: b.r * TILE + TILE / 2,
+                        vx: (Math.random() - 0.5) * 2,
+                        vy: -1,
+                        t: bt,
+                        size: TILE,
+                        ang: 0,
+                        spin: (Math.random() - 0.5) * 0.1,
+                        hp: BDEF[bt] ? BDEF[bt].hp : 1,
+                        bounces: 0
+                    });
+                    fc.t = E; fc.hp = 0; fc.cr = 0;
                 }
             }
         }
