@@ -2603,39 +2603,12 @@
         function sfxEvilLaugh() {
             var ac = getAC(); if (!ac) return;
             var t = ac.currentTime;
-            // Deep evil laugh: descending notes with vibrato
-            var notes = [180, 160, 140, 120, 100, 85, 70];
+            // Happy fanfare — ascending cheerful notes
+            var notes = [330, 392, 440, 523, 587, 659, 784];
             for (var i = 0; i < notes.length; i++) {
-                var osc = ac.createOscillator();
-                var g = ac.createGain();
-                var vib = ac.createOscillator(); // vibrato
-                var vibG = ac.createGain();
-                osc.type = 'sawtooth';
-                var st = t + i * 0.12;
-                osc.frequency.setValueAtTime(notes[i], st);
-                osc.frequency.linearRampToValueAtTime(notes[i] * 0.85, st + 0.1);
-                // Vibrato
-                vib.type = 'sine';
-                vib.frequency.setValueAtTime(6 + i, st);
-                vibG.gain.setValueAtTime(8, st);
-                vib.connect(vibG);
-                vibG.connect(osc.frequency);
-                g.gain.setValueAtTime(0.15, st);
-                g.gain.exponentialRampToValueAtTime(0.001, st + 0.15);
-                osc.connect(g); g.connect(ac.destination);
-                osc.start(st); osc.stop(st + 0.15);
-                vib.start(st); vib.stop(st + 0.15);
+                playNote(notes[i], 'sine', 0.1, 0.01, 0.15, t + i * 0.08);
+                playNote(notes[i] * 1.5, 'triangle', 0.04, 0.01, 0.1, t + i * 0.08 + 0.02);
             }
-            // Deep rumble underneath
-            var rumble = ac.createOscillator();
-            var rg = ac.createGain();
-            rumble.type = 'sine';
-            rumble.frequency.setValueAtTime(35, t);
-            rumble.frequency.linearRampToValueAtTime(20, t + 1.2);
-            rg.gain.setValueAtTime(0.25, t);
-            rg.gain.exponentialRampToValueAtTime(0.001, t + 1.2);
-            rumble.connect(rg); rg.connect(ac.destination);
-            rumble.start(t); rumble.stop(t + 1.2);
         }
 
         function sfxTormenta() {
@@ -6303,93 +6276,137 @@
         }
 
         // ── Música de Boss ──────────────────────────────────────────────────────────
-        // ── Trilha sonora (estilo Aquatic Amb DKC) ─────────────────────────────
+        // ── Trilha sonora — Happy & Dynamic ─────────────────────────────
         var musicPlaying = false;
         var musicTimeout = null;
+        var musicMode = 'normal'; // normal, mega, boss
 
-        // Escala de Ré menor pentatônica + algumas notas extras — clima aquático
-        var ROOT = 73.42; // D2
-        var SCALE = [0, 3, 5, 7, 10, 12, 15, 17, 19, 22, 24, 27, 29]; // semitoms
+        // C Major pentatonic — happy and bright
+        var ROOT = 130.81; // C3
+        var SCALE = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24]; // major pentatonic
 
         function scaleFreq(degree, octave) {
             octave = octave || 0;
             return ROOT * Math.pow(2, (SCALE[degree % SCALE.length] + octave * 12) / 12);
         }
 
-        // Padrão de baixo pulsante (2 compassos)
-        var BASS_PATTERN = [
-            { d: 0, oct: 0, dur: 0.9, vol: 0.18 },
-            { d: 4, oct: 0, dur: 0.45, vol: 0.10 },
-            { d: 2, oct: 0, dur: 0.45, vol: 0.10 },
-            { d: 0, oct: 0, dur: 0.9, vol: 0.16 },
-            { d: 7, oct: -1, dur: 0.45, vol: 0.12 },
-            { d: 4, oct: 0, dur: 0.45, vol: 0.10 },
+        // Happy bouncy bass
+        var BASS_NORMAL = [
+            { d: 0, oct: 0, dur: 0.4, vol: 0.14 },
+            { d: 4, oct: 0, dur: 0.3, vol: 0.10 },
+            { d: 2, oct: 0, dur: 0.4, vol: 0.12 },
+            { d: 4, oct: 0, dur: 0.3, vol: 0.10 },
+        ];
+        // Frantic mega bass
+        var BASS_MEGA = [
+            { d: 0, oct: 0, dur: 0.2, vol: 0.16 },
+            { d: 2, oct: 0, dur: 0.2, vol: 0.14 },
+            { d: 4, oct: 0, dur: 0.2, vol: 0.16 },
+            { d: 5, oct: 0, dur: 0.2, vol: 0.14 },
+            { d: 4, oct: 0, dur: 0.2, vol: 0.16 },
+            { d: 2, oct: 0, dur: 0.2, vol: 0.14 },
+        ];
+        // Dramatic boss bass
+        var BASS_BOSS = [
+            { d: 0, oct: -1, dur: 0.6, vol: 0.18 },
+            { d: 3, oct: -1, dur: 0.3, vol: 0.14 },
+            { d: 0, oct: -1, dur: 0.6, vol: 0.16 },
+            { d: 5, oct: -1, dur: 0.3, vol: 0.14 },
         ];
 
-        // Melodia flutuante (arpejo etéreo)
-        var MELODY_PATTERN = [
-            { d: 4, oct: 1, dur: 0.6, vol: 0.07 },
-            { d: 7, oct: 1, dur: 0.6, vol: 0.06 },
-            { d: 9, oct: 1, dur: 0.6, vol: 0.07 },
-            { d: 7, oct: 1, dur: 0.6, vol: 0.05 },
-            { d: 4, oct: 1, dur: 0.6, vol: 0.07 },
-            { d: 2, oct: 1, dur: 0.6, vol: 0.06 },
-            { d: 0, oct: 1, dur: 0.6, vol: 0.07 },
-            { d: 2, oct: 1, dur: 0.6, vol: 0.05 },
+        // Happy melody
+        var MELODY_NORMAL = [
+            { d: 4, oct: 1, dur: 0.5, vol: 0.06 },
+            { d: 5, oct: 1, dur: 0.5, vol: 0.05 },
+            { d: 7, oct: 1, dur: 0.5, vol: 0.06 },
+            { d: 5, oct: 1, dur: 0.5, vol: 0.05 },
+            { d: 4, oct: 1, dur: 0.5, vol: 0.06 },
+            { d: 2, oct: 1, dur: 0.5, vol: 0.05 },
+            { d: 0, oct: 1, dur: 0.7, vol: 0.07 },
+            { d: 2, oct: 1, dur: 0.3, vol: 0.05 },
+        ];
+        // Fast mega melody
+        var MELODY_MEGA = [
+            { d: 0, oct: 2, dur: 0.25, vol: 0.07 },
+            { d: 2, oct: 2, dur: 0.25, vol: 0.06 },
+            { d: 4, oct: 2, dur: 0.25, vol: 0.07 },
+            { d: 5, oct: 2, dur: 0.25, vol: 0.06 },
+            { d: 7, oct: 2, dur: 0.25, vol: 0.07 },
+            { d: 5, oct: 2, dur: 0.25, vol: 0.06 },
+            { d: 4, oct: 2, dur: 0.25, vol: 0.07 },
+            { d: 2, oct: 2, dur: 0.25, vol: 0.06 },
         ];
 
-        // Pad de fundo (acorde sustentado)
-        var PAD_CHORDS = [
-            [0, 4, 7],   // Dm
-            [0, 3, 7],   // Dm7 parcial
-            [2, 5, 9],   // F
-            [0, 4, 7],   // Dm
-        ];
+        // Happy chords
+        var PAD_NORMAL = [[0, 2, 4], [2, 4, 7], [4, 7, 9], [0, 4, 7]];
+        var PAD_BOSS = [[0, 3, 7], [0, 3, 5], [0, 2, 5], [0, 3, 7]];
 
         var musicStep = 0, bassStep = 0, melStep = 0, padStep = 0;
-        var BEAT = 0.52; // duração de um beat em segundos
+        var BEAT = 0.45;
+
+        function getMusicMode() {
+            if (!pick) return 'normal';
+            var row = Math.floor(pick.y / TILE);
+            if (isMegaClearingRow(row)) {
+                var mz = getMegaZone(row);
+                if (mz >= 0 && megaClearedZones[mz] && !megaClearedZones[mz + '_gateOpen']) return 'boss';
+                return 'mega';
+            }
+            return 'normal';
+        }
 
         function scheduleMusicBeat() {
             if (!musicPlaying) return;
             var ac = getAC();
             var t = ac.currentTime;
+            musicMode = getMusicMode();
 
-            // ── baixo ──
-            var bn = BASS_PATTERN[bassStep % BASS_PATTERN.length];
+            var bass = musicMode === 'mega' ? BASS_MEGA : (musicMode === 'boss' ? BASS_BOSS : BASS_NORMAL);
+            var melody = musicMode === 'mega' ? MELODY_MEGA : MELODY_NORMAL;
+            var pads = musicMode === 'boss' ? PAD_BOSS : PAD_NORMAL;
+            var beat = musicMode === 'mega' ? 0.3 : (musicMode === 'boss' ? 0.55 : BEAT);
+
+            // Bass
+            var bn = bass[bassStep % bass.length];
             var bf = scaleFreq(bn.d, bn.oct);
-            playNote(bf, 'sine', bn.vol, 0.02, bn.dur * 0.85, t);
-            // sub-harmônico
-            playNote(bf * 0.5, 'sine', bn.vol * 0.5, 0.02, bn.dur * 0.85, t);
+            playNote(bf, 'sine', bn.vol, 0.02, bn.dur * 0.8, t);
+            if (musicMode !== 'mega') playNote(bf * 0.5, 'sine', bn.vol * 0.4, 0.02, bn.dur * 0.8, t);
             bassStep++;
 
-            // ── melodia (a cada 2 beats) ──
-            if (musicStep % 2 === 0) {
-                var mn = MELODY_PATTERN[melStep % MELODY_PATTERN.length];
+            // Melody (every 2 beats, or every beat in mega)
+            if (musicMode === 'mega' || musicStep % 2 === 0) {
+                var mn = melody[melStep % melody.length];
                 var mf = scaleFreq(mn.d, mn.oct);
-                playNote(mf, 'sine', mn.vol, 0.04, mn.dur * 1.2, t);
-                playNote(mf * 1.005, 'triangle', mn.vol * 0.4, 0.04, mn.dur * 1.4, t); // chorus leve
+                playNote(mf, 'sine', mn.vol, 0.03, mn.dur, t);
+                if (musicMode !== 'boss') playNote(mf * 1.005, 'triangle', mn.vol * 0.3, 0.03, mn.dur * 1.2, t);
                 melStep++;
             }
 
-            // ── pad (a cada 4 beats) ──
+            // Pad (every 4 beats)
             if (musicStep % 4 === 0) {
-                var chord = PAD_CHORDS[padStep % PAD_CHORDS.length];
+                var chord = pads[padStep % pads.length];
                 for (var ci = 0; ci < chord.length; ci++) {
                     var pf = scaleFreq(chord[ci], 1);
-                    playNote(pf, 'sine', 0.04, 0.15, BEAT * 3.5, t);
+                    var padType = musicMode === 'boss' ? 'triangle' : 'sine';
+                    playNote(pf, padType, musicMode === 'boss' ? 0.05 : 0.035, 0.1, beat * 3.5, t);
                 }
                 padStep++;
             }
 
-            // ── glitter (nota aleatória ocasional) ──
-            if (Math.random() < 0.25) {
-                var gd = SCALE[Math.floor(Math.random() * SCALE.length)];
-                var gf = ROOT * Math.pow(2, (gd + 36) / 12);
-                playNote(gf, 'sine', 0.04, 0.01, 0.3, t + Math.random() * BEAT * 0.8);
+            // Sparkle (random happy note)
+            if (Math.random() < (musicMode === 'mega' ? 0.4 : 0.2)) {
+                var gd = Math.floor(Math.random() * SCALE.length);
+                var gf = scaleFreq(gd, musicMode === 'mega' ? 3 : 2);
+                playNote(gf, 'sine', 0.035, 0.01, 0.2, t + Math.random() * beat * 0.5);
+            }
+
+            // Boss: dramatic low pulse
+            if (musicMode === 'boss' && musicStep % 2 === 0) {
+                playNote(ROOT * 0.5, 'triangle', 0.08, 0.05, beat * 1.5, t);
             }
 
             musicStep++;
-            musicTimeout = setTimeout(scheduleMusicBeat, BEAT * 1000);
+            musicTimeout = setTimeout(scheduleMusicBeat, beat * 1000);
         }
 
         function startMusic() {
