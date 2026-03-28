@@ -1272,6 +1272,29 @@
                     }
                 }
             }
+            // Damage spiders in blast radius
+            for (var si = spiders.length - 1; si >= 0; si--) {
+                var ss = spiders[si];
+                if (ss.state === 'dead') continue;
+                var sdx = ss.x - b.x, sdy = ss.y - b.y;
+                var sd = Math.sqrt(sdx * sdx + sdy * sdy);
+                if (sd < blastR) {
+                    var spDmg = b.nuke ? 999 : (b.mega ? 8 : 3);
+                    ss.hp -= spDmg;
+                    ss.state = 'hurt'; ss.hurtTimer = 12; ss.animTimer = 0;
+                    if (sd > 0) { ss.vx = (sdx / sd) * (b.nuke ? 12 : 4); ss.vy = (sdy / sd) * (b.nuke ? 12 : 4) - 4; }
+                    sfxZombieHurt();
+                    if (ss.hp <= 0) {
+                        ss.state = 'dead'; ss.animTimer = 0; ss.deadTimer = 0;
+                        score += ss.pts;
+                        if (b.userName) {
+                            if (!persistentScores[b.userName]) persistentScores[b.userName] = { score: 0, avatar: '' };
+                            persistentScores[b.userName].score += ss.pts;
+                        }
+                        sfxZombieDeath();
+                    }
+                }
+            }
             shakeAmt = Math.max(shakeAmt, b.nuke ? 40 : (b.mega ? 22 : 10));
             if (b.nuke || b.mega) sfxMegaTNT(); else sfxTNT();
         }
@@ -2858,6 +2881,12 @@
                         var dist = Math.sqrt((b.x - atk.x) * (b.x - atk.x) + (b.y - atk.y) * (b.y - atk.y));
                         if (dist <= 800) targets.push({ bat: b, dist: dist });
                     }
+                    for (var sp_i = 0; sp_i < spiders.length; sp_i++) {
+                        var sp = spiders[sp_i];
+                        if (sp.state === 'dead' || sp.y < camY - 200 || sp.y > camY + canvas.height + 200) continue;
+                        var spDist = Math.sqrt((sp.x - atk.x) * (sp.x - atk.x) + (sp.y - atk.y) * (sp.y - atk.y));
+                        if (spDist <= 800) targets.push({ bat: sp, dist: spDist });
+                    }
 
                     if (targets.length > 0) {
                         // Alternate: try to find a target that isn't the last one hit
@@ -4382,6 +4411,12 @@
                     continue;
                 }
 
+                // Skip physics if captured by black hole
+                if (s._bhCaptured) {
+                    s.x += s.vx; s.y += s.vy;
+                    continue;
+                }
+
                 // Gravity
                 s.vy += SG;
                 s.x += s.vx;
@@ -4514,6 +4549,16 @@
                 if (s.state === 'dead') ctx.globalAlpha = Math.max(0, 1 - s.deadTimer / 100);
 
                 var w = SPIDER_SIZE, h = SPIDER_SIZE;
+                if (s.isMother) { w *= SPIDER_MOTHER_SCALE; h *= SPIDER_MOTHER_SCALE; }
+
+                // Black hole suction effect
+                if (s._bhScale !== undefined && s._bhScale < 1) {
+                    var ssc = Math.max(0.05, s._bhScale);
+                    w *= ssc; h *= ssc;
+                    if (s.dir < 0) ctx.scale(-1, 1);
+                    ctx.rotate(s._bhSpin || 0);
+                    if (s.dir < 0) ctx.scale(-1, 1);
+                }
                 if (s.isMother) { w *= SPIDER_MOTHER_SCALE; h *= SPIDER_MOTHER_SCALE; }
 
                 ctx.drawImage(img, -w / 2, -h / 2, w, h);
@@ -7054,6 +7099,39 @@
                     }
                 }
 
+                // ── Suck spiders: orbit, shrink, spin, devour ──
+                for (var spi = spiders.length - 1; spi >= 0; spi--) {
+                    var sp = spiders[spi];
+                    if (sp.state === 'dead') continue;
+                    var spdx = bh.x - sp.x, spdy = bh.y - sp.y;
+                    var spdist = Math.sqrt(spdx * spdx + spdy * spdy);
+                    var spCaptured = sp._bhCaptured;
+                    if (spdist < R || spCaptured) {
+                        hasCaptured = true;
+                        sp._bhCaptured = true;
+                        var spnx = spdx / (spdist || 1), spny = spdy / (spdist || 1);
+                        var spclose = 1 - Math.min(spdist, R) / R;
+                        var sptSpeed = 1.5 + spclose * 3.5;
+                        var sporbitR = Math.max(0.1, 0.5 - spclose * 0.4);
+                        sp.vx = sp.vx * 0.92 + (spnx * sptSpeed * (1 - sporbitR) + spny * sptSpeed * sporbitR) * 0.08;
+                        sp.vy = sp.vy * 0.92 + (spny * sptSpeed * (1 - sporbitR) - spnx * sptSpeed * sporbitR) * 0.08;
+                        sp._bhScale = Math.max(0.05, spdist / R);
+                        sp._bhSpin = (sp._bhSpin || 0) + 0.15 * spclose;
+                        if (spdist < 25) {
+                            sp.hp = 0; sp.state = 'dead'; sp.animTimer = 0; sp.deadTimer = 80;
+                            sp._bhScale = 0;
+                            score += sp.pts;
+                            if (bh.userName) {
+                                if (!persistentScores[bh.userName]) persistentScores[bh.userName] = { score: 0, avatar: '' };
+                                persistentScores[bh.userName].score += sp.pts;
+                            }
+                            sfxZombieDeath();
+                        }
+                    } else {
+                        if (sp._bhScale !== undefined) { sp._bhScale = undefined; sp._bhSpin = 0; }
+                    }
+                }
+
                 // ── Gradual block destruction: expands from center outward (only while active) ──
                 if (!expired) {
                     var destroyR = R * progress;
@@ -7141,6 +7219,14 @@
                             fz.hp = 0; fz.state = 'dead'; fz.animTimer = 0; fz.deadTimer = 80; fz._bhScale = 0;
                             score += fz.pts;
                             if (bh.userName && persistentScores[bh.userName]) persistentScores[bh.userName].score += fz.pts;
+                        }
+                    }
+                    for (var fsi = spiders.length - 1; fsi >= 0; fsi--) {
+                        var fs2 = spiders[fsi];
+                        if (fs2._bhCaptured && fs2.state !== 'dead') {
+                            fs2.hp = 0; fs2.state = 'dead'; fs2.animTimer = 0; fs2.deadTimer = 80; fs2._bhScale = 0;
+                            score += fs2.pts;
+                            if (bh.userName && persistentScores[bh.userName]) persistentScores[bh.userName].score += fs2.pts;
                         }
                     }
                     bh._collapseTimer--;
