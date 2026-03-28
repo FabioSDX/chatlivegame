@@ -5242,6 +5242,7 @@
 
             // Cycle scoring overlay (screen space)
             drawCycleOverlay();
+            _drawBigPopup();
 
         }
 
@@ -7452,6 +7453,11 @@
         var _apiSetupShown = false;
         var _gameStarted = false;
         var _apiKeyUpdated = false;
+        var _liveVideoId = '';    // current live video ID for statistics polling
+        var _lastLikeCount = -1;  // -1 = not yet fetched
+        var _lastSubCount = -1;
+        var _statsTimer = null;
+        var _statsInterval = 60000; // check every 60s (1 unit per call)
 
         // ── API Key Pool System ──────────────────────────────────────────────────
         var _keyPool = [];        // [{key, status:'ok'|'failed', lastError:'', failedAt:0}]
@@ -7777,6 +7783,8 @@
             if (!confirm('Clear all saved API keys, channel data and live chat? You will need to reconfigure.')) return;
             if (_apiCheckInterval) { clearInterval(_apiCheckInterval); _apiCheckInterval = null; }
             if (_keyRetestTimer) { clearInterval(_keyRetestTimer); _keyRetestTimer = null; }
+            if (_statsTimer) { clearInterval(_statsTimer); _statsTimer = null; }
+            _lastLikeCount = -1; _lastSubCount = -1; _liveVideoId = '';
             var chId = _userChannelId || localStorage.getItem('pd_channel_id') || '';
             if (chId) {
                 localStorage.removeItem('pd_api_keys_' + chId);
@@ -7858,6 +7866,7 @@
                     if (data.error) { errEl.style.display = 'block'; errEl.textContent = data.error.message || 'API error.'; return; }
                     if (data.items && data.items[0] && data.items[0].liveStreamingDetails && data.items[0].liveStreamingDetails.activeLiveChatId) {
                         _liveChatId = data.items[0].liveStreamingDetails.activeLiveChatId;
+                        _liveVideoId = videoId;
                         localStorage.setItem('pd_live_chat_' + _userChannelId, _liveChatId);
                         var dotLive = document.getElementById('statusDotLive');
                         var txtLive = document.getElementById('statusTextLive');
@@ -7945,6 +7954,134 @@
                 if (getOkKeyCount() > 0) getNextApiKey();
                 checkConnection();
             }, 2000);
+            // Start statistics polling for likes/subscribers
+            startStatsPolling();
+        }
+
+        // ── Like & Subscribe Detection ──────────────────────────────────────────
+        function startStatsPolling() {
+            if (_statsTimer) clearInterval(_statsTimer);
+            _statsTimer = setInterval(pollVideoStats, _statsInterval);
+            // First poll after 5s to get baseline
+            setTimeout(pollVideoStats, 5000);
+        }
+
+        function pollVideoStats() {
+            if (!_liveVideoId || !_apiConnected) return;
+            var apiKey = getCurrentApiKey();
+            if (!apiKey) return;
+            // videos.list with statistics costs only 1 unit
+            fetch('https://www.googleapis.com/youtube/v3/videos?part=statistics&id=' + encodeURIComponent(_liveVideoId) + '&key=' + encodeURIComponent(apiKey))
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (!data.items || !data.items[0] || !data.items[0].statistics) return;
+                    var stats = data.items[0].statistics;
+                    var likes = parseInt(stats.likeCount) || 0;
+
+                    // First fetch = baseline only
+                    if (_lastLikeCount < 0) {
+                        _lastLikeCount = likes;
+                        return;
+                    }
+
+                    // Detect new likes
+                    if (likes > _lastLikeCount) {
+                        var newLikes = likes - _lastLikeCount;
+                        _lastLikeCount = likes;
+                        onNewLikes(newLikes);
+                    }
+                })
+                .catch(function() {});
+
+            // Check subscriber count via channels.list (1 unit)
+            if (_userChannelId) {
+                fetch('https://www.googleapis.com/youtube/v3/channels?part=statistics&id=' + encodeURIComponent(_userChannelId) + '&key=' + encodeURIComponent(apiKey))
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        if (!data.items || !data.items[0] || !data.items[0].statistics) return;
+                        var subs = parseInt(data.items[0].statistics.subscriberCount) || 0;
+                        if (_lastSubCount < 0) {
+                            _lastSubCount = subs;
+                            return;
+                        }
+                        if (subs > _lastSubCount) {
+                            var newSubs = subs - _lastSubCount;
+                            _lastSubCount = subs;
+                            onNewSubscribers(newSubs);
+                        }
+                    })
+                    .catch(function() {});
+            }
+        }
+
+        function onNewLikes(count) {
+            // 10 TNT per like event
+            var ox = pick ? pick.x : canvas.width / 2;
+            var oy = pick ? pick.y : camY + canvas.height / 2;
+            var who = pick ? pick.userName : ownerName || '@Player';
+            for (var i = 0; i < Math.min(count * 10, 50); i++) {
+                setTimeout(function() {
+                    activateTNT(ox + (Math.random()-0.5)*200, oy + (Math.random()-0.5)*200, who);
+                }, i * 80);
+            }
+            // Big popup — like icon
+            _showBigPopup('👍', '#4488ff', count > 1 ? count + ' LIKES!' : 'NEW LIKE!');
+        }
+
+        function onNewSubscribers(count) {
+            // 10 TNT + 5 Mega TNT per subscribe event
+            var ox = pick ? pick.x : canvas.width / 2;
+            var oy = pick ? pick.y : camY + canvas.height / 2;
+            var who = pick ? pick.userName : ownerName || '@Player';
+            for (var i = 0; i < Math.min(count * 10, 50); i++) {
+                setTimeout(function() {
+                    activateTNT(ox + (Math.random()-0.5)*200, oy + (Math.random()-0.5)*200, who);
+                }, i * 80);
+            }
+            for (var j = 0; j < Math.min(count * 5, 25); j++) {
+                setTimeout(function() {
+                    activateMegaTNT(ox + (Math.random()-0.5)*300, oy + (Math.random()-0.5)*300, who);
+                }, 800 + j * 150);
+            }
+            // Big popup — bell icon
+            _showBigPopup('🔔', '#ff4444', count > 1 ? count + ' SUBS!' : 'NEW SUB!');
+        }
+
+        // ── Big Popup (no background, just icon + text) ──
+        var _bigPopup = null;
+        function _showBigPopup(icon, color, text) {
+            _bigPopup = { icon: icon, color: color, text: text, timer: 240, maxTimer: 240 }; // 4 seconds
+        }
+
+        function _drawBigPopup() {
+            if (!_bigPopup || _bigPopup.timer <= 0) { _bigPopup = null; return; }
+            _bigPopup.timer--;
+            var bp = _bigPopup;
+            var W = canvas.width, H = canvas.height;
+            var fadeIn = Math.min(1, (bp.maxTimer - bp.timer) / 15);
+            var fadeOut = Math.min(1, bp.timer / 20);
+            var alpha = Math.min(fadeIn, fadeOut);
+            var bounce = 1 + Math.sin((bp.maxTimer - bp.timer) * 0.08) * 0.05;
+            var scale = alpha * bounce;
+
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.translate(W / 2, H * 0.35);
+            ctx.scale(scale, scale);
+
+            // Big icon
+            ctx.font = Math.min(120, W * 0.25) + 'px sans-serif';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(bp.icon, 0, -20);
+
+            // Text below
+            ctx.font = 'bold ' + Math.min(48, W * 0.1) + 'px Arial';
+            ctx.strokeStyle = '#000'; ctx.lineWidth = 5; ctx.lineJoin = 'round';
+            ctx.strokeText(bp.text, 0, 60);
+            ctx.fillStyle = bp.color;
+            ctx.fillText(bp.text, 0, 60);
+
+            ctx.restore();
         }
 
         // ── Initial API setup flow ──
@@ -7967,6 +8104,7 @@
                             .then(function (data) {
                                 if (data.items && data.items[0] && data.items[0].liveStreamingDetails && data.items[0].liveStreamingDetails.activeLiveChatId) {
                                     _liveChatId = data.items[0].liveStreamingDetails.activeLiveChatId;
+                                    _liveVideoId = videoId;
                                     localStorage.setItem('pd_live_chat_' + _userChannelId, _liveChatId);
                                     var dotLive = document.getElementById('statusDotLive');
                                     if (dotLive) { dotLive.classList.remove('warning'); dotLive.classList.add('online'); }
@@ -9105,6 +9243,7 @@
                             _resolvingLive = false;
                             if (vdata.items && vdata.items[0] && vdata.items[0].liveStreamingDetails && vdata.items[0].liveStreamingDetails.activeLiveChatId) {
                                 _liveChatId = vdata.items[0].liveStreamingDetails.activeLiveChatId;
+                                _liveVideoId = videoId;
                                 localStorage.setItem('pd_live_chat_' + _userChannelId, _liveChatId);
                                 if (dotLive) { dotLive.classList.remove('warning'); dotLive.classList.add('online'); }
                                 if (txtLive) { txtLive.textContent = 'Live: ON'; txtLive.style.color = '#00ff88'; }
