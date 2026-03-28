@@ -4965,7 +4965,7 @@
                         b.lastSpawnTime = qNow;
                         if (bats.length < MAX_BATS_MEGA) {
                             spawnBat(b.x + (Math.random() - 0.5) * 60, b.y - 40, b.zone, false);
-                            spawnText(b.x, b.y + BAT_SIZE * 0.5, '🥚 Baby!', '#ff88ff');
+                            spawnText(b.x, b.y + BAT_SIZE * 0.5, '🥚 Pop!', '#ff88ff');
                         }
                     }
                     continue;
@@ -4987,22 +4987,24 @@
                     b.retargetTimer = 60 + Math.floor(Math.random() * 120);
                 }
 
-                // Steer toward target (lateral bias)
+                // Steer toward target — bubbly float physics
                 var dx = b.targetX - b.x;
                 var dy = b.targetY - b.y;
                 var dist = Math.sqrt(dx * dx + dy * dy) || 1;
-                var accel = 0.12;
+                var accel = 0.08;
                 b.vx += (dx / dist) * accel;
-                b.vy += (dy / dist) * accel * 0.3 + Math.sin(b.flyPhase) * 0.03;
+                b.vy += (dy / dist) * accel * 0.5 + Math.sin(b.flyPhase) * 0.06;
+                // Buoyancy — bubbles float upward slightly
+                b.vy -= 0.02;
 
-                // Speed limit
+                // Speed limit (bubbles are slow and floaty)
                 var spd = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
-                var maxSpd = 2.5;
+                var maxSpd = 1.8;
                 if (spd > maxSpd) { b.vx = (b.vx / spd) * maxSpd; b.vy = (b.vy / spd) * maxSpd; }
 
-                // Damping
-                b.vx *= 0.97;
-                b.vy *= 0.97;
+                // Damping (more than before — bubbles are sluggish)
+                b.vx *= 0.96;
+                b.vy *= 0.96;
 
                 b.x += b.vx;
                 b.y += b.vy;
@@ -5065,7 +5067,7 @@
                         b.lastSpawnTime = now;
                         if (bats.length < MAX_BATS) {
                             spawnBat(b.x + (Math.random() - 0.5) * 40, b.y + 20, b.zone, false);
-                            spawnText(b.x, b.y + BAT_SIZE * 0.5, '🥚 Baby!', '#ff88ff');
+                            spawnText(b.x, b.y + BAT_SIZE * 0.5, '🥚 Pop!', '#ff88ff');
                         }
                     }
                 }
@@ -5126,77 +5128,95 @@
         }
 
         // ── Queen Barrier Physical Collision ──────────────────────────────────
+        // Bubble colors per zone type
+        var BUBBLE_COLORS = [
+            { fill: 'rgba(100,180,255,0.25)', stroke: 'rgba(150,210,255,0.6)', highlight: 'rgba(255,255,255,0.7)' },
+            { fill: 'rgba(255,150,200,0.25)', stroke: 'rgba(255,180,220,0.6)', highlight: 'rgba(255,255,255,0.7)' },
+            { fill: 'rgba(150,255,150,0.25)', stroke: 'rgba(180,255,180,0.6)', highlight: 'rgba(255,255,255,0.7)' }
+        ];
+
         function drawBats() {
             var viewTop = camY - TILE * 2;
             var viewBot = camY + canvas.height + TILE * 2;
+            var t = Date.now() * 0.003;
             for (var i = 0; i < bats.length; i++) {
                 var b = bats[i];
                 if (b.y < viewTop || b.y > viewBot) continue;
-                var animKey = b.state;
-                if (animKey === 'hurt') animKey = 'fall';
-                if (animKey === 'dead') animKey = 'dying';
-                var spriteSet = flyerSprites[b.flyType] || flyerSprites.bat;
-                var sprites = spriteSet[animKey] || spriteSet.fly;
-                var frame = Math.min(Math.floor(b.anim), sprites.length - 1);
-                if (frame < 0) frame = 0;
-                var img = sprites[frame];
-                if (!img || !img.complete || !img.naturalWidth) continue;
+
+                var r = BAT_SIZE * 0.45;
+                if (b.isQueen) r *= QUEEN_SCALE;
+                else if (b.isMother) r *= MOTHER_SCALE;
+
+                // Black hole shrink
+                if (b._bhScale !== undefined && b._bhScale < 1) {
+                    r *= Math.max(0.05, b._bhScale);
+                }
+
+                if (b.state === 'hurt' && b.hurtTimer % 3 < 2) ctx.globalAlpha = 0.5;
+                if (b.state === 'dead') {
+                    ctx.globalAlpha = Math.max(0, 1 - b.deadTimer / 90);
+                    r *= Math.max(0.1, 1 - b.deadTimer / 90); // shrink on death (pop)
+                }
+
+                var bc = BUBBLE_COLORS[b.zone % BUBBLE_COLORS.length];
+                var wobble = Math.sin(t + i * 2.3) * r * 0.06;
 
                 ctx.save();
                 ctx.translate(b.x, b.y);
-                if (b.dir < 0) ctx.scale(-1, 1);
 
-                if (b.state === 'hurt' && b.hurtTimer % 3 < 2) ctx.globalAlpha = 0.5;
-                if (b.state === 'dead') ctx.globalAlpha = Math.max(0, 1 - b.deadTimer / 90);
-
-                var w = BAT_SIZE, h = BAT_SIZE;
-                if (b.isQueen) { w *= QUEEN_SCALE; h *= QUEEN_SCALE; }
-                else if (b.isMother) { w *= MOTHER_SCALE; h *= MOTHER_SCALE; }
-
-                // Black hole suction effect: shrink and spin
+                // Black hole spin
                 if (b._bhScale !== undefined && b._bhScale < 1) {
-                    var sc = Math.max(0.05, b._bhScale);
-                    w *= sc; h *= sc;
-                    if (b.dir < 0) ctx.scale(-1, 1);
                     ctx.rotate(b._bhSpin || 0);
-                    if (b.dir < 0) ctx.scale(-1, 1);
                 }
 
-                // Queen aura glow
-                if (b.isQueen && b.state !== 'dead') {
-                    if (b.dir < 0) ctx.scale(-1, 1);
-                    var qPulse = 0.6 + Math.sin(Date.now() * 0.005) * 0.4;
-                    var qGrad = ctx.createRadialGradient(0, 0, w * 0.2, 0, 0, w * 0.7);
-                    qGrad.addColorStop(0, 'rgba(255, 0, 80, ' + (0.2 * qPulse) + ')');
-                    qGrad.addColorStop(0.6, 'rgba(255, 50, 0, ' + (0.1 * qPulse) + ')');
-                    qGrad.addColorStop(1, 'rgba(255, 0, 0, 0)');
-                    ctx.fillStyle = qGrad;
-                    ctx.beginPath(); ctx.arc(0, 0, w * 0.7, 0, Math.PI * 2); ctx.fill();
-                    if (b.dir < 0) ctx.scale(-1, 1);
-                }
+                // Main bubble body
+                ctx.beginPath();
+                ctx.arc(0, wobble, r, 0, Math.PI * 2);
+                ctx.fillStyle = bc.fill;
+                ctx.fill();
+                ctx.strokeStyle = bc.stroke;
+                ctx.lineWidth = b.isMother ? 2.5 : 1.5;
+                ctx.stroke();
 
-                ctx.drawImage(img, -w / 2, -h / 2, w, h);
+                // Highlight (top-left shine)
+                ctx.beginPath();
+                ctx.arc(-r * 0.25, -r * 0.3 + wobble, r * 0.3, 0, Math.PI * 2);
+                ctx.fillStyle = bc.highlight;
+                ctx.globalAlpha = (ctx.globalAlpha || 1) * 0.5;
+                ctx.fill();
+                ctx.globalAlpha = 1;
+
+                // Small secondary highlight
+                ctx.beginPath();
+                ctx.arc(-r * 0.1, -r * 0.5 + wobble, r * 0.12, 0, Math.PI * 2);
+                ctx.fillStyle = '#fff';
+                ctx.globalAlpha = 0.4;
+                ctx.fill();
+                ctx.globalAlpha = 1;
+
+                // Mother/Queen indicator — inner glow
+                if (b.isMother && b.state !== 'dead') {
+                    var mPulse = 0.3 + Math.sin(t * 2 + i) * 0.2;
+                    var mGrad = ctx.createRadialGradient(0, wobble, 0, 0, wobble, r);
+                    if (b.isQueen) {
+                        mGrad.addColorStop(0, 'rgba(255,215,0,' + mPulse + ')');
+                        mGrad.addColorStop(1, 'rgba(255,215,0,0)');
+                    } else {
+                        mGrad.addColorStop(0, 'rgba(255,100,200,' + mPulse + ')');
+                        mGrad.addColorStop(1, 'rgba(255,100,200,0)');
+                    }
+                    ctx.fillStyle = mGrad;
+                    ctx.beginPath(); ctx.arc(0, wobble, r, 0, Math.PI * 2); ctx.fill();
+                }
 
                 // HP bar
                 if (b.state !== 'dead' && b.hp < b.maxHp) {
                     ctx.globalAlpha = 0.7;
-                    if (b.dir < 0) ctx.scale(-1, 1);
-                    var barW = b.isQueen ? 90 : (b.isMother ? 60 : 30);
-                    var barH = b.isQueen ? 8 : (b.isMother ? 6 : 4);
-                    var barX = -barW / 2, barY = -h / 2 - 8;
-                    ctx.fillStyle = '#333'; ctx.fillRect(barX, barY, barW, barH);
-                    ctx.fillStyle = b.isQueen ? '#ff0044' : (b.isMother ? '#ff2266' : '#ff66aa');
-                    ctx.fillRect(barX, barY, barW * (b.hp / b.maxHp), barH);
-                }
-
-                // Crown indicator
-                if (b.isMother && b.state !== 'dead') {
-                    ctx.globalAlpha = 0.9;
-                    if (b.dir < 0) ctx.scale(-1, 1);
-                    ctx.font = b.isQueen ? 'bold 28px Arial' : 'bold 18px Arial';
-                    ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-                    ctx.fillStyle = '#ffdd44';
-                    ctx.fillText(b.isQueen ? '👑👑👑' : '👑', 0, -h / 2 - 10);
+                    var barW = b.isQueen ? 70 : (b.isMother ? 45 : 22);
+                    var barH = b.isQueen ? 6 : (b.isMother ? 4 : 3);
+                    ctx.fillStyle = '#333'; ctx.fillRect(-barW / 2, -r - 8, barW, barH);
+                    ctx.fillStyle = b.isQueen ? '#ffdd00' : (b.isMother ? '#ff88cc' : '#88ccff');
+                    ctx.fillRect(-barW / 2, -r - 8, barW * (b.hp / b.maxHp), barH);
                 }
 
                 ctx.globalAlpha = 1;
@@ -5204,36 +5224,40 @@
             }
         }
 
-        // Bat sound effects (high-pitched squeaks)
+        // Bubble sound effects
         function sfxBatHurt() {
             if (!_audioStarted) return;
             var ac = getAC(), t = ac.currentTime;
             var o = ac.createOscillator(), g = ac.createGain();
-            o.type = 'square';
-            o.frequency.setValueAtTime(900, t);
-            o.frequency.linearRampToValueAtTime(1400, t + 0.03);
-            o.frequency.linearRampToValueAtTime(600, t + 0.1);
-            g.gain.setValueAtTime(0.08, t);
-            g.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+            o.type = 'sine';
+            o.frequency.setValueAtTime(600, t);
+            o.frequency.exponentialRampToValueAtTime(300, t + 0.08);
+            g.gain.setValueAtTime(0.1, t);
+            g.gain.exponentialRampToValueAtTime(0.0001, t + 0.1);
             o.connect(g); g.connect(ac.destination);
-            o.start(t); o.stop(t + 0.12);
+            o.start(t); o.stop(t + 0.1);
         }
 
         function sfxBatDeath() {
             if (!_audioStarted) return;
             var ac = getAC(), t = ac.currentTime;
-            var freqs = [1200, 900, 600, 400];
-            for (var i = 0; i < freqs.length; i++) {
-                var o = ac.createOscillator(), g = ac.createGain();
-                o.type = 'square';
-                var st = t + i * 0.05;
-                o.frequency.setValueAtTime(freqs[i], st);
-                o.frequency.linearRampToValueAtTime(freqs[i] * 0.6, st + 0.05);
-                g.gain.setValueAtTime(0.07, st);
-                g.gain.exponentialRampToValueAtTime(0.0001, st + 0.07);
-                o.connect(g); g.connect(ac.destination);
-                o.start(st); o.stop(st + 0.07);
-            }
+            // Bubble pop sound
+            var o = ac.createOscillator(), g = ac.createGain();
+            o.type = 'sine';
+            o.frequency.setValueAtTime(800, t);
+            o.frequency.exponentialRampToValueAtTime(200, t + 0.12);
+            g.gain.setValueAtTime(0.15, t);
+            g.gain.exponentialRampToValueAtTime(0.0001, t + 0.15);
+            o.connect(g); g.connect(ac.destination);
+            o.start(t); o.stop(t + 0.15);
+            // Tiny noise burst
+            var nLen = Math.ceil(ac.sampleRate * 0.05);
+            var buf = ac.createBuffer(1, nLen, ac.sampleRate);
+            var d = buf.getChannelData(0);
+            for (var j = 0; j < nLen; j++) d[j] = (Math.random() * 2 - 1) * (1 - j / nLen);
+            var src = ac.createBufferSource(); src.buffer = buf;
+            var ng = ac.createGain(); ng.gain.setValueAtTime(0.08, t); ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+            src.connect(ng); ng.connect(ac.destination); src.start(t);
         }
 
         function spawnZombie(wx, wy) {
