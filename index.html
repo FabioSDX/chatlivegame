@@ -7457,7 +7457,7 @@
         var _lastLikeCount = -1;  // -1 = not yet fetched
         var _lastSubCount = -1;
         var _statsTimer = null;
-        var _statsInterval = 60000; // check every 60s (1 unit per call)
+        var _statsInterval = 10000; // check every 10s (1 unit per call)
 
         // ── API Key Pool System ──────────────────────────────────────────────────
         var _keyPool = [];        // [{key, status:'ok'|'failed', lastError:'', failedAt:0}]
