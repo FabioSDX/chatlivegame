@@ -3230,6 +3230,101 @@
             cx.closePath();
         }
 
+        // ── Weather/Sky System — changes every 1000m ──
+        var WEATHER_TYPES = [
+            { name: 'day',    sky1: '#4a90d9', sky2: '#87ceeb', fog: 'rgba(135,206,235,0.1)', particles: null },
+            { name: 'sunset', sky1: '#ff6b35', sky2: '#ffd700', fog: 'rgba(255,107,53,0.08)', particles: null },
+            { name: 'night',  sky1: '#0a0a2e', sky2: '#1a1a4e', fog: 'rgba(10,10,46,0.15)', particles: null },
+            { name: 'rain',   sky1: '#3a4a5a', sky2: '#5a6a7a', fog: 'rgba(100,120,140,0.12)', particles: 'rain' },
+            { name: 'snow',   sky1: '#8a9aaa', sky2: '#c0d0e0', fog: 'rgba(180,200,220,0.1)', particles: 'snow' },
+            { name: 'dawn',   sky1: '#ff9a76', sky2: '#ffecd2', fog: 'rgba(255,154,118,0.06)', particles: null },
+            { name: 'storm',  sky1: '#1a2030', sky2: '#2a3040', fog: 'rgba(30,40,60,0.2)', particles: 'rain' },
+            { name: 'aurora',  sky1: '#0a1a2a', sky2: '#1a3a4a', fog: 'rgba(0,255,150,0.05)', particles: null },
+            { name: 'cloudy', sky1: '#6a7a8a', sky2: '#9aaaba', fog: 'rgba(120,140,160,0.1)', particles: null },
+            { name: 'dusk',   sky1: '#2a1a3a', sky2: '#5a3a6a', fog: 'rgba(90,58,106,0.08)', particles: null }
+        ];
+        var _weatherParticles = [];
+
+        function getWeather() {
+            var zone = Math.floor(maxDepth / 1000);
+            return WEATHER_TYPES[zone % WEATHER_TYPES.length];
+        }
+
+        function updateWeatherParticles() {
+            var w = getWeather();
+            if (!w.particles) { _weatherParticles = []; return; }
+            // Spawn
+            if (_weatherParticles.length < 40) {
+                var px = Math.random() * canvas.width;
+                if (w.particles === 'rain') {
+                    _weatherParticles.push({ x: px, y: -10, vx: -1, vy: 8 + Math.random() * 4, size: 1, life: 1 });
+                } else {
+                    _weatherParticles.push({ x: px, y: -10, vx: (Math.random() - 0.5) * 1.5, vy: 0.5 + Math.random() * 1.5, size: 2 + Math.random() * 3, life: 1 });
+                }
+            }
+            // Update
+            for (var i = _weatherParticles.length - 1; i >= 0; i--) {
+                var p = _weatherParticles[i];
+                p.x += p.vx; p.y += p.vy;
+                if (p.y > canvas.height + 10) _weatherParticles.splice(i, 1);
+            }
+        }
+
+        function drawWeatherOverlay() {
+            var w = getWeather();
+            var W = canvas.width, H = canvas.height;
+
+            // Sky gradient overlay (drawn in screen space, before camera transform)
+            ctx.save();
+            ctx.globalAlpha = 0.35;
+            var skyGrad = ctx.createLinearGradient(0, 0, 0, H);
+            skyGrad.addColorStop(0, w.sky1);
+            skyGrad.addColorStop(1, w.sky2);
+            ctx.fillStyle = skyGrad;
+            ctx.fillRect(0, 0, W, H);
+            ctx.globalAlpha = 1;
+
+            // Weather particles
+            if (w.particles === 'rain') {
+                ctx.strokeStyle = 'rgba(180,200,255,0.3)';
+                ctx.lineWidth = 1;
+                for (var i = 0; i < _weatherParticles.length; i++) {
+                    var p = _weatherParticles[i];
+                    ctx.beginPath();
+                    ctx.moveTo(p.x, p.y);
+                    ctx.lineTo(p.x + p.vx * 2, p.y + p.vy * 2);
+                    ctx.stroke();
+                }
+            } else if (w.particles === 'snow') {
+                ctx.fillStyle = 'rgba(255,255,255,0.6)';
+                for (var i = 0; i < _weatherParticles.length; i++) {
+                    var p = _weatherParticles[i];
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            // Aurora effect
+            if (w.name === 'aurora') {
+                var t = Date.now() * 0.001;
+                ctx.globalAlpha = 0.08;
+                for (var ai = 0; ai < 3; ai++) {
+                    var ay = H * 0.1 + ai * 30 + Math.sin(t + ai) * 20;
+                    var aGrad = ctx.createLinearGradient(0, ay, W, ay);
+                    aGrad.addColorStop(0, '#00ff88');
+                    aGrad.addColorStop(0.3, '#00ffcc');
+                    aGrad.addColorStop(0.6, '#8844ff');
+                    aGrad.addColorStop(1, '#00ff88');
+                    ctx.fillStyle = aGrad;
+                    ctx.fillRect(0, ay, W, 15 + Math.sin(t * 2 + ai) * 8);
+                }
+                ctx.globalAlpha = 1;
+            }
+
+            ctx.restore();
+        }
+
         function drawBackground() {
             bgTick++;
             var W = canvas.width, H = canvas.height;
@@ -3679,6 +3774,7 @@
         function draw() {
             // Fundo gradiente(0, 0, canvas.width, canvas.height);
             drawBackground(); // caverna de cristais
+            drawWeatherOverlay(); // sky + weather particles (screen space)
             ctx.save();
             var sx = shakeAmt > 0 ? (Math.random() - 0.5) * 2 * shakeAmt : 0;
             var sy = shakeAmt > 0 ? (Math.random() - 0.5) * 2 * shakeAmt : 0;
@@ -4361,6 +4457,7 @@
 
             update();
             updateFX();
+            updateWeatherParticles();
             try { draw(); } catch(e) { console.warn('draw error:', e.message); }
             requestAnimationFrame(loop);
         }
