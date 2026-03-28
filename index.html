@@ -2905,7 +2905,7 @@
                             var spacing = ((COLS - 2) * TILE) / (QUEEN_COUNT + 1);
                             for (var qi = 0; qi < QUEEN_COUNT; qi++) {
                                 var queenX = TILE + spacing * (qi + 1);
-                                spawnQueen(queenX, queenY, mz);
+                                spawnQueen(queenX, queenY, mz, qi);
                             }
                             spawnText(canvas.width / 2, pick.y - 60, '⚠️ MEGA ZONE!', '#ff4444');
                         }
@@ -4250,7 +4250,7 @@
             });
         }
 
-        function spawnQueen(wx, wy, zone) {
+        function spawnQueen(wx, wy, zone, index) {
             var flyType = FLYER_TYPES[zone % FLYER_TYPES.length];
             var megaStart = getMegaStart(zone);
             bats.push({
