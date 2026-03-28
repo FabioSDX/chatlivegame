@@ -2031,7 +2031,7 @@
                 return { name: n, score: _cycleScores[n].score, kills: _cycleScores[n].kills, items: _cycleScores[n].items, avatar: _cycleScores[n].avatar };
             }).sort(function(a, b) { return b.score - a.score; }).slice(0, 3);
             if (players.length === 0) return;
-            _cycleOverlay = { timer: 360, top3: players, cycle: cycle }; // 6 seconds
+            _cycleOverlay = { timer: 600, top3: players, cycle: cycle, confetti: [] }; // 10 seconds
             _cycleOverlayTimer = 0;
             // Reset for next cycle
             _cycleScores = {};
@@ -2044,70 +2044,194 @@
             _cycleOverlay.timer--;
             _cycleOverlayTimer++;
             var W = canvas.width, H = canvas.height;
-            var fadeIn = Math.min(1, _cycleOverlayTimer / 30);
-            var fadeOut = Math.min(1, _cycleOverlay.timer / 30);
+            var fadeIn = Math.min(1, _cycleOverlayTimer / 40);
+            var fadeOut = Math.min(1, _cycleOverlay.timer / 40);
             var alpha = Math.min(fadeIn, fadeOut);
+            var top3 = _cycleOverlay.top3;
+            var medals = ['🥇', '🥈', '🥉'];
+            var medalColors = ['#FFD700', '#C0C0C0', '#CD7F32'];
+            var podiumH = [H * 0.38, H * 0.44, H * 0.50]; // y positions (1st higher)
 
             ctx.save();
-            // Semi-transparent backdrop
-            ctx.globalAlpha = alpha * 0.3;
+
+            // Full screen dim
+            ctx.globalAlpha = alpha * 0.45;
             ctx.fillStyle = '#000';
-            ctx.fillRect(0, H * 0.15, W, H * 0.5);
+            ctx.fillRect(0, 0, W, H);
             ctx.globalAlpha = alpha;
 
-            // Title
-            var medals = ['🥇', '🥈', '🥉'];
-            ctx.font = 'bold ' + Math.floor(W * 0.04) + 'px Arial';
-            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            ctx.fillStyle = '#ffdd44';
-            ctx.strokeStyle = '#000'; ctx.lineWidth = 3; ctx.lineJoin = 'round';
-            var title = '🏆 CYCLE ' + (_cycleOverlay.cycle * 400) + 'm RESULTS';
-            ctx.strokeText(title, W / 2, H * 0.2);
-            ctx.fillText(title, W / 2, H * 0.2);
-
-            // Top 3 players
-            var top3 = _cycleOverlay.top3;
-            for (var i = 0; i < top3.length; i++) {
-                var p = top3[i];
-                var py = H * 0.3 + i * H * 0.12;
-                var slideIn = Math.min(1, (_cycleOverlayTimer - i * 15) / 20);
-                if (slideIn <= 0) continue;
-                var px = W * 0.5 + (1 - slideIn) * W * 0.5;
-
-                // Animated score count-up
-                var countProgress = Math.min(1, (_cycleOverlayTimer - 30 - i * 15) / 60);
-                var displayScore = Math.floor(p.score * Math.max(0, countProgress));
-
-                // Medal + name
-                ctx.font = 'bold ' + Math.floor(W * 0.035) + 'px Arial';
-                ctx.textAlign = 'left';
-                ctx.fillStyle = i === 0 ? '#ffdd44' : (i === 1 ? '#cccccc' : '#cc8844');
-                ctx.strokeText(medals[i] + ' ' + p.name, px - W * 0.35, py);
-                ctx.fillText(medals[i] + ' ' + p.name, px - W * 0.35, py);
-
-                // Score with count-up animation
-                ctx.textAlign = 'right';
-                ctx.fillStyle = '#fff';
-                ctx.font = 'bold ' + Math.floor(W * 0.03) + 'px Arial';
-                var statsText = displayScore + ' pts';
-                if (p.kills > 0) statsText += '  💥' + p.kills;
-                if (p.items > 0) statsText += '  💎' + p.items;
-                ctx.strokeText(statsText, px + W * 0.35, py);
-                ctx.fillText(statsText, px + W * 0.35, py);
+            // ── Confetti system ──
+            var conf = _cycleOverlay.confetti;
+            if (_cycleOverlayTimer % 2 === 0 && _cycleOverlay.timer > 80 && conf.length < 80) {
+                var cc = ['#ff4466','#44dd66','#4488ff','#ffdd44','#ff44ff','#44ffdd','#ff8844','#88ff44'];
+                conf.push({ x: Math.random() * W, y: -10, vx: (Math.random()-0.5)*2, vy: 1.5+Math.random()*2, r: 0, w: 4+Math.random()*6, h: 6+Math.random()*8, c: cc[Math.floor(Math.random()*cc.length)], spin: Math.random()*0.2-0.1, life: 1 });
+            }
+            for (var ci = conf.length - 1; ci >= 0; ci--) {
+                var c = conf[ci];
+                c.x += c.vx; c.y += c.vy; c.r += c.spin;
+                c.vx += (Math.random()-0.5)*0.1;
+                c.vy += 0.02;
+                c.life -= 0.003;
+                if (c.life <= 0 || c.y > H + 20) { conf.splice(ci, 1); continue; }
+                ctx.save();
+                ctx.translate(c.x, c.y); ctx.rotate(c.r);
+                ctx.globalAlpha = alpha * c.life;
+                ctx.fillStyle = c.c;
+                ctx.fillRect(-c.w/2, -c.h/2, c.w, c.h);
+                ctx.restore();
             }
 
-            // Confetti particles during overlay
-            if (_cycleOverlayTimer % 3 === 0 && _cycleOverlay.timer > 60) {
-                var colors = ['#ff4444','#44ff44','#4444ff','#ffff44','#ff44ff','#44ffff'];
-                parts.push({
-                    x: Math.random() * W, y: -10,
-                    vx: (Math.random() - 0.5) * 3, vy: 1 + Math.random() * 2,
-                    life: 1, dec: 0.008, r: 3 + Math.random() * 3,
-                    c: colors[Math.floor(Math.random() * colors.length)]
-                });
+            // ── Title banner ──
+            var titleY = H * 0.08;
+            var bannerScale = Math.min(1, _cycleOverlayTimer / 20);
+            ctx.save();
+            ctx.translate(W / 2, titleY);
+            ctx.scale(bannerScale, bannerScale);
+            // Banner bg
+            var bw = Math.min(W * 0.85, 500);
+            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+            _roundRect(ctx, -bw/2, -25, bw, 50, 15);
+            ctx.fill();
+            ctx.strokeStyle = '#ffdd44'; ctx.lineWidth = 2;
+            _roundRect(ctx, -bw/2, -25, bw, 50, 15);
+            ctx.stroke();
+            ctx.font = 'bold ' + Math.min(24, Math.floor(W * 0.055)) + 'px Arial';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#ffdd44';
+            ctx.fillText('🏆 CYCLE ' + (_cycleOverlay.cycle * 400) + 'm', 0, 0);
+            ctx.restore();
+
+            // ── Podium cards ──
+            var cardW = Math.min(W * 0.8, 420);
+            var cardH = Math.min(70, H * 0.12);
+            var avSize = Math.min(52, cardH - 10);
+            var cardX = W / 2 - cardW / 2;
+
+            for (var i = 0; i < top3.length; i++) {
+                var p = top3[i];
+                var delay = i * 20;
+                var slideIn = Math.min(1, (_cycleOverlayTimer - delay) / 25);
+                if (slideIn <= 0) continue;
+                // Ease out
+                var ease = 1 - Math.pow(1 - slideIn, 3);
+                var cardY = podiumH[i];
+                var offX = (1 - ease) * (i % 2 === 0 ? -W : W);
+
+                ctx.save();
+                ctx.globalAlpha = alpha * ease;
+                ctx.translate(offX, 0);
+
+                // Card background with gradient
+                var grad = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY);
+                if (i === 0) { grad.addColorStop(0, 'rgba(255,215,0,0.3)'); grad.addColorStop(1, 'rgba(255,215,0,0.08)'); }
+                else if (i === 1) { grad.addColorStop(0, 'rgba(192,192,192,0.25)'); grad.addColorStop(1, 'rgba(192,192,192,0.06)'); }
+                else { grad.addColorStop(0, 'rgba(205,127,50,0.25)'); grad.addColorStop(1, 'rgba(205,127,50,0.06)'); }
+                ctx.fillStyle = grad;
+                _roundRect(ctx, cardX, cardY, cardW, cardH, 12);
+                ctx.fill();
+                // Border
+                ctx.strokeStyle = medalColors[i];
+                ctx.lineWidth = i === 0 ? 2.5 : 1.5;
+                _roundRect(ctx, cardX, cardY, cardW, cardH, 12);
+                ctx.stroke();
+
+                // Position number (big)
+                var numX = cardX + 8;
+                var numY = cardY + cardH / 2;
+                ctx.font = 'bold ' + Math.min(36, Math.floor(cardH * 0.6)) + 'px Arial';
+                ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+                ctx.fillStyle = medalColors[i];
+                ctx.fillText(medals[i], numX, numY);
+                var numW = ctx.measureText(medals[i]).width + 8;
+
+                // Avatar circle
+                var avX = numX + numW + avSize / 2 + 4;
+                var avY = cardY + cardH / 2;
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(avX, avY, avSize / 2, 0, Math.PI * 2);
+                ctx.closePath();
+                ctx.clip();
+                var avUrl = p.avatar;
+                var avImg = avUrl ? avatarCache[avUrl] : null;
+                if (avImg && avImg.complete && avImg.naturalWidth > 0) {
+                    ctx.drawImage(avImg, avX - avSize / 2, avY - avSize / 2, avSize, avSize);
+                } else {
+                    ctx.fillStyle = medalColors[i];
+                    ctx.fillRect(avX - avSize / 2, avY - avSize / 2, avSize, avSize);
+                    ctx.fillStyle = '#fff';
+                    ctx.font = 'bold ' + Math.floor(avSize * 0.5) + 'px Arial';
+                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillText((p.name || '?').replace('@','').charAt(0).toUpperCase(), avX, avY);
+                }
+                ctx.restore();
+                // Avatar ring
+                ctx.beginPath();
+                ctx.arc(avX, avY, avSize / 2 + 1, 0, Math.PI * 2);
+                ctx.strokeStyle = medalColors[i]; ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Player name
+                var nameX = avX + avSize / 2 + 10;
+                ctx.font = 'bold ' + Math.min(16, Math.floor(cardH * 0.25)) + 'px Arial';
+                ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+                ctx.fillStyle = '#fff';
+                var displayName = (p.name || '').replace('@', '');
+                if (displayName.length > 18) displayName = displayName.substring(0, 16) + '..';
+                ctx.fillText(displayName, nameX, cardY + 8);
+
+                // Animated score count-up
+                var countDelay = 40 + i * 20;
+                var countProgress = Math.min(1, (_cycleOverlayTimer - countDelay) / 90);
+                countProgress = countProgress < 0 ? 0 : (1 - Math.pow(1 - countProgress, 2)); // ease out
+                var displayScore = Math.floor(p.score * countProgress);
+
+                // Score number (big, colored)
+                ctx.font = 'bold ' + Math.min(22, Math.floor(cardH * 0.35)) + 'px Arial';
+                ctx.textBaseline = 'bottom';
+                ctx.fillStyle = medalColors[i];
+                ctx.fillText(displayScore.toLocaleString() + ' pts', nameX, cardY + cardH - 6);
+
+                // Stats icons (right side)
+                var statsX = cardX + cardW - 10;
+                ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+                ctx.font = Math.min(12, Math.floor(cardH * 0.18)) + 'px Arial';
+                ctx.fillStyle = '#aaa';
+                var statsY = cardY + cardH / 2;
+                var statsStr = '';
+                if (p.kills > 0) statsStr += '💥' + p.kills + ' ';
+                if (p.items > 0) statsStr += '💎' + p.items;
+                if (statsStr) ctx.fillText(statsStr, statsX, statsY);
+
+                ctx.restore();
+            }
+
+            // ── 1st place spotlight effect ──
+            if (top3.length > 0 && _cycleOverlayTimer > 20) {
+                var spotAlpha = Math.sin(_cycleOverlayTimer * 0.03) * 0.08 + 0.08;
+                var spotGrad = ctx.createRadialGradient(W / 2, podiumH[0], 0, W / 2, podiumH[0], W * 0.4);
+                spotGrad.addColorStop(0, 'rgba(255,215,0,' + spotAlpha + ')');
+                spotGrad.addColorStop(1, 'rgba(255,215,0,0)');
+                ctx.fillStyle = spotGrad;
+                ctx.fillRect(0, 0, W, H);
             }
 
             ctx.restore();
+        }
+
+        // Helper: rounded rectangle path
+        function _roundRect(c, x, y, w, h, r) {
+            c.beginPath();
+            c.moveTo(x + r, y);
+            c.lineTo(x + w - r, y);
+            c.quadraticCurveTo(x + w, y, x + w, y + r);
+            c.lineTo(x + w, y + h - r);
+            c.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+            c.lineTo(x + r, y + h);
+            c.quadraticCurveTo(x, y + h, x, y + h - r);
+            c.lineTo(x, y + r);
+            c.quadraticCurveTo(x, y, x + r, y);
+            c.closePath();
         }
 
         var extraPicks = [];
