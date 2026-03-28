@@ -2890,7 +2890,7 @@
             return false;
         }
 
-        function checkFallingBlocks(col, row) {
+        function checkFallingBlocks(col, row, source) {
             // Flood-fill from destroyed block: find all connected non-anchored blocks
             // Scan 10x10 area for candidate blocks
             var R = 5;
@@ -2980,7 +2980,8 @@
                         ang: 0,
                         spin: (Math.random() - 0.5) * 0.1,
                         hp: BDEF[bt] ? BDEF[bt].hp : 1,
-                        bounces: 0
+                        bounces: 0,
+                        owner: source || pick
                     });
                     fc.t = E; fc.hp = 0; fc.cr = 0;
                 }
@@ -2995,6 +2996,14 @@
                 fb.y += fb.vy;
                 fb.ang += fb.spin;
                 fb.vx *= 0.99;
+                // Shrink slightly as it accumulates bounces
+                fb.size = TILE * (1 - fb.bounces * 0.08);
+
+                // Trail particles while falling
+                if (Math.random() < 0.3 && parts.length < MAX_PARTS) {
+                    var tc = BDEF[fb.t] ? BDEF[fb.t].glow : '#aaa';
+                    parts.push({ x: fb.x + (Math.random()-0.5)*fb.size*0.4, y: fb.y + (Math.random()-0.5)*fb.size*0.4, vx: (Math.random()-0.5)*1.5, vy: (Math.random()-0.5)*1.5, life: 0.6, dec: 0.04, r: 2+Math.random()*3, c: tc });
+                }
 
                 // Ground collision
                 var fRow = Math.floor((fb.y + fb.size * 0.4) / TILE);
@@ -3004,17 +3013,66 @@
                     fb.y = fRow * TILE - fb.size * 0.4;
                     fb.bounces++;
                     if (fb.bounces >= 3 || Math.abs(fb.vy) < 1) {
-                        // Break into debris
-                        var pts = BDEF[fb.t] ? BDEF[fb.t].pts || 0 : 0;
-                        score += pts;
-                        spawnParts(fb.x, fb.y, BDEF[fb.t] ? BDEF[fb.t].glow : '#888', 4);
+                        // ── Enhanced destruction ──
+                        var def = BDEF[fb.t];
+                        var pts = def ? def.pts || 0 : 0;
+                        var glow = def ? def.glow : '#888';
+
+                        // Burst of particles (ring explosion)
+                        var pCount = isMobile ? 4 : 8;
+                        for (var p = 0; p < pCount; p++) {
+                            var ang = (p / pCount) * Math.PI * 2;
+                            var spd = 2 + Math.random() * 3;
+                            if (parts.length < MAX_PARTS + 20) {
+                                parts.push({ x: fb.x, y: fb.y, vx: Math.cos(ang)*spd, vy: Math.sin(ang)*spd, life: 1, dec: 0.02 + Math.random()*0.02, r: 3+Math.random()*5, c: glow });
+                            }
+                        }
+                        // Debris chunks flying outward
+                        spawnDebris(fb.x, fb.y, fb.t, fb.owner);
+                        spawnDebris(fb.x, fb.y, fb.t, fb.owner);
+
+                        // Shockwave ring particles
+                        if (!isMobile) {
+                            for (var sw = 0; sw < 12; sw++) {
+                                var sAng = (sw / 12) * Math.PI * 2;
+                                var sSpd = 4 + Math.random() * 2;
+                                if (parts.length < MAX_PARTS + 30) {
+                                    parts.push({ x: fb.x, y: fb.y, vx: Math.cos(sAng)*sSpd, vy: Math.sin(sAng)*sSpd, life: 0.8, dec: 0.04, r: 1.5+Math.random()*2, c: '#fff' });
+                                }
+                            }
+                        }
+
+                        // Sound
                         sfxBreak(fb.t);
+
+                        // ── Score & items attributed to owner ──
+                        var owner = fb.owner || pick;
+                        score += pts;
+                        if (owner && owner.userName) {
+                            var player = userPicks.find(function(u) { return u.userName === owner.userName; });
+                            if (player) player.score = (player.score || 0) + pts;
+                            if (!persistentScores[owner.userName]) persistentScores[owner.userName] = { score: 0, avatar: owner.userAvatarUrl || '' };
+                            persistentScores[owner.userName].score += pts;
+                            addCycleScore(owner.userName, pts, ITEM_DEFS[fb.t] ? 'item' : 'block');
+                        }
+
+                        // Spawn collectible item if block type has one
+                        if (ITEM_DEFS[fb.t]) {
+                            spawnItem(fb.x, fb.y, fb.t, owner);
+                        }
+
                         fallingBlocks.splice(i, 1);
                         continue;
                     }
                     fb.vy = -Math.abs(fb.vy) * 0.5; // bounce
                     fb.vx += (Math.random() - 0.5) * 2;
                     fb.spin += (Math.random() - 0.5) * 0.15;
+                    // Small dust puff on bounce
+                    if (parts.length < MAX_PARTS) {
+                        for (var d = 0; d < 3; d++) {
+                            parts.push({ x: fb.x + (Math.random()-0.5)*fb.size*0.5, y: fb.y + fb.size*0.3, vx: (Math.random()-0.5)*2, vy: -Math.random()*2, life: 0.5, dec: 0.05, r: 2+Math.random()*3, c: '#c8b89a' });
+                        }
+                    }
                 }
 
                 // Wall collision
@@ -3037,14 +3095,39 @@
                 var fb = fallingBlocks[i];
                 if (fb.y < camY - TILE * 2 || fb.y > camY + canvas.height + TILE * 2) continue;
                 var tex = BTEX[fb.t];
+                var half = fb.size / 2;
                 ctx.save();
                 ctx.translate(fb.x, fb.y);
                 ctx.rotate(fb.ang);
+                // Drop shadow
+                ctx.globalAlpha = 0.25;
+                ctx.fillStyle = '#000';
+                ctx.fillRect(-half + 3, -half + 3, fb.size, fb.size);
+                ctx.globalAlpha = 1;
+                // Block texture
                 if (tex && tex.complete && tex.naturalWidth > 0) {
-                    ctx.drawImage(tex, -fb.size / 2, -fb.size / 2, fb.size, fb.size);
+                    ctx.drawImage(tex, -half, -half, fb.size, fb.size);
                 } else {
                     ctx.fillStyle = BDEF[fb.t] ? BDEF[fb.t].color : '#888';
-                    ctx.fillRect(-fb.size / 2, -fb.size / 2, fb.size, fb.size);
+                    ctx.fillRect(-half, -half, fb.size, fb.size);
+                }
+                // Crack overlay based on bounces
+                if (fb.bounces > 0) {
+                    var crackStage = Math.min(fb.bounces, 2);
+                    var crackTex = DESTROY_TEX[Math.min(crackStage * 3, DESTROY_TEX.length - 1)];
+                    if (crackTex && crackTex.complete && crackTex.naturalWidth > 0) {
+                        ctx.globalAlpha = 0.5 + crackStage * 0.2;
+                        ctx.drawImage(crackTex, -half, -half, fb.size, fb.size);
+                        ctx.globalAlpha = 1;
+                    }
+                }
+                // Glow outline when about to break
+                if (fb.bounces >= 2) {
+                    ctx.strokeStyle = BDEF[fb.t] ? BDEF[fb.t].glow : '#ff0';
+                    ctx.lineWidth = 2;
+                    ctx.globalAlpha = 0.4 + Math.sin(Date.now() * 0.01) * 0.3;
+                    ctx.strokeRect(-half, -half, fb.size, fb.size);
+                    ctx.globalAlpha = 1;
                 }
                 ctx.restore();
             }
@@ -3078,7 +3161,7 @@
                 sfxBreak(cell.t);
                 cell.t = E; cell.cr = 0;
                 // Check neighbors for unsupported blocks → make them fall
-                checkFallingBlocks(col, row);
+                checkFallingBlocks(col, row, source);
                 // Chance to spawn zombie — increases with depth
                 var zDepth = row;
                 var zChance = zDepth > 10 ? Math.min(0.04, 0.005 + zDepth * 0.0005) : 0;
