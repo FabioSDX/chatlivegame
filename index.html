@@ -1510,12 +1510,12 @@
         // ── Water Table (underground water level) ──
         var WATER_DRAG = 0.91;
         var QUEEN_SCALE = 4.0;
-        var QUEEN_HP = 30;
+        var QUEEN_HP = 50;
         var QUEEN_COUNT = 3;
 
         // ── Zombie Boss Gate (alternates with Queen Gate) ──
         var ZBOSS_SCALE = 3.5;
-        var ZBOSS_HP = 25;
+        var ZBOSS_HP = 40;
         var ZBOSS_COUNT = 4;
         var MAX_ZOMBIES_MEGA = 40;
 
@@ -2997,8 +2997,18 @@
                         }
                         if (aliveBosses === 0) {
                             megaClearedZones[mz + '_gateOpen'] = true;
-                            spawnText(canvas.width / 2, pick.y - 80, '🚪 PASSAGE OPEN!', '#44ff44');
-                            shakeAmt = 20;
+                            spawnText(canvas.width / 2, pick.y - 80, '🎉 PASSAGE OPEN!', '#44ff44');
+                            shakeAmt = 25;
+                            // Destroy barrier blocks at gate row so pickaxes never stop
+                            var gateRow = getMegaStart(mz) + MEGA_CLEARING_HEIGHT - 10;
+                            for (var gr = gateRow - 2; gr <= gateRow + 2; gr++) {
+                                if (!worldMap[gr]) continue;
+                                for (var gc = 1; gc < COLS - 1; gc++) {
+                                    if (worldMap[gr][gc] && worldMap[gr][gc].t !== E && worldMap[gr][gc].t !== BEDROCK) {
+                                        worldMap[gr][gc].t = E; worldMap[gr][gc].hp = 0; worldMap[gr][gc].cr = 0;
+                                    }
+                                }
+                            }
                         }
                     }
                     // Continuous reinforcement every 120 frames (~2s) — only while gate is closed
@@ -4877,21 +4887,37 @@
                 // ── FLY: erratic movement within clearing bounds ──
                 b.flyPhase += b.flyFreq;
 
-                // Queens: stay near home position, just hover
+                // Queens: dynamic movement across entire mega-clearing (like mothers but bigger)
                 if (b.isQueen) {
-                    b.x = b.homeX + Math.sin(b.flyPhase) * TILE * 0.5;
-                    b.y = b.homeY + Math.cos(b.flyPhase * 0.7) * TILE * 0.3;
-                    b.vx = 0; b.vy = 0;
+                    b.retargetTimer--;
+                    if (b.retargetTimer <= 0) {
+                        b.targetX = b.boundsMinX + Math.random() * (b.boundsMaxX - b.boundsMinX);
+                        b.targetY = b.boundsMinY + Math.random() * (b.boundsMaxY - b.boundsMinY);
+                        b.retargetTimer = 40 + Math.floor(Math.random() * 80);
+                    }
+                    var qdx = b.targetX - b.x, qdy = b.targetY - b.y;
+                    var qdist = Math.sqrt(qdx * qdx + qdy * qdy) || 1;
+                    b.vx += (qdx / qdist) * 0.15;
+                    b.vy += (qdy / qdist) * 0.1 + Math.sin(b.flyPhase) * 0.05;
+                    b.vy -= 0.02; // buoyancy
+                    var qspd = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+                    if (qspd > 2.0) { b.vx = (b.vx / qspd) * 2.0; b.vy = (b.vy / qspd) * 2.0; }
+                    b.vx *= 0.96; b.vy *= 0.96;
+                    b.x += b.vx; b.y += b.vy;
+                    // Clamp to bounds
+                    if (b.x < b.boundsMinX) { b.x = b.boundsMinX; b.vx = Math.abs(b.vx); }
+                    if (b.x > b.boundsMaxX) { b.x = b.boundsMaxX; b.vx = -Math.abs(b.vx); }
+                    if (b.y < b.boundsMinY) { b.y = b.boundsMinY; b.vy = Math.abs(b.vy); }
+                    if (b.y > b.boundsMaxY) { b.y = b.boundsMaxY; b.vy = -Math.abs(b.vy); }
                     if (Math.abs(b.vx) > 0.3) b.dir = b.vx > 0 ? 1 : -1;
                     b.anim += BAT_ANIMS.fly.speed;
                     if (b.anim >= BAT_ANIMS.fly.count) b.anim = 0;
-                    // Queens also spawn babies
+                    // Queens spawn babies
                     var qNow = Date.now();
                     if (qNow - b.lastSpawnTime >= MOTHER_SPAWN_MS) {
                         b.lastSpawnTime = qNow;
                         if (bats.length < MAX_BATS_MEGA) {
                             spawnBat(b.x + (Math.random() - 0.5) * 60, b.y - 40, b.zone, false);
-                            spawnText(b.x, b.y + BAT_SIZE * 0.5, '🥚 Pop!', '#ff88ff');
                         }
                     }
                     continue;
@@ -5389,7 +5415,7 @@
                 if (z.isZBoss && !z._bhCaptured) {
                     z.vy += ZG;
                     // Find nearest pick to chase
-                    var nearPick = null, nearDist = 400;
+                    var nearPick = null, nearDist = 600;
                     var allP = [pick].concat(userPicks);
                     for (var np = 0; np < allP.length; np++) {
                         if (!allP[np] || allP[np].stuck) continue;
@@ -5397,7 +5423,7 @@
                         var nd = Math.sqrt(ndx * ndx + ndy * ndy);
                         if (nd < nearDist) { nearDist = nd; nearPick = allP[np]; }
                     }
-                    var moveSpeed = z.speed * 2.0;
+                    var moveSpeed = z.speed * 2.5;
                     var pickClose = nearDist < ZOMBIE_SIZE * ZBOSS_SCALE * 0.8;
 
                     // ── Boss state machine ──
@@ -5422,21 +5448,20 @@
                             z.vx += z.dir * 0.2;
                             z.animTimer += ZOMBIE_ANIMS.run.speed;
                             if (z.animTimer >= ZOMBIE_ANIMS.run.count) z.animTimer = 0;
-                            // Jump toward pick if it's above
-                            if (nearPick.y < z.y - TILE * 1.5) {
-                                z.vy = -8 - Math.random() * 3;
+                            // Jump toward pick if it's above or randomly
+                            if (nearPick.y < z.y - TILE || Math.random() < 0.03) {
+                                z.vy = -10 - Math.random() * 4;
                                 z.grounded = false;
                                 z.state = 'jump'; z.animTimer = 0;
                             }
                         } else {
-                            // Patrol — walk
+                            // Patrol — walk with frequent jumps
                             z.state = 'walk';
                             z.vx = z.dir * moveSpeed;
                             z.animTimer += ZOMBIE_ANIMS.walk.speed;
                             if (z.animTimer >= ZOMBIE_ANIMS.walk.count) z.animTimer = 0;
-                            // Random jump while patrolling
-                            if (Math.random() < 0.01) {
-                                z.vy = -6 - Math.random() * 3;
+                            if (Math.random() < 0.03) {
+                                z.vy = -8 - Math.random() * 4;
                                 z.grounded = false;
                                 z.state = 'jump'; z.animTimer = 0;
                             }
