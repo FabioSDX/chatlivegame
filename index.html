@@ -4647,7 +4647,9 @@
                 }
                 if (s.isMother) { w *= SPIDER_MOTHER_SCALE; h *= SPIDER_MOTHER_SCALE; }
 
-                ctx.drawImage(img, -w / 2, -h / 2, w, h);
+                // Anchor at feet — offset up by extra height for mothers
+                var yOff = s.isMother ? -h * 0.25 : 0;
+                ctx.drawImage(img, -w / 2, -h / 2 + yOff, w, h);
 
                 // HP bar
                 if (s.state !== 'dead' && s.hp < s.maxHp) {
