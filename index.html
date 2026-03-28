@@ -2192,6 +2192,23 @@
                 p.vx = 0; p.vy = 0;
             }
 
+            // ── Boss Gate barrier: block passage until all bosses are dead ──
+            var pRow = Math.floor(p.y / TILE);
+            if (isMegaClearingRow(pRow)) {
+                var gMz = getMegaZone(pRow);
+                if (gMz >= 0 && megaClearedZones[gMz] && !megaClearedZones[gMz + '_gateOpen']) {
+                    // Gate row = bottom of mega-clearing minus 10 rows
+                    var gateRow = getMegaStart(gMz) + MEGA_CLEARING_HEIGHT - 10;
+                    var gateY = gateRow * TILE;
+                    if (p.y + r > gateY && p.vy > 0) {
+                        p.y = gateY - r - 1;
+                        p.vy = -Math.abs(p.vy) * 0.6 - 2;
+                        p.vx += (Math.random() - 0.5) * 3;
+                        hitAny = true;
+                    }
+                }
+            }
+
             p.ang += p.spin;
             if (hitAny) p.spin = p.spin * 0.9 + (Math.random() - 0.5) * 0.12; else p.spin *= 0.995;
             // Combo armor: when hitting block, give 1s immunity before combo can reset
@@ -3898,6 +3915,31 @@
             // zombies
             drawZombies();
             drawBlackHoles();
+
+            // ── Boss Gate barrier visual ──
+            if (pick) {
+                var gPRow = Math.floor(pick.y / TILE);
+                if (isMegaClearingRow(gPRow)) {
+                    var gMz = getMegaZone(gPRow);
+                    if (gMz >= 0 && megaClearedZones[gMz] && !megaClearedZones[gMz + '_gateOpen']) {
+                        var gateRow = getMegaStart(gMz) + MEGA_CLEARING_HEIGHT - 10;
+                        var gateY = gateRow * TILE;
+                        var gPulse = 0.5 + Math.sin(Date.now() * 0.004) * 0.3;
+                        var gType = megaClearedZones[gMz + '_type'];
+                        var gColor = gType === 'zombie' ? '0, 255, 80' : '255, 60, 100';
+                        ctx.save();
+                        // Glow line
+                        ctx.strokeStyle = 'rgba(' + gColor + ', ' + (0.4 * gPulse) + ')';
+                        ctx.lineWidth = 8 + Math.sin(Date.now() * 0.006) * 3;
+                        ctx.beginPath(); ctx.moveTo(TILE, gateY); ctx.lineTo((COLS - 1) * TILE, gateY); ctx.stroke();
+                        // Bright core
+                        ctx.strokeStyle = 'rgba(' + gColor + ', ' + (0.7 * gPulse) + ')';
+                        ctx.lineWidth = 2;
+                        ctx.beginPath(); ctx.moveTo(TILE, gateY); ctx.lineTo((COLS - 1) * TILE, gateY); ctx.stroke();
+                        ctx.restore();
+                    }
+                }
+            }
 
             // bats
             drawBats();
