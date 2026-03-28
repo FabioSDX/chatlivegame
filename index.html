@@ -1241,6 +1241,7 @@
                         zz.state = 'dead'; zz.animTimer = 0; zz.deadTimer = 0;
                         score += zz.pts;
                         spawnText(zz.x, zz.y - ZOMBIE_SIZE * 0.6, '+' + zz.pts, '#ffdd44');
+                        if (b.userName) addCycleScore(b.userName, zz.pts, 'kill');
                         sfxZombieDeath();
                     }
                 }
@@ -1265,6 +1266,7 @@
                         if (b.userName) {
                             if (!persistentScores[b.userName]) persistentScores[b.userName] = { score: 0, avatar: '' };
                             persistentScores[b.userName].score += bb.pts;
+                            addCycleScore(b.userName, bb.pts, 'kill');
                         }
                         spawnText(bb.x, bb.y - BAT_SIZE * 0.5, '+' + bb.pts, '#ffdd44');
                         sfxBatDeath();
@@ -1291,6 +1293,7 @@
                         if (b.userName) {
                             if (!persistentScores[b.userName]) persistentScores[b.userName] = { score: 0, avatar: '' };
                             persistentScores[b.userName].score += ss.pts;
+                            addCycleScore(b.userName, ss.pts, 'kill');
                         }
                         sfxZombieDeath();
                     }
@@ -2625,6 +2628,7 @@
                         if (!persistentScores[tName]) persistentScores[tName] = { score: 0, avatar: target.userAvatarUrl || '' };
                         persistentScores[tName].score += pts;
                         if (target !== pick) target.score = (target.score || 0) + pts;
+                        addCycleScore(tName, pts, 'item');
                     }
                     if (_audioStarted) sfxSkillActivate();
                     items.splice(i, 1); continue;
@@ -3761,6 +3765,7 @@
                                     player.score = (player.score || 0) + pts;
                                     if (!persistentScores[atk.userName]) persistentScores[atk.userName] = { score: 0, avatar: '', color: '#00ffff' };
                                     persistentScores[atk.userName].score += pts;
+                                    addCycleScore(atk.userName, pts, 'kill');
                                 }
                             }
                             atk.hitsLeft--;
@@ -5517,6 +5522,7 @@
                                 if (p.userName) {
                                     if (!persistentScores[p.userName]) persistentScores[p.userName] = { score: 0, avatar: p.userAvatarUrl || '' };
                                     persistentScores[p.userName].score += s.pts;
+                                    addCycleScore(p.userName, s.pts, 'kill');
                                 }
                                 sfxZombieDeath();
                             }
@@ -6005,6 +6011,7 @@
                                 if (p.userName) {
                                     if (!persistentScores[p.userName]) persistentScores[p.userName] = { score: 0, avatar: p.userAvatarUrl || '' };
                                     persistentScores[p.userName].score += b.pts;
+                                    addCycleScore(p.userName, b.pts, 'kill');
                                 }
                                 sfxBatDeath();
                             } else {
@@ -6266,6 +6273,7 @@
                                 if (p.userName) {
                                     if (!persistentScores[p.userName]) persistentScores[p.userName] = { score: 0, avatar: p.userAvatarUrl || '' };
                                     persistentScores[p.userName].score += z.pts;
+                                    addCycleScore(p.userName, z.pts, 'kill');
                                 }
                                 sfxZombieDeath();
                             }
@@ -8392,6 +8400,7 @@
                             if (bh.userName) {
                                 if (!persistentScores[bh.userName]) persistentScores[bh.userName] = { score: 0, avatar: '' };
                                 persistentScores[bh.userName].score += pts;
+                                addCycleScore(bh.userName, pts, 'block');
                             }
                         }
                     }
@@ -8593,6 +8602,7 @@
                         target.state = 'dead'; target.animTimer = 0; target.deadTimer = 0;
                         score += (target.pts || 100);
                         spawnText(target.x, target.y - 65, '+' + (target.pts || 100), '#ffdd44');
+                        if (userName) addCycleScore(userName, target.pts || 100, 'kill');
                     }
                 }
                 spawnText(startX, startY - 60, '🌊 WATER SHOCK! ⚡', '#00ffff');
