@@ -3726,6 +3726,17 @@
                             ctx.drawImage(tex, 0, 0, TILE, TILE);
                             ctx.restore();
                         }
+                        // Crack on top face
+                        if (cell.cr > 0.01) {
+                            var stageT = Math.min(9, Math.floor(cell.cr * 10));
+                            var dtexT = DESTROY_TEX[stageT];
+                            if (dtexT && dtexT.complete && dtexT.naturalWidth > 0) {
+                                ctx.save();
+                                ctx.transform(1, 0, _3D_SIDE / TILE, -_3D_TOP / TILE, x, y);
+                                ctx.drawImage(dtexT, 0, 0, TILE, TILE);
+                                ctx.restore();
+                            }
+                        }
                         ctx.fillStyle = 'rgba(255,255,255,0.22)';
                         ctx.fill();
                         ctx.restore();
@@ -3746,6 +3757,17 @@
                             ctx.transform(_3D_SIDE / TILE, -_3D_TOP / TILE, 0, 1, x + TILE, y);
                             ctx.drawImage(tex, 0, 0, TILE, TILE);
                             ctx.restore();
+                        }
+                        // Crack on right face
+                        if (cell.cr > 0.01) {
+                            var stageR = Math.min(9, Math.floor(cell.cr * 10));
+                            var dtexR = DESTROY_TEX[stageR];
+                            if (dtexR && dtexR.complete && dtexR.naturalWidth > 0) {
+                                ctx.save();
+                                ctx.transform(_3D_SIDE / TILE, -_3D_TOP / TILE, 0, 1, x + TILE, y);
+                                ctx.drawImage(dtexR, 0, 0, TILE, TILE);
+                                ctx.restore();
+                            }
                         }
                         ctx.fillStyle = 'rgba(0,0,0,0.3)';
                         ctx.fill();
