@@ -2054,7 +2054,7 @@
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             ctx.fillStyle = '#ffdd44';
             ctx.strokeStyle = '#000'; ctx.lineWidth = 3; ctx.lineJoin = 'round';
-            var title = '🏆 CYCLE ' + (_cycleOverlay.cycle * 200) + 'm RESULTS';
+            var title = '🏆 CYCLE ' + (_cycleOverlay.cycle * 400) + 'm RESULTS';
             ctx.strokeText(title, W / 2, H * 0.2);
             ctx.fillText(title, W / 2, H * 0.2);
 
@@ -2905,14 +2905,17 @@
             var depth = Math.floor(pick.y / TILE);
             if (depth > maxDepth) {
                 var oldMilestone = Math.floor(maxDepth / 200);
+                var oldCycle = Math.floor(maxDepth / 400);
                 maxDepth = depth;
                 document.getElementById('depthDisplay').textContent = 'Depth: ' + maxDepth + 'm';
                 var newMilestone = Math.floor(maxDepth / 200);
+                var newCycle = Math.floor(maxDepth / 400);
                 if (newMilestone > oldMilestone && newMilestone > 0) {
                     showDepthWarning(newMilestone * 200);
                     sfxEvilLaugh();
-                    // Trigger cycle scoring
-                    triggerCycleEnd(newMilestone);
+                }
+                if (newCycle > oldCycle && newCycle > 0) {
+                    triggerCycleEnd(newCycle);
                 }
             }
             document.getElementById('scoreDisplay').textContent = '⛏ ' + score;
