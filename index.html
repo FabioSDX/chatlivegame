@@ -1741,6 +1741,21 @@
                         spawnBat(bx, by, zone, bi === 0);
                     }
                 }
+                // Spawn spiders on the clearing floor — first one is Mother
+                if (typeof spiders !== 'undefined') {
+                    var spShape = getClearingShape(zone);
+                    var spBounds = spShape[CLEARING_HEIGHT - 1];
+                    var numSp = Math.min(MAX_SPIDERS - spiders.length, 2 + Math.floor(zone * 0.3));
+                    for (var spi = 0; spi < numSp; spi++) {
+                        var spMinC = (spBounds ? spBounds.left + 1 : 2);
+                        var spMaxC = (spBounds ? spBounds.right - 1 : COLS - 3);
+                        if (spMinC > spMaxC) spMinC = spMaxC;
+                        var spCol = spMinC + Math.floor(seededRand(zone * 400 + spi * 11) * (spMaxC - spMinC + 1));
+                        var spx = spCol * TILE + TILE / 2;
+                        var spy = (lastEmptyRow + 1) * TILE;
+                        spawnSpider(spx, spy, spi === 0);
+                    }
+                }
             }
 
             // Place torches on clearing walls (every 3 rows, left and right walls)
@@ -2048,7 +2063,7 @@
         function restart() {
             score = 0; maxDepth = 0; parts = []; texts = []; debris = []; announcements = [];
             var ov = document.getElementById('announceOverlay'); if (ov) ov.innerHTML = '';
-            worldMap = {}; explosions = []; tntBlocks = []; items = []; zombies = []; bats = []; clearedZones = {}; clearingShapes = {}; crystalDecoList = []; torchList = []; clearingCrystals = {}; megaClearedZones = {};
+            worldMap = {}; explosions = []; tntBlocks = []; items = []; zombies = []; bats = []; spiders = []; clearedZones = {}; clearingShapes = {}; crystalDecoList = []; torchList = []; clearingCrystals = {}; megaClearedZones = {};
             miniClearedZones = {};
             extraPicks = []; userPicks = []; lastActivity = {};
             doublePickActive = false; doublePickTimer = 0; updateDoublePickHUD();
@@ -2722,6 +2737,21 @@
                         }
                     }
                 }
+                // Kill spiders in radius
+                for (var spi = spiders.length - 1; spi >= 0; spi--) {
+                    var sp = spiders[spi];
+                    if (sp.state === 'dead') continue;
+                    var spdx = p.x - sp.x, spdy = p.y - sp.y;
+                    if (spdx * spdx + spdy * spdy < killR * killR) {
+                        sp.hp = 0; sp.state = 'dead'; sp.animTimer = 0; sp.deadTimer = 0;
+                        score += sp.pts;
+                        if (p.userName) {
+                            if (!persistentScores[p.userName]) persistentScores[p.userName] = { score: 0, avatar: p.userAvatarUrl || '' };
+                            persistentScores[p.userName].score += sp.pts;
+                        }
+                        sfxZombieDeath();
+                    }
+                }
             }
         }
         function drawTormentaAura(p) {
@@ -2909,6 +2939,8 @@
 
             updateZombies();
             checkPickZombieCollisions();
+            updateSpiders();
+            checkPickSpiderCollisions();
             updateBats();
             // ── Mega-clearing: spawn flyers when pick enters the zone ──
             if (pick) {
@@ -3959,6 +3991,7 @@
 
             // zombies
             drawZombies();
+            drawSpiders();
             drawBlackHoles();
 
             // ── Boss Gate barrier visual ──
@@ -4243,6 +4276,301 @@
                 }
             });
         });
+
+        // ── SPIDER SYSTEM (mini-clearings) ──────────────────────────────────────
+        var spiders = [];
+        var MAX_SPIDERS = 12;
+        var SPIDER_SIZE = TILE * 0.8;
+        var SPIDER_MOTHER_SCALE = 2.0;
+        var SPIDER_MOTHER_SPAWN_MS = 5000;
+
+        var SPIDER_ANIMS = {
+            idle:   { folder: 'Idle_Nervous', count: 24, speed: 0.12 },
+            walk:   { folder: 'Walk',         count: 16, speed: 0.15 },
+            run:    { folder: 'Run',          count: 16, speed: 0.22 },
+            attack: { folder: 'Attack_01',    count: 20, speed: 0.18 },
+            hurt:   { folder: 'Hit',          count: 16, speed: 0.15 },
+            dead:   { folder: 'Die_01',       count: 24, speed: 0.12 },
+            jump:   { folder: 'Jump_Simple',  count: 24, speed: 0.15 }
+        };
+
+        // Baby spiders use 256x144, mothers use 384x216
+        var spiderSprites = { baby: {}, mother: {} };
+        (function() {
+            ['baby', 'mother'].forEach(function(size) {
+                var res = size === 'baby' ? 'Frames_256x144' : 'Frames_384x216';
+                Object.keys(SPIDER_ANIMS).forEach(function(anim) {
+                    var a = SPIDER_ANIMS[anim];
+                    spiderSprites[size][anim] = [];
+                    for (var i = 1; i <= a.count; i++) {
+                        var img = new Image();
+                        var frame = String(i);
+                        while (frame.length < 4) frame = '0' + frame;
+                        img.src = 'Spider/' + res + '/' + a.folder + '/Body/' + a.folder + '_' + frame + '.png';
+                        spiderSprites[size][anim].push(img);
+                    }
+                });
+            });
+        })();
+
+        function spawnSpider(wx, wy, isMother) {
+            if (spiders.length >= MAX_SPIDERS) return;
+            var safeY = wy - SPIDER_SIZE * 0.5;
+            for (var sy = 0; sy < 3; sy++) {
+                var cr = Math.floor((safeY + SPIDER_SIZE * 0.5) / TILE);
+                var cc = getCell(cr, Math.floor(wx / TILE));
+                if (!cc || cc.t === E) break;
+                safeY -= TILE;
+            }
+            var motherFlag = !!isMother;
+            var depth = Math.floor(wy / TILE);
+            spiders.push({
+                x: wx, y: safeY,
+                vx: 0, vy: 0,
+                hp: motherFlag ? 8 : 2,
+                maxHp: motherFlag ? 8 : 2,
+                speed: 0.5 + Math.random() * 0.4 + Math.min(depth / 150, 0.5),
+                dir: Math.random() < 0.5 ? -1 : 1,
+                state: 'idle',
+                animTimer: 0,
+                hurtTimer: 0,
+                deadTimer: 0,
+                idleTimer: 0,
+                grounded: false,
+                isMother: motherFlag,
+                lastSpawnTime: Date.now(),
+                pts: motherFlag ? 80 + depth * 2 : 25 + depth
+            });
+        }
+
+        function updateSpiders() {
+            var SG = 0.35;
+            for (var i = spiders.length - 1; i >= 0; i--) {
+                var s = spiders[i];
+                if (s.y < camY - 400) { spiders.splice(i, 1); continue; }
+
+                // DEAD
+                if (s.state === 'dead') {
+                    s.deadTimer++;
+                    s.animTimer += SPIDER_ANIMS.dead.speed;
+                    if (s.animTimer >= SPIDER_ANIMS.dead.count) s.animTimer = SPIDER_ANIMS.dead.count - 0.01;
+                    s.vy += SG; s.y += s.vy;
+                    var dRow = Math.floor((s.y + SPIDER_SIZE * 0.5) / TILE);
+                    var dG = getCell(dRow, Math.floor(s.x / TILE));
+                    if (dG && dG.t !== E) { s.y = dRow * TILE - SPIDER_SIZE * 0.5; s.vy = 0; }
+                    if (s.deadTimer > 100) spiders.splice(i, 1);
+                    continue;
+                }
+
+                // HURT
+                if (s.state === 'hurt') {
+                    s.hurtTimer--;
+                    s.animTimer += SPIDER_ANIMS.hurt.speed;
+                    s.vy += SG; s.y += s.vy;
+                    var hRow = Math.floor((s.y + SPIDER_SIZE * 0.5) / TILE);
+                    var hG = getCell(hRow, Math.floor(s.x / TILE));
+                    if (hG && hG.t !== E) { s.y = hRow * TILE - SPIDER_SIZE * 0.5; s.vy = 0; }
+                    if (s.hurtTimer <= 0) { s.state = 'idle'; s.animTimer = 0; }
+                    else if (s.animTimer >= SPIDER_ANIMS.hurt.count) s.animTimer = 0;
+                    continue;
+                }
+
+                // Physics
+                s.vy += SG;
+                s.x += s.vx;
+                s.y += s.vy;
+                if (!isFinite(s.x) || !isFinite(s.y)) { spiders.splice(i, 1); continue; }
+
+                // Ground
+                var fRow = Math.floor((s.y + SPIDER_SIZE * 0.5) / TILE);
+                var fCol = Math.floor(s.x / TILE);
+                var ground = getCell(fRow, fCol);
+                s.grounded = false;
+                if (ground && ground.t !== E) {
+                    s.y = fRow * TILE - SPIDER_SIZE * 0.5;
+                    if (s.vy > 0) s.vy = 0;
+                    s.grounded = true;
+                }
+
+                // Not grounded → fall
+                if (!s.grounded && s.state !== 'jump') {
+                    s.state = 'jump'; s.animTimer = 0;
+                    continue;
+                }
+
+                // Jump anim
+                if (s.state === 'jump') {
+                    s.animTimer += SPIDER_ANIMS.jump.speed;
+                    if (s.animTimer >= SPIDER_ANIMS.jump.count) s.animTimer = SPIDER_ANIMS.jump.count - 0.01;
+                    if (s.grounded) { s.state = 'idle'; s.animTimer = 0; }
+                    continue;
+                }
+
+                // Find nearest pick
+                var nearPick = null, nearDist = 200;
+                var allP = [pick].concat(userPicks);
+                for (var np = 0; np < allP.length; np++) {
+                    if (!allP[np] || allP[np].stuck) continue;
+                    var dx = allP[np].x - s.x, dy = allP[np].y - s.y;
+                    var nd = Math.sqrt(dx * dx + dy * dy);
+                    if (nd < nearDist) { nearDist = nd; nearPick = allP[np]; }
+                }
+                var pickClose = nearDist < SPIDER_SIZE * 1.5;
+
+                // State machine
+                if (s.state === 'idle') {
+                    s.vx = 0;
+                    s.animTimer += SPIDER_ANIMS.idle.speed;
+                    if (s.animTimer >= SPIDER_ANIMS.idle.count) s.animTimer = 0;
+                    s.idleTimer++;
+                    if (pickClose && nearPick) {
+                        s.dir = nearPick.x > s.x ? 1 : -1;
+                        s.state = 'attack'; s.animTimer = 0;
+                    } else if (nearPick) {
+                        s.dir = nearPick.x > s.x ? 1 : -1;
+                        s.state = 'run'; s.animTimer = 0;
+                    } else if (s.idleTimer > 60 + Math.random() * 80) {
+                        s.state = 'walk'; s.animTimer = 0; s.idleTimer = 0;
+                        s.dir = Math.random() < 0.5 ? -1 : 1;
+                    }
+                } else if (s.state === 'run') {
+                    if (nearPick) s.dir = nearPick.x > s.x ? 1 : -1;
+                    s.vx = s.dir * s.speed * 2;
+                    s.animTimer += SPIDER_ANIMS.run.speed;
+                    if (s.animTimer >= SPIDER_ANIMS.run.count) s.animTimer = 0;
+                    if (pickClose) { s.state = 'attack'; s.animTimer = 0; s.vx = 0; }
+                    else if (!nearPick) { s.state = 'idle'; s.animTimer = 0; }
+                    // Random jump while chasing
+                    if (nearPick && nearPick.y < s.y - TILE && s.grounded && Math.random() < 0.03) {
+                        s.vy = -7; s.grounded = false; s.state = 'jump'; s.animTimer = 0;
+                    }
+                } else if (s.state === 'attack') {
+                    s.animTimer += SPIDER_ANIMS.attack.speed;
+                    if (s.animTimer >= SPIDER_ANIMS.attack.count) { s.state = 'idle'; s.animTimer = 0; }
+                    s.vx *= 0.8;
+                } else if (s.state === 'walk') {
+                    s.vx = s.dir * s.speed;
+                    s.animTimer += SPIDER_ANIMS.walk.speed;
+                    if (s.animTimer >= SPIDER_ANIMS.walk.count) s.animTimer = 0;
+                    s.idleTimer++;
+                    if (nearPick) { s.dir = nearPick.x > s.x ? 1 : -1; s.state = 'run'; s.animTimer = 0; }
+                    else if (s.idleTimer > 100 + Math.random() * 120) { s.state = 'idle'; s.animTimer = 0; s.idleTimer = 0; }
+                    if (Math.random() < 0.01 && s.grounded) {
+                        s.vy = -5 - Math.random() * 2; s.grounded = false; s.state = 'jump'; s.animTimer = 0;
+                    }
+                }
+
+                // Wall clamp
+                if (s.x < TILE * 2) { s.x = TILE * 2; s.dir = 1; }
+                if (s.x > (COLS - 2) * TILE) { s.x = (COLS - 2) * TILE; s.dir = -1; }
+                if (s.grounded) s.vx *= 0.85;
+
+                // Mother spawns babies
+                if (s.isMother && s.state !== 'dead' && s.grounded) {
+                    var now = Date.now();
+                    if (now - s.lastSpawnTime >= SPIDER_MOTHER_SPAWN_MS && spiders.length < MAX_SPIDERS) {
+                        s.lastSpawnTime = now;
+                        spawnSpider(s.x + (Math.random() - 0.5) * 40, s.y, false);
+                    }
+                }
+            }
+        }
+
+        function checkPickSpiderCollisions() {
+            var PICK_R = 28;
+            var allPicks = [pick].concat(userPicks, extraPicks);
+            for (var pi = 0; pi < allPicks.length; pi++) {
+                var p = allPicks[pi];
+                if (!p || p.stuck) continue;
+                var pSpeed = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
+                if (pSpeed < 1.5) continue;
+                for (var si = spiders.length - 1; si >= 0; si--) {
+                    var s = spiders[si];
+                    if (s.state === 'dead') continue;
+                    var SR = SPIDER_SIZE * 0.4 * (s.isMother ? SPIDER_MOTHER_SCALE : 1);
+                    var dx = p.x - s.x, dy = p.y - s.y;
+                    var dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < PICK_R + SR) {
+                        var nx = dist > 0 ? dx / dist : 0;
+                        var ny = dist > 0 ? dy / dist : -1;
+                        var bounceForce = Math.max(3, pSpeed * 0.6);
+                        p.vx = nx * bounceForce;
+                        p.vy = ny * bounceForce - 2;
+                        p.spin += (Math.random() - 0.5) * 0.3;
+                        p.x = s.x + nx * (PICK_R + SR + 1);
+                        p.y = s.y + ny * (PICK_R + SR + 1);
+                        s.hp -= 1;
+                        s.state = 'hurt'; s.hurtTimer = 12; s.animTimer = 0;
+                        s.vx += nx * -2; s.vy -= 1;
+                        sfxZombieHurt();
+                        registerComboHit(p, s.x, s.y);
+                        if (s.hp <= 0) {
+                            s.state = 'dead'; s.animTimer = 0; s.deadTimer = 0;
+                            score += s.pts;
+                            if (p.userName) {
+                                if (!persistentScores[p.userName]) persistentScores[p.userName] = { score: 0, avatar: p.userAvatarUrl || '' };
+                                persistentScores[p.userName].score += s.pts;
+                            }
+                            sfxZombieDeath();
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
+        function drawSpiders() {
+            var viewTop = camY - TILE * 2;
+            var viewBot = camY + canvas.height + TILE * 2;
+            for (var i = 0; i < spiders.length; i++) {
+                var s = spiders[i];
+                if (s.y < viewTop || s.y > viewBot) continue;
+                var spriteSize = s.isMother ? 'mother' : 'baby';
+                var animKey = s.state;
+                if (animKey === 'sleep') animKey = 'idle';
+                var animDef = SPIDER_ANIMS[animKey];
+                if (!animDef) { animKey = 'idle'; animDef = SPIDER_ANIMS.idle; }
+                var sprites = spiderSprites[spriteSize][animKey];
+                if (!sprites || sprites.length === 0) continue;
+                var frame = Math.min(Math.floor(s.animTimer), sprites.length - 1);
+                if (frame < 0) frame = 0;
+                var img = sprites[frame];
+                if (!img || !img.complete || !img.naturalWidth) continue;
+
+                ctx.save();
+                ctx.translate(s.x, s.y);
+                if (s.dir < 0) ctx.scale(-1, 1);
+                if (s.state === 'hurt' && s.hurtTimer % 4 < 2) ctx.globalAlpha = 0.5;
+                if (s.state === 'dead') ctx.globalAlpha = Math.max(0, 1 - s.deadTimer / 100);
+
+                var w = SPIDER_SIZE, h = SPIDER_SIZE;
+                if (s.isMother) { w *= SPIDER_MOTHER_SCALE; h *= SPIDER_MOTHER_SCALE; }
+
+                ctx.drawImage(img, -w / 2, -h / 2, w, h);
+
+                // HP bar
+                if (s.state !== 'dead' && s.hp < s.maxHp) {
+                    ctx.globalAlpha = 0.7;
+                    if (s.dir < 0) ctx.scale(-1, 1);
+                    var barW = s.isMother ? 50 : 25, barH = s.isMother ? 5 : 3;
+                    ctx.fillStyle = '#333'; ctx.fillRect(-barW / 2, -h / 2 - 8, barW, barH);
+                    ctx.fillStyle = s.isMother ? '#ff4400' : '#ff8844';
+                    ctx.fillRect(-barW / 2, -h / 2 - 8, barW * (s.hp / s.maxHp), barH);
+                }
+
+                // Mother indicator
+                if (s.isMother && s.state !== 'dead') {
+                    ctx.globalAlpha = 0.9;
+                    if (s.dir < 0) ctx.scale(-1, 1);
+                    ctx.font = 'bold 16px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+                    ctx.fillStyle = '#ff4400';
+                    ctx.fillText('🕷️', 0, -h / 2 - 10);
+                }
+
+                ctx.globalAlpha = 1;
+                ctx.restore();
+            }
+        }
 
         // ── BAT / VESP SYSTEM (alternating per clearing) ──────────────────────
         var bats = [];
