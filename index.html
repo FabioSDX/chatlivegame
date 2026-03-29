@@ -846,6 +846,10 @@
                     <span class="cmd-icon">🕳️</span>
                     <span class="cmd-badge badge-purple">bh</span>
                 </div>
+                <div class="cmd-row" onclick="ensureAudio();activateBig(pick.userName||'@Player')">
+                    <span class="cmd-icon">🔷</span>
+                    <span class="cmd-badge badge-cyan">big</span>
+                </div>
             </div>
         </div>
 
@@ -2287,6 +2291,9 @@
         var cloneCooldown = 900;    // 15 seconds at 60fps
         var stormCooldown = 900;    // 15 seconds at 60fps
         var blackholeCooldown = 1800; // 30 seconds at 60fps
+        var bigCooldown = 1800;     // 30 seconds at 60fps
+        var BIG_DURATION = 900;     // 15 seconds at 60fps
+        var BIG_SCALE = 2.5;
         var BLACKHOLE_RADIUS = 400;   // suction radius in pixels
         var BLACKHOLE_DURATION = 360; // 6 seconds at 60fps
         var activeBlackHoles = [];    // { x, y, timer, userName }
@@ -2375,9 +2382,27 @@
             if (_audioStarted) sfxSkillActivate();
         }
 
+        function activateBig(userName) {
+            userName = (userName || '').replace(/^@@+/, '@');
+            var cdKey = userName + '_big';
+            if (skillCooldowns[cdKey] && skillCooldowns[cdKey] > 0) return;
+            // Find the pick
+            var p = null;
+            if (pick && pick.userName === userName) p = pick;
+            if (!p) p = userPicks.find(function(u) { return u.userName === userName; });
+            if (!p) p = pick;
+            if (!p) return;
+            skillCooldowns[cdKey] = bigCooldown;
+            p.bigTimer = BIG_DURATION;
+            spawnText(p.x, p.y - 40, '🔷 BIG MODE!', '#44aaff');
+            if (_audioStarted) sfxSkillActivate();
+        }
+
         function applyPhysics(p, r) {
             if (!p) return false;
             if (p._spinLock) return false; // skip physics during spin dash
+            // Big mode — increase collision radius
+            if (p.bigTimer > 0) r = Math.floor(r * BIG_SCALE);
 
             // Fire Storm Ping-Pong Mode - Skill OR Combo 25
             var hasPingPong = ((p.stormTimer || 0) > 0);
@@ -2674,7 +2699,7 @@
         }
 
         // Only show important announcements — skip all small/medium texts for performance
-        var _importantTexts = /JOINED|MEGA|SUPER BURST|TORMENTA|THOR|NUKE|CLONE|BLACK HOLE|PASSAGE|ZOMBIE|COMBO|BOSS|ARMY|SHOCK|SPIN|PING|ACTIVATED|NICE|GREAT|AMAZING|FANTASTIC|LEGENDARY|CHAMPION|HERO|LEGEND|BONUS|\+500/i;
+        var _importantTexts = /JOINED|MEGA|SUPER BURST|TORMENTA|THOR|NUKE|CLONE|BLACK HOLE|PASSAGE|ZOMBIE|COMBO|BOSS|ARMY|SHOCK|SPIN|PING|ACTIVATED|NICE|GREAT|AMAZING|FANTASTIC|LEGENDARY|CHAMPION|HERO|LEGEND|BONUS|BIG MODE|\+500/i;
         function spawnText(x, y, txt, color) {
             if (!_importantTexts.test(txt)) return;
             if (texts.length > MAX_TEXTS) return;
@@ -3616,6 +3641,12 @@
             updateItems();
             updateExplosions();
             updateStorm();
+            // Decrement bigTimer on all picks
+            var _allBigPicks = [pick].concat(userPicks);
+            for (var _bi = 0; _bi < _allBigPicks.length; _bi++) {
+                var _bp = _allBigPicks[_bi];
+                if (_bp && _bp.bigTimer > 0) _bp.bigTimer--;
+            }
             updateTormenta();
             updateBlackHoles();
             updateSpins();
@@ -4959,6 +4990,8 @@
                 ctx.save();
                 ctx.translate(pick.x, pick.y);
                 ctx.rotate(pick.ang);
+                var _bigS = (pick.bigTimer > 0) ? BIG_SCALE : 1;
+                if (_bigS > 1) ctx.scale(_bigS, _bigS);
                 var pimg = currentPickaxe.imgObj;
                 if (pimg && pimg.complete && pimg.naturalWidth > 0) {
                     ctx.drawImage(pimg, -PICK_HALF, -PICK_HALF, PICK_HALF * 2, PICK_HALF * 2);
@@ -5086,6 +5119,8 @@
                 ctx.save();
                 ctx.translate(up.x, up.y);
                 ctx.rotate(up.ang);
+                var _upBigS = (up.bigTimer > 0) ? BIG_SCALE : 1;
+                if (_upBigS > 1) ctx.scale(_upBigS, _upBigS);
                 if (SHADOW_ENABLED) { ctx.shadowBlur = 12; ctx.shadowColor = up.color || '#00ff88'; }
                 var uImg = (up.pickaxe || currentPickaxe).imgObj;
                 if (uImg && uImg.complete && uImg.naturalWidth > 0) {
@@ -7233,6 +7268,7 @@
             if (e.key === '6') activateStorm(pick); // Ping-Pong mode
             if (e.key === '7') activateBlackHole(pick ? pick.x : undefined, pick ? pick.y : undefined, me);
             if (e.key === '8') activateTormenta(pick);
+            if (e.key === '9') activateBig(pick ? pick.userName : ownerName || '@Player');
             if (e.key === 'u' || e.key === 'U') triggerBotrixEvent('follow', '@fabiosdx');
             if (e.key === 'i' || e.key === 'I') triggerBotrixEvent('superchat', '@fabiosdx');
             if (e.key === 'p' || e.key === 'P') triggerBotrixEvent('gift', '@fabiosdx');
@@ -9338,6 +9374,8 @@
                                     spawnClone(cUser, cAvatarUrl);
                                 } else if (msg.includes("black hole") || msg.includes("blackhole") || msg.includes("bh")) {
                                     activateBlackHole(tx, ty, cUser);
+                                } else if (msg.includes("big")) {
+                                    activateBig(cUser);
                                 } else if (msg.includes("ping pong") || msg.includes("pingpong") || msg.includes(" pp") || msg === "pp") {
                                     // Auto-spawn pickaxe if user hasn't joined yet
                                     if (!isOwner && !userPick) {
