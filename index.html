@@ -366,39 +366,38 @@
         #commandBox {
             position: fixed;
             top: 60px;
-            right: 12px;
+            right: 6px;
             z-index: 100;
             background: rgba(0, 0, 0, 0.55);
             backdrop-filter: blur(12px);
-            padding: 12px;
+            padding: 6px 5px;
             width: fit-content;
-            min-width: 120px;
-            max-width: 280px;
+            min-width: 60px;
+            max-width: 200px;
             border: 1px solid rgba(255, 255, 255, 0.15);
-            border-radius: 12px;
+            border-radius: 10px;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
         }
 
         #commandBox .panel-title {
             font-family: 'Inter', Arial, sans-serif;
-            font-size: 11px;
+            font-size: 10px;
             font-weight: 700;
-            letter-spacing: 1.5px;
+            letter-spacing: 1px;
             text-transform: uppercase;
-            color: rgba(255, 255, 255, 0.55);
-            margin-bottom: 7px;
-            padding-bottom: 5px;
+            color: rgba(255, 255, 255, 0.45);
+            margin-bottom: 4px;
+            padding-bottom: 3px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         .cmd-row {
             display: flex;
             align-items: center;
-            gap: 6px;
-            padding: 3px 4px;
-            margin-bottom: 0px;
+            gap: 3px;
+            padding: 2px 3px;
             cursor: pointer;
-            border-radius: 6px;
+            border-radius: 5px;
             transition: background 0.15s;
             user-select: none;
             -webkit-tap-highlight-color: transparent;
@@ -414,19 +413,19 @@
         }
 
         .cmd-icon {
-            font-size: 14px;
-            flex: 0 0 18px;
+            font-size: 12px;
+            flex: 0 0 14px;
             text-align: center;
             line-height: 1;
         }
 
         .cmd-badge {
             font-family: 'Inter', Arial, sans-serif;
-            font-size: 11px;
+            font-size: 10px;
             font-weight: 700;
-            padding: 1px 6px;
-            border-radius: 5px;
-            letter-spacing: 0.3px;
+            padding: 1px 4px;
+            border-radius: 4px;
+            letter-spacing: 0.2px;
             flex: 0 0 auto;
             white-space: nowrap;
         }
@@ -516,29 +515,29 @@
         #commandBox .join-row {
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 4px;
             background: rgba(0, 255, 136, 0.08);
             border: 1px solid rgba(0, 255, 136, 0.2);
-            border-radius: 8px;
-            padding: 4px 7px;
-            margin-bottom: 6px;
+            border-radius: 6px;
+            padding: 3px 5px;
+            margin-bottom: 4px;
         }
 
         #commandBox .join-text {
             font-family: 'Inter', Arial, sans-serif;
-            font-size: 11px;
+            font-size: 10px;
             font-weight: 600;
             color: #00ff88;
         }
 
         #commandBox .join-cmd {
             font-family: 'Inter', Arial, sans-serif;
-            font-size: 11px;
+            font-size: 10px;
             font-weight: 800;
             color: #fff;
             background: rgba(0, 255, 136, 0.25);
-            border-radius: 5px;
-            padding: 1px 6px;
+            border-radius: 4px;
+            padding: 1px 5px;
         }
 
         /* ── Leaderboard ── */
@@ -798,25 +797,12 @@
                 <span class="join-cmd">play</span>
             </div>
 
-            <div class="panel-title">⚡ Commands</div>
+            <div class="panel-title">⚡ Cmds</div>
 
-            <!-- Single Column Layout -->
-            <div style="display: flex; flex-direction: column; gap: 2px;">
-                <div class="cmd-row" onclick="ensureAudio();activateSpin(pick.userName||'@Player','right')">
-                    <span class="cmd-icon" style="color:#00ddff; font-weight:bold;">➔</span>
-                    <span class="cmd-badge badge-cyan">sr</span>
-                </div>
-                <div class="cmd-row" onclick="ensureAudio();activateSpin(pick.userName||'@Player','left')">
-                    <span class="cmd-icon" style="color:#00ddff; font-weight:bold;">⬅</span>
-                    <span class="cmd-badge badge-cyan">sl</span>
-                </div>
-                <div class="cmd-row" onclick="ensureAudio();activateSpin(pick.userName||'@Player','up')">
-                    <span class="cmd-icon" style="color:#00ddff; font-weight:bold;">⬆</span>
-                    <span class="cmd-badge badge-cyan">su</span>
-                </div>
-                <div class="cmd-row" onclick="ensureAudio();activateSpin(pick.userName||'@Player','down')">
-                    <span class="cmd-icon" style="color:#00ddff; font-weight:bold;">⬇</span>
-                    <span class="cmd-badge badge-cyan">sd</span>
+            <div style="display: flex; flex-direction: column; gap: 1px;">
+                <div class="cmd-row" onclick="ensureAudio();var d=['right','left','up','down'][Math.floor(Math.random()*4)];activateSpin(pick.userName||'@Player',d)">
+                    <span class="cmd-icon" style="color:#00ddff;">↕</span>
+                    <span class="cmd-badge badge-cyan">sr sl su sd</span>
                 </div>
                 <div class="cmd-row" onclick="ensureAudio();var m=pick.userName||'@Player';activateTNT(pick?pick.x:undefined,pick?pick.y:undefined,m)">
                     <span class="cmd-icon">💥</span>
