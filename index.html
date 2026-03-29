@@ -3332,10 +3332,8 @@
         function updateBonusBalls() {
             for (var b = collectBoxes.length - 1; b >= 0; b--) {
                 var box = collectBoxes[b];
-                box.life--;
                 box.pulse += 0.05;
                 if (box.shakeTimer > 0) box.shakeTimer--;
-                if (box.life <= 0) collectBoxes.splice(b, 1);
             }
 
             for (var i = bonusBalls.length - 1; i >= 0; i--) {
