@@ -40,7 +40,7 @@
         }
 
         #ui .depth {
-            font-size: 18px;
+            font-size: 26px;
             opacity: 1;
             margin-top: -2px;
             color: #ddd;
@@ -48,7 +48,7 @@
         }
 
         .score-display {
-            font-size: 22px;
+            font-size: 30px;
             font-weight: bold;
             color: #ffdd44;
             text-shadow: 0 1px 3px #000, 0 0 10px rgba(255, 221, 68, 0.6);
@@ -79,7 +79,7 @@
             border-radius: 20px;
             border: 1px solid rgba(0, 255, 255, 0.3);
             color: #fff;
-            font-size: 11px;
+            font-size: 14px;
             font-weight: bold;
             display: flex;
             align-items: center;
@@ -299,7 +299,7 @@
         }
 
         #leaderboard h3 {
-            font-size: 14px;
+            font-size: 16px;
             margin-bottom: 5px;
             color: #00ff88;
             text-align: center;
@@ -669,7 +669,7 @@
 
             #commandBox .panel-title,
             #leaderboard h3 {
-                font-size: 11px;
+                font-size: 14px;
             }
 
             .cmd-desc {
@@ -677,26 +677,26 @@
             }
 
             .cmd-badge {
-                font-size: 12px;
+                font-size: 14px;
             }
 
             .lb-name,
             .lb-score {
-                font-size: 13px;
+                font-size: 15px;
             }
 
             #apiStatus {
-                font-size: 13px;
+                font-size: 14px;
                 padding: 4px 10px;
                 top: 5px;
             }
 
             #ui .depth {
-                font-size: 20px;
+                font-size: 30px;
             }
 
             .score-display {
-                font-size: 24px;
+                font-size: 34px;
             }
 
             #commandBox {
@@ -3458,7 +3458,7 @@
                 ctx.fillStyle = '#fff'; ctx.font = (TILE * 0.8) + 'px sans-serif';
                 ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                 ctx.fillText('⭐', bx + bw / 2, by + bh / 2);
-                ctx.fillStyle = '#fff'; ctx.font = 'bold 12px sans-serif';
+                ctx.fillStyle = '#fff'; ctx.font = 'bold 16px sans-serif';
                 ctx.textAlign = 'center'; ctx.textBaseline = 'top';
                 ctx.fillText(box.collected, bx + bw / 2, by + bh + 4);
                 ctx.restore();
@@ -4828,7 +4828,7 @@
                         ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
                         ctx.beginPath(); ctx.arc(b.x - 5 - avSize / 2, avY, avSize / 2, 0, Math.PI * 2); ctx.stroke();
                     }
-                    ctx.fillStyle = '#fff'; ctx.font = 'bold 16px Arial'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+                    ctx.fillStyle = '#fff'; ctx.font = 'bold 22px Arial'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
                     if (SHADOW_ENABLED) { ctx.shadowBlur = 4; ctx.shadowColor = '#000'; }
                     ctx.fillText(b.userName, b.x + 5, avY);
                     ctx.restore();
@@ -4962,7 +4962,7 @@
             // textos flutuantes
             for (var j = 0; j < texts.length; j++) {
                 var t = texts[j];
-                ctx.globalAlpha = t.life; ctx.font = 'bold 14px Arial';
+                ctx.globalAlpha = t.life; ctx.font = 'bold 22px Arial';
                 ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                 ctx.strokeStyle = 'rgba(0,0,0,' + (t.life * 0.8) + ')'; ctx.lineWidth = 3; ctx.lineJoin = 'round';
                 ctx.strokeText(t.txt, t.x, t.y);
@@ -5017,7 +5017,7 @@
                         ctx.fillText((pick.userName || '?').replace('@','').charAt(0).toUpperCase(), pick.x - 10 - oAvSize / 2, oAvY);
                         ctx.restore();
                     }
-                    ctx.fillStyle = '#ffdd44'; ctx.font = isMobile ? 'bold 16px Arial' : 'bold 24px Arial'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+                    ctx.fillStyle = '#ffdd44'; ctx.font = isMobile ? 'bold 22px Arial' : 'bold 26px Arial'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
                     ctx.strokeStyle = '#000'; ctx.lineWidth = isMobile ? 3 : 4; ctx.lineJoin = 'round';
                     ctx.strokeText(pick.userName, pick.x + 10, oAvY);
                     if (SHADOW_ENABLED) { ctx.shadowBlur = 8; ctx.shadowColor = '#000'; }
@@ -5073,7 +5073,7 @@
                     }
                     ctx.save();
                     ctx.globalAlpha = cloneAlpha * 0.85;
-                    ctx.fillStyle = '#fff'; ctx.font = isMobile ? 'bold 16px Arial' : 'bold 24px Arial'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+                    ctx.fillStyle = '#fff'; ctx.font = isMobile ? 'bold 22px Arial' : 'bold 26px Arial'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
                     ctx.strokeStyle = '#000'; ctx.lineWidth = isMobile ? 3 : 4; ctx.lineJoin = 'round';
                     ctx.strokeText(ep.cloneOwner || '', ep.x + 10, cloneAvY);
                     if (SHADOW_ENABLED) { ctx.shadowBlur = 8; ctx.shadowColor = '#000'; }
@@ -5141,7 +5141,7 @@
                     ctx.fillText((up.userName || '?').replace('@','').charAt(0).toUpperCase(), up.x - 10 - avSize / 2, avY);
                     ctx.restore();
                 }
-                ctx.fillStyle = '#fff'; ctx.font = isMobile ? 'bold 16px Arial' : 'bold 24px Arial'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+                ctx.fillStyle = '#fff'; ctx.font = isMobile ? 'bold 22px Arial' : 'bold 26px Arial'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
                 ctx.strokeStyle = '#000'; ctx.lineWidth = isMobile ? 3 : 4; ctx.lineJoin = 'round';
                 ctx.strokeText(up.userName, up.x + 10, avY);
                 if (SHADOW_ENABLED) { ctx.shadowBlur = 8; ctx.shadowColor = '#000'; }
@@ -5155,7 +5155,7 @@
             // ── Camera target indicator ──
             if (camTarget && camTarget !== pick && !camTarget.stuck) {
                 ctx.save();
-                ctx.font = '12px sans-serif';
+                ctx.font = '20px sans-serif';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'bottom';
                 ctx.fillStyle = '#ffdd44';
