@@ -870,16 +870,31 @@
 
         var COLS = 15, TILE = 72;
         var VIS = 27;
-        canvas.width = COLS * TILE;
-        canvas.height = VIS * TILE;
 
-        var MAX_PARTS = isMobile ? 15 : 150;
-        var MAX_DEBRIS = isMobile ? 10 : 60;
-        var MAX_TEXTS = isMobile ? 4 : 20;
-        var MAX_ITEMS = 30;
+        // Mobile: reduce canvas resolution for GPU performance
+        if (isMobile) {
+            var mScale = 0.7;
+            canvas.style.width = (COLS * TILE) + 'px';
+            canvas.style.height = (VIS * TILE) + 'px';
+            canvas.width = Math.floor(COLS * TILE * mScale);
+            canvas.height = Math.floor(VIS * TILE * mScale);
+            TILE = Math.floor(TILE * mScale);
+        } else {
+            canvas.width = COLS * TILE;
+            canvas.height = VIS * TILE;
+        }
+
+        var MAX_PARTS = isMobile ? 10 : 150;
+        var MAX_DEBRIS = isMobile ? 8 : 60;
+        var MAX_TEXTS = isMobile ? 3 : 20;
+        var MAX_ITEMS = isMobile ? 15 : 30;
         var SHADOW_ENABLED = !isMobile;
         var SHIMMER_ENABLED = !isMobile;
         var BG_DETAIL = isMobile ? 0 : 1; // 0=simple, 1=full crystals
+        var BLOCKS_3D = !isMobile;          // 3D block faces (biggest draw call saver)
+        var MAX_BATS_VISIBLE = isMobile ? 15 : 999;
+        var MAX_ZOMBIES_VISIBLE = isMobile ? 8 : 999;
+        var MAX_SPIDERS_VISIBLE = isMobile ? 8 : 999;
         // ── Tipos ──
         var E = 0, DIRT = 1, STONE = 2, COAL = 3, IRON = 4, GOLD = 5, REDSTONE = 6, DIAMOND = 7, EMERALD = 8, BEDROCK = 9,
             GRASS = 10, ANDESITE = 11, DIORITE = 12, GRANITE = 13, COBBLE = 14, MOSSY = 15, COPPER = 16, LAPIS = 17, OBSIDIAN = 18, BONUS_BOX = 19;
@@ -4350,7 +4365,8 @@
                     ctx.fillStyle = '#0a3a6a';
                     ctx.fillRect(x, y, TILE, TILE);
 
-                    // Caustic shimmer
+                    // Caustic shimmer (skip on mobile)
+                    if (!isMobile) {
                     ctx.globalAlpha = alpha * 0.25;
                     ctx.fillStyle = '#4488cc';
                     var cx1 = Math.sin(t * 1.5 + c * 0.8 + r * 0.3) * TILE * 0.3;
@@ -4358,6 +4374,7 @@
                     ctx.beginPath();
                     ctx.arc(x + TILE * 0.5 + cx1, y + TILE * 0.5 + cy1, 11, 0, Math.PI * 2);
                     ctx.fill();
+                    }
 
                     // Surface wave on top row
                     if (r === topWaterRow) {
@@ -4483,6 +4500,7 @@
             var _3D_SIDE = 8;
 
             // Pass 1: 3D faces (drawn BEHIND front faces)
+            if (BLOCKS_3D) {
             for (var r = rStart; r <= rEnd; r++) {
                 for (var c = 0; c < COLS; c++) {
                     var cell = getCell(r, c);
@@ -4561,6 +4579,7 @@
                     }
                 }
             }
+            } // end BLOCKS_3D
 
             // Pass 2: Front faces + shimmer + cracks (drawn ON TOP of 3D faces)
             for (var r = rStart; r <= rEnd; r++) {
@@ -5464,9 +5483,11 @@
             var viewTop = camY - TILE * 2;
             var viewBot = camY + canvas.height + TILE * 2;
             var t = Date.now() * 0.004;
+            var _spiderDrawn = 0;
             for (var i = 0; i < spiders.length; i++) {
                 var s = spiders[i];
                 if (s.y < viewTop || s.y > viewBot) continue;
+                if (++_spiderDrawn > MAX_SPIDERS_VISIBLE) break;
 
                 var baseW = SPIDER_SIZE * 0.5;
                 var baseH = SPIDER_SIZE * 0.45;
@@ -5963,9 +5984,11 @@
             var viewTop = camY - TILE * 2;
             var viewBot = camY + canvas.height + TILE * 2;
             var t = Date.now() * 0.003;
+            var _batDrawn = 0;
             for (var i = 0; i < bats.length; i++) {
                 var b = bats[i];
                 if (b.y < viewTop || b.y > viewBot) continue;
+                if (++_batDrawn > MAX_BATS_VISIBLE) break;
 
                 var r = BAT_SIZE * 0.45;
                 if (b.isQueen) r *= QUEEN_SCALE;
@@ -6680,9 +6703,11 @@
             var viewTop = camY - TILE * 2;
             var viewBot = camY + canvas.height + TILE * 2;
             var t = Date.now() * 0.004;
+            var _zombieDrawn = 0;
             for (var i = 0; i < zombies.length; i++) {
                 var z = zombies[i];
                 if (z.y < viewTop || z.y > viewBot) continue;
+                if (++_zombieDrawn > MAX_ZOMBIES_VISIBLE) break;
 
                 var baseW = ZOMBIE_SIZE * 0.9;
                 var baseH = ZOMBIE_SIZE * 0.8;
