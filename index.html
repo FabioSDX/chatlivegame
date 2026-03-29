@@ -2022,22 +2022,24 @@
 
         function addCycleScore(userName, pts, type) {
             if (!userName) return;
-            if (!_cycleScores[userName]) _cycleScores[userName] = { score: 0, kills: 0, items: 0, avatar: '' };
+            if (!_cycleScores[userName]) _cycleScores[userName] = { score: 0, kills: 0, items: 0, balls: 0, avatar: '' };
             _cycleScores[userName].score += pts;
             if (type === 'kill') _cycleScores[userName].kills++;
             if (type === 'item') _cycleScores[userName].items++;
+            if (type === 'ball') _cycleScores[userName].balls++;
             if (persistentScores[userName] && persistentScores[userName].avatar) _cycleScores[userName].avatar = persistentScores[userName].avatar;
         }
 
         function triggerCycleEnd(cycle) {
-            // Get top 3
             var players = Object.keys(_cycleScores).map(function(n) {
-                return { name: n, score: _cycleScores[n].score, kills: _cycleScores[n].kills, items: _cycleScores[n].items, avatar: _cycleScores[n].avatar };
+                return { name: n, score: _cycleScores[n].score, kills: _cycleScores[n].kills, items: _cycleScores[n].items, balls: _cycleScores[n].balls || 0, avatar: _cycleScores[n].avatar };
             }).sort(function(a, b) { return b.score - a.score; }).slice(0, 3);
             if (players.length === 0) return;
-            _cycleOverlay = { timer: 600, top3: players, cycle: cycle, confetti: [] }; // 10 seconds
+            _cycleOverlay = { timer: 600, top3: players, cycle: cycle, confetti: [] };
             _cycleOverlayTimer = 0;
-            // Reset for next cycle
+            // Reset balls in persistentScores
+            var keys = Object.keys(persistentScores);
+            for (var i = 0; i < keys.length; i++) { persistentScores[keys[i]].balls = 0; }
             _cycleScores = {};
             _currentCycle = cycle;
             _saveCycleScores();
@@ -2213,7 +2215,8 @@
                 var statsY = cardY + cardH / 2;
                 var statsStr = '';
                 if (p.kills > 0) statsStr += '💥' + p.kills + ' ';
-                if (p.items > 0) statsStr += '💎' + p.items;
+                if (p.items > 0) statsStr += '💎' + p.items + ' ';
+                if (p.balls > 0) statsStr += '🔮' + p.balls;
                 if (statsStr) ctx.fillText(statsStr, statsX, statsY);
 
                 ctx.restore();
@@ -3413,7 +3416,7 @@
                             if (!persistentScores[owner.userName]) persistentScores[owner.userName] = { score: 0, avatar: owner.userAvatarUrl || '' };
                             persistentScores[owner.userName].score += BONUS_BALL_PTS;
                             persistentScores[owner.userName].balls = (persistentScores[owner.userName].balls || 0) + 1;
-                            addCycleScore(owner.userName, BONUS_BALL_PTS, 'item');
+                            addCycleScore(owner.userName, BONUS_BALL_PTS, 'ball');
                         }
                         spawnText(ball.x, ball.y - 10, '+' + BONUS_BALL_PTS, '#ffdd44');
                         spawnText(boxX + boxW / 2, boxY - 16, '→ ' + (ball.ownerName || '?'), ball.color);
