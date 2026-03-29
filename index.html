@@ -2210,7 +2210,7 @@
                 // Stats icons (right side)
                 var statsX = cardX + cardW - 16;
                 ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
-                ctx.font = Math.min(22, Math.floor(cardH * 0.17)) + 'px Arial';
+                ctx.font = 'bold ' + Math.min(26, Math.floor(cardH * 0.2)) + 'px Arial';
                 ctx.fillStyle = '#aaa';
                 var statsY = cardY + cardH / 2;
                 var statsStr = '';
@@ -2674,7 +2674,7 @@
         }
 
         // Only show important announcements — skip all small/medium texts for performance
-        var _importantTexts = /JOINED|MEGA|SUPER BURST|TORMENTA|THOR|NUKE|CLONE|BLACK HOLE|PASSAGE|ZOMBIE|COMBO|BOSS|ARMY|SHOCK|SPIN|PING|ACTIVATED|NICE|GREAT|AMAZING|FANTASTIC|LEGENDARY|CHAMPION|HERO|LEGEND/i;
+        var _importantTexts = /JOINED|MEGA|SUPER BURST|TORMENTA|THOR|NUKE|CLONE|BLACK HOLE|PASSAGE|ZOMBIE|COMBO|BOSS|ARMY|SHOCK|SPIN|PING|ACTIVATED|NICE|GREAT|AMAZING|FANTASTIC|LEGENDARY|CHAMPION|HERO|LEGEND|BONUS|\+500/i;
         function spawnText(x, y, txt, color) {
             if (!_importantTexts.test(txt)) return;
             if (texts.length > MAX_TEXTS) return;
