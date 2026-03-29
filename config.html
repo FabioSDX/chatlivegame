@@ -25,7 +25,7 @@
     <h2>⛏️ Pickaxe Drop — Settings</h2>
     <label>Owner Name (main pickaxe player)</label>
     <input id="ownerName" type="text" placeholder="@yourname">
-    <div class="info" id="ownerInfo">When this user comments in live chat, they control the main pickaxe. Auto-detected when you connect your API key.</div>
+    <div class="info" id="ownerInfo">When this user comments in live chat, they control the main pickaxe.</div>
 
     <label>Pickaxe Change Interval (seconds)</label>
     <input id="pickInterval" type="number" value="10" min="1" max="120">
@@ -57,7 +57,7 @@
     }
 
     function clearData() {
-      if (!confirm('This will clear all scores, settings, and API keys. Continue?')) return;
+      if (!confirm('This will clear all scores and settings. Continue?')) return;
       var keys = Object.keys(localStorage);
       keys.forEach(function(k) { if (k.startsWith('pd_')) localStorage.removeItem(k); });
       var msg = document.getElementById('msg');

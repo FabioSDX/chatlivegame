@@ -2,6 +2,9 @@
 data/
 config.txt
 
+# Node
+node_modules/
+
 # Arquivos temporários
 *.rar
 *.zip

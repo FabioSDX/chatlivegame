@@ -730,9 +730,8 @@
             style="background:#1a1a2e; border:2px solid #00ff88; border-radius:16px; padding:28px 32px; max-width:460px; width:90%; color:#fff; box-shadow:0 0 40px rgba(0,255,136,0.2); max-height:90vh; overflow-y:auto;">
             <div style="text-align:center; margin-bottom:18px;">
                 <div style="font-size:36px;">⛏️</div>
-                <h2 style="margin:8px 0 4px; color:#00ff88; font-size:20px;">Pickaxe Drop — API Setup</h2>
-                <p id="apiSetupMsg" style="font-size:13px; color:#aaa; margin:0;">Enter your YouTube API Key and Channel
-                    ID to connect the live chat.</p>
+                <h2 style="margin:8px 0 4px; color:#00ff88; font-size:20px;">Pickaxe Drop — Connect</h2>
+                <p id="apiSetupMsg" style="font-size:13px; color:#aaa; margin:0;">Enter your Channel ID or Live Video ID to connect. No API key needed.</p>
             </div>
             <div id="apiSetupError"
                 style="display:none; background:rgba(255,68,68,0.15); border:1px solid #ff4444; border-radius:8px; padding:8px 12px; margin-bottom:12px; font-size:12px; color:#ff8888;">
@@ -740,40 +739,32 @@
             <div id="apiSetupSuccess"
                 style="display:none; background:rgba(0,255,136,0.1); border:1px solid #00ff88; border-radius:8px; padding:8px 12px; margin-bottom:12px; font-size:12px; color:#00ff88;">
             </div>
-            <label for="apiChannelInput" style="font-size:12px; color:#888; display:block; margin-bottom:4px;">Channel ID</label>
+            <label for="apiChannelInput" style="font-size:12px; color:#888; display:block; margin-bottom:4px;">Channel ID (recommended)</label>
             <input id="apiChannelInput" type="text" placeholder="UC_xxxxxxxxxxxxxxxxxx"
                 style="width:100%; padding:10px 12px; border-radius:8px; border:1px solid #333; background:#0d0d1a; color:#fff; font-size:14px; margin-bottom:12px; box-sizing:border-box; outline:none;" />
-            <label for="apiKeyInput" style="font-size:12px; color:#888; display:block; margin-bottom:4px;">YouTube API Key(s) <span
-                    style="color:#666;">(separate multiple with commas)</span></label>
-            <textarea id="apiKeyInput" placeholder="AIzaSy..., AIzaSy..., AIzaSy..." rows="2"
-                style="width:100%; padding:10px 12px; border-radius:8px; border:1px solid #333; background:#0d0d1a; color:#fff; font-size:13px; margin-bottom:16px; box-sizing:border-box; outline:none; resize:vertical; font-family:monospace;"></textarea>
+            <div style="margin-bottom:12px; padding-bottom:12px; border-bottom:1px solid #333;">
+                <label for="apiLiveIdInput" style="font-size:12px; color:#888; display:block; margin-bottom:4px;">Or Live Video URL / ID</label>
+                <input id="apiLiveIdInput" type="text" placeholder="https://youtube.com/watch?v=... or video ID"
+                    style="width:100%; padding:10px 12px; border-radius:8px; border:1px solid #333; background:#0d0d1a; color:#fff; font-size:13px; box-sizing:border-box; outline:none;" />
+            </div>
+            <div style="margin-bottom:16px; padding-top:12px; border-top:1px solid #333;">
+                <label for="statsKeyInput" style="font-size:12px; color:#888; display:block; margin-bottom:4px;">API Key(s) for Like detection <span style="color:#666;">(optional, comma-separated)</span></label>
+                <div style="display:flex; gap:8px;">
+                    <input id="statsKeyInput" type="text" placeholder="AIzaSy... (optional — enables like events)"
+                        style="flex:1; padding:10px 12px; border-radius:8px; border:1px solid #333; background:#0d0d1a; color:#fff; font-size:13px; box-sizing:border-box; outline:none; font-family:monospace;" />
+                    <button id="statsTestBtn" onclick="testStatsKeys()"
+                        style="padding:10px 14px; border:1px solid #00aaff; border-radius:8px; background:transparent; color:#00aaff; font-size:12px; cursor:pointer; white-space:nowrap;">🔑 Test Keys</button>
+                </div>
+                <div id="statsTestResult" style="font-size:11px; color:#555; margin-top:4px;">Only used for like polling. Chat works without it.</div>
+            </div>
             <div style="display:flex; gap:8px;">
-                <button id="apiTestBtn" onclick="apiSetupTest()"
-                    style="flex:1; padding:10px; border:none; border-radius:8px; background:#00ff88; color:#000; font-weight:bold; font-size:14px; cursor:pointer;">Test
-                    & Connect</button>
-                <button id="apiFindLiveBtn" onclick="apiSetupFindLive()"
-                    style="padding:10px 14px; border:1px solid #00aaff; border-radius:8px; background:transparent; color:#00aaff; font-size:13px; cursor:pointer; display:none;">🔍
-                    Find Live</button>
+                <button id="apiTestBtn" onclick="wsConnect()"
+                    style="flex:1; padding:10px; border:none; border-radius:8px; background:#00ff88; color:#000; font-weight:bold; font-size:14px; cursor:pointer;">▶ Connect</button>
                 <button id="apiSkipBtn" onclick="apiSetupSkip()"
                     style="padding:10px 16px; border:1px solid #555; border-radius:8px; background:transparent; color:#888; font-size:13px; cursor:pointer;">Play
                     Offline</button>
-                <button onclick="apiResetAll()" title="Clear all saved keys and data"
+                <button onclick="apiResetAll()" title="Clear all saved data"
                     style="padding:10px 12px; border:1px solid #ff4444; border-radius:8px; background:transparent; color:#ff4444; font-size:13px; cursor:pointer;">🗑</button>
-            </div>
-            <div style="margin-top:12px; padding-top:12px; border-top:1px solid #333;">
-                <label for="apiLiveIdInput" style="font-size:12px; color:#888; display:block; margin-bottom:4px;">Live Video URL or ID
-                    (optional — saves API quota)</label>
-                <div style="display:flex; gap:8px;">
-                    <input id="apiLiveIdInput" type="text" placeholder="https://youtube.com/watch?v=... or video ID"
-                        style="flex:1; padding:8px 12px; border-radius:8px; border:1px solid #333; background:#0d0d1a; color:#fff; font-size:13px; box-sizing:border-box; outline:none;" />
-                    <button id="apiLiveIdBtn" onclick="apiConnectLiveById()"
-                        style="padding:8px 14px; border:1px solid #ff8800; border-radius:8px; background:transparent; color:#ff8800; font-size:13px; cursor:pointer; white-space:nowrap;">▶
-                        Connect Live</button>
-                </div>
-            </div>
-            <div id="apiKeysList" style="margin-top:16px; display:none;">
-                <div style="font-size:12px; color:#888; margin-bottom:6px;">Your registered API keys:</div>
-                <div id="apiKeysListInner"></div>
             </div>
         </div>
     </div>
@@ -782,10 +773,13 @@
         <div id="fpsCounter">FPS: 0</div>
         <div id="apiStatus">
             <div class="status-dot" id="statusDotApi"></div>
-            <span id="statusTextApi" style="font-size:11px;">API: —</span>
+            <span id="statusTextApi" style="font-size:11px;">WS: —</span>
             <div style="width:1px;height:14px;background:rgba(255,255,255,0.15);margin:0 2px;"></div>
             <div class="status-dot" id="statusDotLive"></div>
             <span id="statusTextLive" style="font-size:11px;">Live: —</span>
+            <div style="width:1px;height:14px;background:rgba(255,255,255,0.15);margin:0 2px;"></div>
+            <div class="status-dot" id="statusDotStats"></div>
+            <span id="statusTextStats" style="font-size:11px;">API: —</span>
         </div>
         <div class="depth" id="depthDisplay">Depth: 0m</div>
         <div class="score-display" id="scoreDisplay" style="display:none">⛏ 0</div>
@@ -1438,10 +1432,6 @@
         (function () {
             var cfg = JSON.parse(localStorage.getItem('pd_config') || '{}');
             pickaxeChangeInterval = cfg.pickaxe_change_interval || 10;
-            if (cfg.owner_name) {
-                ownerName = cfg.owner_name.replace(/^@@+/, '@');
-                if (ownerName && ownerName[0] !== '@') ownerName = '@' + ownerName;
-            }
             updateOwnerPickaxe();
             setInterval(updateOwnerPickaxe, 5000);
         })();
@@ -1959,11 +1949,8 @@
             { lx: (1 - 8) * _S, ly: (15 - 8) * _S, role: 'tail' }
         ];
 
-        var ownerName = ''; // loaded from config
+        var ownerName = ''; // detected from youtube-chat isOwner flag
         var pick = { x: 540, y: 100, vx: 0, vy: 0, ang: 0, spin: 0, stuck: false, stuckTimer: 0, userName: '', userAvatarUrl: '', stormTimer: 0 };
-        if (ownerName) pick.userName = ownerName;
-        // Ensure pick always has a userName for offline play
-        if (!pick.userName) pick.userName = '@Player';
 
         function spawnPick() {
             var savedUser = pick.userName;
@@ -3660,6 +3647,12 @@
                         if (b.state === 'dead' || b.y < camY - 200 || b.y > camY + canvas.height + 200) continue;
                         var dist = Math.sqrt((b.x - atk.x) * (b.x - atk.x) + (b.y - atk.y) * (b.y - atk.y));
                         if (dist <= 800) targets.push({ bat: b, dist: dist });
+                    }
+                    for (var z_i = 0; z_i < zombies.length; z_i++) {
+                        var z = zombies[z_i];
+                        if (z.state === 'dead' || z.y < camY - 200 || z.y > camY + canvas.height + 200) continue;
+                        var zDist = Math.sqrt((z.x - atk.x) * (z.x - atk.x) + (z.y - atk.y) * (z.y - atk.y));
+                        if (zDist <= 800) targets.push({ bat: z, dist: zDist });
                     }
                     for (var sp_i = 0; sp_i < spiders.length; sp_i++) {
                         var sp = spiders[sp_i];
@@ -7237,6 +7230,13 @@
 
         // Atalhos de teclado (Skills e Reset)
         window.addEventListener('keydown', function (e) {
+            // Ctrl+Shift+R: full reset (clear all saved data, then hard reload)
+            if (e.ctrlKey && e.shiftKey && (e.key === 'r' || e.key === 'R')) {
+                var keys = Object.keys(localStorage);
+                keys.forEach(function(k) { if (k.startsWith('pd_')) localStorage.removeItem(k); });
+                // Let the browser do the hard reload naturally
+                return;
+            }
             if (e.key === 'r' || e.key === 'R') {
                 processedComments.clear();
                 _firstFetchDone = false;
@@ -7376,132 +7376,25 @@
         }
         setInterval(savePersistentScores, 15000); // Salva a cada 15s
 
-        // ── API Key Management System ──────────────────────────────────────────────
+        // ── WebSocket Chat System (youtube-chat) ──────────────────────────────────
         var _userChannelId = localStorage.getItem('pd_channel_id') || '';
-        var _activeApiKey = '';
-        var _liveChatId = ''; // persisted per user, avoids search.list (100 units)
         var _apiConnected = false;
-        var _apiCheckInterval = null;
         var _apiSetupShown = false;
         var _gameStarted = false;
-        var _apiKeyUpdated = false;
-        var _liveVideoId = '';    // current live video ID for statistics polling
-        var _lastLikeCount = -1;  // -1 = not yet fetched
-        var _lastSubCount = -1;
-        var _statsTimer = null;
-        var _statsInterval = 10000; // check every 10s (1 unit per call)
+        var _ws = null;
+        var _wsReconnectTimer = null;
+        var _userClickedConnect = false;
 
-        // ── API Key Pool System ──────────────────────────────────────────────────
-        var _keyPool = [];        // [{key, status:'ok'|'failed', lastError:'', failedAt:0}]
-        var _keyPoolIndex = 0;    // round-robin index
-        var _keyRetestTimer = null;
-        var _keyRetestInterval = 3600000; // retest failed keys every 1 hour
+        // ── WebSocket Connection Functions ──────────────────────────────────────
 
-        function apiStatusText() {
-            var ok = getOkKeyCount();
-            return ok > 1 ? 'API: ' + ok + ' keys' : 'API: OK';
-        }
-
-        function getNextApiKey() {
-            var okKeys = _keyPool.filter(function (k) { return k.status === 'ok'; });
-            if (okKeys.length === 0) return '';
-            _keyPoolIndex = (_keyPoolIndex + 1) % okKeys.length;
-            _activeApiKey = okKeys[_keyPoolIndex].key;
-            return _activeApiKey;
-        }
-
-        function getCurrentApiKey() {
-            var okKeys = _keyPool.filter(function (k) { return k.status === 'ok'; });
-            if (okKeys.length === 0) return '';
-            if (_keyPoolIndex >= okKeys.length) _keyPoolIndex = 0;
-            _activeApiKey = okKeys[_keyPoolIndex].key;
-            return _activeApiKey;
-        }
-
-        function getOkKeyCount() {
-            return _keyPool.filter(function (k) { return k.status === 'ok'; }).length;
-        }
-
-        function markKeyFailed(key, errorMsg) {
-            _keyPool.forEach(function (k) {
-                if (k.key === key) { k.status = 'failed'; k.lastError = errorMsg; k.failedAt = Date.now(); }
-            });
-            saveKeyPool();
-            var okCount = getOkKeyCount();
-            console.log('[KeyPool] Key failed:', key.substring(0, 8) + '...', errorMsg, '| OK keys left:', okCount);
-            if (okCount > 0) {
-                // Rotate to next OK key
-                getNextApiKey();
-                var txtApi = document.getElementById('statusTextApi');
-                if (txtApi) { txtApi.textContent = 'API: ' + okCount + ' key(s)'; txtApi.style.color = '#ffaa00'; }
-            } else {
-                _apiConnected = false;
-                _activeApiKey = '';
-                // Don't show setup modal — just update status and retest
-                var txtApi = document.getElementById('statusTextApi');
-                if (txtApi) { txtApi.textContent = 'API: no keys (retesting...)'; txtApi.style.color = '#ff4444'; }
-                startKeyRetest();
-            }
-            loadKeysList();
-        }
-
-        function saveKeyPool() {
-            if (!_userChannelId) return;
-            localStorage.setItem('pd_api_keys_' + _userChannelId, JSON.stringify(_keyPool));
-        }
-
-        function loadKeyPool() {
-            if (!_userChannelId) { _keyPool = []; return; }
-            try {
-                _keyPool = JSON.parse(localStorage.getItem('pd_api_keys_' + _userChannelId) || '[]');
-            } catch (e) { _keyPool = []; }
-        }
-
-        function startKeyRetest() {
-            if (_keyRetestTimer) return;
-            console.log('[KeyPool] Starting hourly retest of failed keys');
-            _keyRetestTimer = setInterval(retestFailedKeys, _keyRetestInterval);
-        }
-
-        function retestFailedKeys() {
-            var failedKeys = _keyPool.filter(function (k) { return k.status === 'failed'; });
-            if (failedKeys.length === 0) {
-                if (_keyRetestTimer) { clearInterval(_keyRetestTimer); _keyRetestTimer = null; }
-                return;
-            }
-            console.log('[KeyPool] Retesting', failedKeys.length, 'failed key(s)...');
-            var testChannel = _userChannelId;
-            var pending = failedKeys.length;
-            failedKeys.forEach(function (kObj) {
-                var testUrl = 'https://www.googleapis.com/youtube/v3/channels?part=snippet&id=' + encodeURIComponent(testChannel) + '&key=' + encodeURIComponent(kObj.key);
-                fetch(testUrl)
-                    .then(function (r) { return r.json().catch(function () { return { error: { code: 0, message: 'parse error' } }; }); })
-                    .then(function (data) {
-                        if (!data.error) {
-                            kObj.status = 'ok'; kObj.lastError = ''; kObj.failedAt = 0;
-                            console.log('[KeyPool] Key recovered:', kObj.key.substring(0, 8) + '...');
-                            if (!_apiConnected) {
-                                _activeApiKey = kObj.key;
-                                _apiConnected = true;
-                                dismissApiBanner();
-                                startApiPolling();
-                            }
-                        } else {
-                            console.log('[KeyPool] Key still failed:', kObj.key.substring(0, 8) + '...', data.error.message);
-                        }
-                        pending--;
-                        if (pending <= 0) { saveKeyPool(); loadKeysList(); }
-                    })
-                    .catch(function () { pending--; if (pending <= 0) { saveKeyPool(); loadKeysList(); } });
-            });
+        function getWsUrl() {
+            var loc = window.location;
+            var proto = loc.protocol === 'https:' ? 'wss:' : 'ws:';
+            return proto + '//' + loc.host;
         }
 
         function showApiSetup(msg) {
-            // During gameplay (live on screen), never show the inline form — open popup instead
-            if (_gameStarted) {
-                showApiBanner(msg);
-                return;
-            }
+            if (_gameStarted) { showApiBanner(msg); return; }
             var overlay = document.getElementById('apiSetupOverlay');
             overlay.style.display = 'flex';
             _apiSetupShown = true;
@@ -7509,15 +7402,14 @@
             var sucEl = document.getElementById('apiSetupSuccess');
             errEl.style.display = 'none';
             sucEl.style.display = 'none';
-            if (msg) {
-                errEl.style.display = 'block';
-                errEl.textContent = msg;
-            }
+            if (msg) { errEl.style.display = 'block'; errEl.textContent = msg; }
             if (_userChannelId) document.getElementById('apiChannelInput').value = _userChannelId;
-            if (_userChannelId) loadKeysList();
-            // Show Find Live button if already connected
-            var flBtn = document.getElementById('apiFindLiveBtn');
-            if (flBtn) flBtn.style.display = (_apiConnected && _activeApiKey) ? 'inline-block' : 'none';
+            var savedLiveId = localStorage.getItem('pd_live_id') || '';
+            if (savedLiveId) document.getElementById('apiLiveIdInput').value = savedLiveId;
+            try {
+                var savedStatsKeys = JSON.parse(localStorage.getItem('pd_stats_keys') || '[]');
+                if (savedStatsKeys.length > 0) document.getElementById('statsKeyInput').value = savedStatsKeys.join(', ');
+            } catch(e) {}
         }
 
         function hideApiSetup() {
@@ -7525,7 +7417,6 @@
             _apiSetupShown = false;
         }
 
-        // ── Discrete banner for mid-game API issues (no sensitive data shown) ──
         function showApiBanner(msg) {
             var existing = document.getElementById('apiBanner');
             if (existing) existing.remove();
@@ -7534,10 +7425,10 @@
             banner.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:99998;background:rgba(0,0,0,0.85);border:1px solid #ff4444;border-radius:12px;padding:16px 24px;color:#fff;font-family:Arial,sans-serif;text-align:center;max-width:360px;width:90%;box-shadow:0 0 30px rgba(255,0,0,0.2);';
             banner.innerHTML =
                 '<div style="font-size:24px;margin-bottom:8px;">⚠️</div>' +
-                '<div style="font-size:14px;margin-bottom:12px;color:#ffaa00;">API connection lost</div>' +
-                '<div style="font-size:12px;color:#aaa;margin-bottom:14px;">Open the setup page to add a new API key. The game continues offline.</div>' +
+                '<div style="font-size:14px;margin-bottom:12px;color:#ffaa00;">Connection lost</div>' +
+                '<div style="font-size:12px;color:#aaa;margin-bottom:14px;">The server connection was lost. The game continues offline.</div>' +
                 '<div style="display:flex;gap:8px;justify-content:center;">' +
-                '<button onclick="openApiPopup()" style="padding:8px 16px;border:none;border-radius:8px;background:#00ff88;color:#000;font-weight:bold;font-size:13px;cursor:pointer;">Open API Setup</button>' +
+                '<button onclick="wsReconnect()" style="padding:8px 16px;border:none;border-radius:8px;background:#00ff88;color:#000;font-weight:bold;font-size:13px;cursor:pointer;">Reconnect</button>' +
                 '<button onclick="dismissApiBanner()" style="padding:8px 16px;border:1px solid #555;border-radius:8px;background:transparent;color:#888;font-size:13px;cursor:pointer;">Dismiss</button>' +
                 '</div>';
             document.body.appendChild(banner);
@@ -7548,436 +7439,480 @@
             if (b) b.remove();
         }
 
-        function openApiPopup() {
-            dismissApiBanner();
-            // Re-show the inline API setup form
-            _gameStarted = false;
-            showApiSetup('Add a new API key to reconnect.');
+        function updateStatusUI(connected) {
+            var dotApi = document.getElementById('statusDotApi');
+            var txtApi = document.getElementById('statusTextApi');
+            var dotLive = document.getElementById('statusDotLive');
+            var txtLive = document.getElementById('statusTextLive');
+            if (connected) {
+                if (dotApi) dotApi.classList.add('online');
+                if (txtApi) { txtApi.textContent = 'WS: OK'; txtApi.style.color = '#00ff88'; }
+                if (dotLive) { dotLive.classList.remove('warning'); dotLive.classList.add('online'); }
+                if (txtLive) { txtLive.textContent = 'Live: ON'; txtLive.style.color = '#00ff88'; }
+            } else {
+                if (dotApi) dotApi.classList.remove('online');
+                if (txtApi) { txtApi.textContent = 'WS: Off'; txtApi.style.color = '#ffaa00'; }
+                if (dotLive) { dotLive.classList.remove('online'); dotLive.classList.add('warning'); }
+                if (txtLive) { txtLive.textContent = 'Live: Off'; txtLive.style.color = '#888'; }
+            }
         }
 
-        function loadKeysList() {
-            if (!_userChannelId) return;
+        var _statsTestedOk = 0;
+        var _statsTestedTotal = 0;
+
+        function updateStatsUI(data) {
+            var dot = document.getElementById('statusDotStats');
+            var txt = document.getElementById('statusTextStats');
+            if (!dot || !txt) return;
+
+            // If server polling is active, use server data
+            if (data.active && data.total > 0) {
+                _statsTestedOk = 0; _statsTestedTotal = 0; // clear local test state
+                if (data.ok === 0) {
+                    dot.classList.remove('online'); dot.classList.add('warning');
+                    txt.textContent = 'API: 0/' + data.total; txt.style.color = '#ff4444';
+                } else if (data.ok < data.total) {
+                    dot.classList.remove('warning'); dot.classList.add('online');
+                    txt.textContent = 'API: ' + data.ok + '/' + data.total; txt.style.color = '#ffaa00';
+                } else {
+                    dot.classList.remove('warning'); dot.classList.add('online');
+                    txt.textContent = data.ok > 1 ? 'API: ' + data.ok + ' keys' : 'API: OK'; txt.style.color = '#00ff88';
+                }
+                return;
+            }
+
+            // If we have local test results, keep showing them
+            if (_statsTestedTotal > 0) return;
+
+            // No data at all
+            dot.classList.remove('online', 'warning');
+            txt.textContent = 'API: Off'; txt.style.color = '#888';
+        }
+
+        function processWsChat(data) {
+            var cUser = (data.userName || '').replace(/^@@+/, '@');
+            if (cUser && cUser[0] !== '@') cUser = '@' + cUser;
+            var cAvatarUrl = data.avatarUrl || '';
+            var cText = data.message || '';
+            var isOwner = data.isOwner || (ownerName && cUser === ownerName);
+            lastActivity[cUser] = Date.now();
+
+            // Always cache avatars (even from history)
+            if (cAvatarUrl && !avatarCache[cAvatarUrl]) loadAvatar(cAvatarUrl);
+
+            // Always detect owner (even from history)
+            if (isOwner) {
+                ownerName = cUser;
+                pick.userName = ownerName;
+                if (cAvatarUrl) pick.userAvatarUrl = cAvatarUrl;
+                if (!persistentScores[ownerName]) persistentScores[ownerName] = { score: 0, avatar: cAvatarUrl || '', color: '#ffdd44' };
+                else if (cAvatarUrl) persistentScores[ownerName].avatar = cAvatarUrl;
+                var cfg = JSON.parse(localStorage.getItem('pd_config') || '{}');
+                cfg.owner_name = ownerName;
+                localStorage.setItem('pd_config', JSON.stringify(cfg));
+            }
+
+            // Cache avatar in persistentScores
+            if (cAvatarUrl) {
+                if (!persistentScores[cUser]) persistentScores[cUser] = { score: 0, avatar: cAvatarUrl, color: '' };
+                else if (!persistentScores[cUser].avatar) persistentScores[cUser].avatar = cAvatarUrl;
+            }
+
+            // History messages: only detect owner + cache avatars, don't execute commands
+            if (data.isHistory) return;
+
+            var existingPick = userPicks.find(function(up) { return up.userName === cUser; });
+            if (existingPick && cAvatarUrl && !existingPick.userAvatarUrl) {
+                existingPick.userAvatarUrl = cAvatarUrl;
+            }
+
+            // Ignore bots — never spawn them as players
+            var isBot = /botrix|nightbot|streamelements|streamlabs|moobot/i.test(cUser);
+
+            if (!isBot && !isOwner && persistentScores[cUser] && !userPicks.some(function(up) { return up.userName === cUser; })) {
+                spawnUserPickaxe(cUser, cAvatarUrl);
+            }
+
+            var msg = cText.toLowerCase();
+            if (!isBot && !isOwner && (msg.includes("join") || msg.includes("play"))) {
+                spawnUserPickaxe(cUser, cAvatarUrl);
+            }
+
+            var userPick = isOwner ? pick : userPicks.find(function(up) { return up.userName === cUser; });
+            var tx = userPick ? userPick.x : undefined;
+            var ty = userPick ? userPick.y : undefined;
+
+            // ── Parse up to 4 chained commands from a single message ──
+            var cmdPatterns = [
+                { re: /\bmega\b|\bpower\s*tnt\b|\bpowertnt\b/gi, fn: function() { activateMegaTNT(tx, ty, cUser, cAvatarUrl); }, id: 'mega' },
+                { re: /\btnt\b/gi, fn: function() { activateTNT(tx, ty, cUser, cAvatarUrl); }, id: 'tnt' },
+                { re: /\bthor\b/gi, fn: function() { activateThor(tx, ty, cUser); }, id: 'thor' },
+                { re: /\bnuke\b/gi, fn: function() { activateNuke(tx, ty, cUser); }, id: 'nuke' },
+                { re: /\bclone\b/gi, fn: function() { spawnClone(cUser, cAvatarUrl); }, id: 'clone' },
+                { re: /\bblackhole\b|\bblack\s*hole\b|\bbh\b/gi, fn: function() { activateBlackHole(tx, ty, cUser); }, id: 'bh' },
+                { re: /\bping\s*pong\b|\bpingpong\b|\bpp\b/gi, fn: function() {
+                    if (!isBot && !isOwner && !userPick) {
+                        spawnUserPickaxe(cUser, cAvatarUrl);
+                        userPick = userPicks.find(function(up) { return up.userName === cUser; });
+                    }
+                    if (userPick) activateStorm(userPick);
+                }, id: 'pp' },
+                { re: /\b(sr|sl|sd|su)\b|\bspin\s+(right|left|down|up)\b/gi, fn: function() {
+                    // Handled separately below for chained spins with delay
+                }, id: 'spin', skipLoop: true },
+                { re: /\bbig\b/gi, fn: function() { if (isOwner) activateBig(cUser); }, id: 'big' }
+            ];
+
+            var cmdCount = 0;
+            var MAX_CMDS = 4;
+            var megaCount = 0;
+            for (var ci = 0; ci < cmdPatterns.length && cmdCount < MAX_CMDS; ci++) {
+                if (cmdPatterns[ci].skipLoop) continue;
+                var matches = msg.match(cmdPatterns[ci].re);
+                if (!matches) continue;
+                var count = matches.length;
+                if (cmdPatterns[ci].id === 'tnt' && megaCount > 0) {
+                    count = Math.max(0, count - megaCount);
+                }
+                if (cmdPatterns[ci].id === 'mega') megaCount = count;
+                for (var cj = 0; cj < count && cmdCount < MAX_CMDS; cj++) {
+                    cmdPatterns[ci].fn();
+                    cmdCount++;
+                }
+            }
+
+            // ── Spin commands: extract each direction and queue with delay ──
+            var spinDirs = [];
+            var sMap = { sr: 'right', sl: 'left', sd: 'down', su: 'up' };
+            var spinShorts = msg.match(/\b(sr|sl|sd|su)\b/gi);
+            if (spinShorts) {
+                for (var si = 0; si < spinShorts.length && spinDirs.length < MAX_CMDS; si++) {
+                    spinDirs.push(sMap[spinShorts[si].toLowerCase()]);
+                }
+            }
+            var spinFulls = msg.match(/spin\s+(right|left|down|up)/gi);
+            if (spinFulls) {
+                for (var sf = 0; sf < spinFulls.length && spinDirs.length < MAX_CMDS; sf++) {
+                    var m = spinFulls[sf].match(/spin\s+(right|left|down|up)/i);
+                    if (m) spinDirs.push(m[1].toLowerCase());
+                }
+            }
+            if (spinDirs.length > 0) {
+                for (var sd = 0; sd < spinDirs.length; sd++) {
+                    (function(dir, delay) {
+                        setTimeout(function() { activateSpin(cUser, dir); }, delay);
+                    })(spinDirs[sd], sd * 300);
+                }
+            }
+
+            if (cmdCount > 1) console.log('[chat] ' + cUser + ' chained ' + cmdCount + ' commands: ' + msg);
+
+            if (msg.includes("bot20ok")) {
+                for (var bi = 0; bi < 20; bi++) {
+                    var botName = '@Bot_' + (1 + Math.floor(Math.random() * 9999));
+                    spawnUserPickaxe(botName, '');
+                }
+                spawnText(canvas.width / 2, camY + 100, '20 BOTS ADDED!', '#ffff00');
+            }
+
+            // Botrix events
+            var rawMsg = cText;
+            var botrixName = null;
+            var botrixAvatar = null;
+            var followMatch = rawMsg.match(/thank you for the follow @?(\S+)/i);
+            if (followMatch) {
+                botrixName = followMatch[1];
+                var fp = userPicks.find(function(u) { return u.userName === botrixName; });
+                botrixAvatar = fp ? fp.userAvatarUrl : null;
+                triggerBotrixEvent('follow', botrixName, botrixAvatar);
+            }
+            var scMatch = rawMsg.match(/thanks @?(\S+) for the superchat/i);
+            if (scMatch) {
+                botrixName = scMatch[1];
+                var sp2 = userPicks.find(function(u) { return u.userName === botrixName; });
+                botrixAvatar = sp2 ? sp2.userAvatarUrl : null;
+                triggerBotrixEvent('superchat', botrixName, botrixAvatar);
+            }
+            var memberMatch = rawMsg.match(/thank you for the member @?(\S+)/i);
+            if (memberMatch) {
+                botrixName = memberMatch[1];
+                var mp = userPicks.find(function(u) { return u.userName === botrixName; });
+                botrixAvatar = mp ? mp.userAvatarUrl : null;
+                triggerBotrixEvent('member', botrixName, botrixAvatar);
+            }
+            var giftMatch = rawMsg.match(/thank you for gifting a member @?(\S+)/i);
+            if (giftMatch) {
+                botrixName = giftMatch[1];
+                var gp = userPicks.find(function(u) { return u.userName === botrixName; });
+                botrixAvatar = gp ? gp.userAvatarUrl : null;
+                triggerBotrixEvent('gift', botrixName, botrixAvatar);
+            }
+        }
+
+        function connectWebSocket() {
+            if (_ws && (_ws.readyState === 0 || _ws.readyState === 1)) return;
             try {
-                var container = document.getElementById('apiKeysList');
-                var inner = document.getElementById('apiKeysListInner');
-                if (!_keyPool || _keyPool.length === 0) { container.style.display = 'none'; return; }
-                container.style.display = 'block';
-                var html = '<div style="font-size:11px;color:#666;margin-bottom:4px;">Pool: ' + getOkKeyCount() + '/' + _keyPool.length + ' active | Round-robin per request</div>';
-                _keyPool.forEach(function (k, idx) {
-                    var statusColor = k.status === 'ok' ? '#00ff88' : '#ff4444';
-                    var statusIcon = k.status === 'ok' ? '✓' : '✗';
-                    var masked = k.key ? k.key.substring(0, 8) + '...' + k.key.slice(-4) : '???';
-                    var isActive = k.key === _activeApiKey;
-                    html += '<div style="display:flex;align-items:center;gap:6px;padding:4px 0;font-size:12px;border-bottom:1px solid #222;' + (isActive ? 'background:#111;' : '') + '">';
-                    html += '<span style="color:' + statusColor + ';">' + statusIcon + '</span>';
-                    html += '<span style="flex:1;color:' + (isActive ? '#fff' : '#ccc') + ';font-family:monospace;">' + masked + (isActive ? ' ◄' : '') + '</span>';
-                    html += '<span style="color:#666;font-size:10px;">' + (k.lastError || k.status) + '</span>';
-                    html += '</div>';
-                });
-                inner.innerHTML = html;
-            } catch (e) { }
+                _ws = new WebSocket(getWsUrl());
+            } catch(e) {
+                console.error('[ws] Failed to create WebSocket:', e);
+                updateStatusUI(false);
+                return;
+            }
+
+            _ws.onopen = function() {
+                console.log('[ws] Connected to server');
+                dismissApiBanner();
+                // Send connect command with saved channel/live info
+                var channelId = _userChannelId;
+                var liveId = localStorage.getItem('pd_live_id') || '';
+                if (channelId || liveId) {
+                    _ws.send(JSON.stringify({ type: 'connect', channelId: channelId, liveId: liveId }));
+                }
+            };
+
+            _ws.onmessage = function(event) {
+                try {
+                    var data = JSON.parse(event.data);
+                    if (data.type === 'status') {
+                        _apiConnected = data.connected;
+                        updateStatusUI(data.connected);
+                        if (data.connected && _userClickedConnect) {
+                            _gameStarted = true;
+                            hideApiSetup();
+                            _sendStatsStart(data.liveId);
+                        }
+                    } else if (data.type === 'chat') {
+                        processWsChat(data);
+                    } else if (data.type === 'likes') {
+                        onNewLikes(data.count);
+                    } else if (data.type === 'stats_status') {
+                        updateStatsUI(data);
+                    } else if (data.type === 'error') {
+                        console.warn('[ws] Server error:', data.message);
+                        var errEl = document.getElementById('apiSetupError');
+                        if (errEl && _apiSetupShown) {
+                            errEl.style.display = 'block';
+                            errEl.textContent = data.message;
+                        }
+                    }
+                } catch(e) {
+                    console.error('[ws] Parse error:', e);
+                }
+            };
+
+            _ws.onclose = function() {
+                console.log('[ws] Disconnected');
+                _apiConnected = false;
+                updateStatusUI(false);
+                // Auto-reconnect after 5s
+                if (_wsReconnectTimer) clearTimeout(_wsReconnectTimer);
+                _wsReconnectTimer = setTimeout(function() {
+                    if (!_apiConnected) connectWebSocket();
+                }, 5000);
+            };
+
+            _ws.onerror = function(err) {
+                console.error('[ws] Error:', err);
+            };
         }
 
-        function apiSetupTest() {
-            var btn = document.getElementById('apiTestBtn');
-            var errEl = document.getElementById('apiSetupError');
-            var sucEl = document.getElementById('apiSetupSuccess');
-            var channelId = document.getElementById('apiChannelInput').value.trim();
-            var rawKeys = document.getElementById('apiKeyInput').value.trim();
-            errEl.style.display = 'none';
-            sucEl.style.display = 'none';
+        function _sendStatsStart(videoId) {
+            try {
+                var keys = JSON.parse(localStorage.getItem('pd_stats_keys') || '[]');
+                if (keys.length === 0 || !_ws || _ws.readyState !== 1) return;
+                var vid = videoId || localStorage.getItem('pd_live_id') || '';
+                if (!vid) return;
+                _ws.send(JSON.stringify({ type: 'start_stats', videoId: vid, apiKeys: keys, interval: 2000 }));
+                console.log('[stats] Sent start_stats with ' + keys.length + ' key(s) for video ' + vid);
+            } catch(e) {}
+        }
 
-            if (!channelId) { errEl.style.display = 'block'; errEl.textContent = 'Channel ID is required.'; return; }
-            if (!rawKeys) { errEl.style.display = 'block'; errEl.textContent = 'At least one API Key is required.'; return; }
+        function onNewLikes(count) {
+            var ox = pick ? pick.x : canvas.width / 2;
+            var oy = pick ? pick.y : camY + canvas.height / 2;
+            var who = pick ? pick.userName : ownerName || '@Player';
+            for (var i = 0; i < Math.min(count * 10, 50); i++) {
+                setTimeout(function() {
+                    activateTNT(ox + (Math.random()-0.5)*200, oy + (Math.random()-0.5)*200, who);
+                }, i * 80);
+            }
+            _showBigPopup('👍', '#4488ff', count > 1 ? count + ' LIKES!' : 'NEW LIKE!');
+        }
 
-            // Parse comma-separated keys
-            var inputKeys = rawKeys.split(',').map(function (k) { return k.trim(); }).filter(function (k) { return k.length > 10; });
-            if (inputKeys.length === 0) { errEl.style.display = 'block'; errEl.textContent = 'No valid API keys found.'; return; }
+        function testStatsKeys() {
+            var btn = document.getElementById('statsTestBtn');
+            var result = document.getElementById('statsTestResult');
+            var raw = document.getElementById('statsKeyInput').value.trim();
+            if (!raw) { result.textContent = 'Enter at least one API key.'; result.style.color = '#ff8888'; return; }
 
-            btn.textContent = 'Testing ' + inputKeys.length + ' key(s)...';
+            var keys = raw.split(',').map(function(k) { return k.trim(); }).filter(function(k) { return k.length > 10; });
+            if (keys.length === 0) { result.textContent = 'No valid keys found.'; result.style.color = '#ff8888'; return; }
+
+            btn.textContent = 'Testing ' + keys.length + '...';
             btn.disabled = true;
-
-            _userChannelId = channelId;
-            localStorage.setItem('pd_channel_id', channelId);
-            loadKeyPool(); // load existing pool
+            result.textContent = 'Testing...';
+            result.style.color = '#ffaa00';
 
             var tested = 0;
             var okCount = 0;
-            var firstOkData = null;
-            var errors = [];
+            var failedKeys = [];
 
-            inputKeys.forEach(function (apiKey) {
-                var testUrl = 'https://www.googleapis.com/youtube/v3/channels?part=snippet&id=' + encodeURIComponent(channelId) + '&key=' + encodeURIComponent(apiKey);
+            keys.forEach(function(apiKey) {
+                var testUrl = 'https://www.googleapis.com/youtube/v3/videos?part=statistics&id=dQw4w9WgXcQ&key=' + encodeURIComponent(apiKey);
                 fetch(testUrl)
-                    .then(function (r) { return r.json().catch(function () { return { error: { code: 0, message: 'parse error' } }; }); })
-                    .then(function (data) {
+                    .then(function(r) { return r.json().catch(function() { return { error: { message: 'parse error' } }; }); })
+                    .then(function(data) {
                         tested++;
                         if (data.error) {
-                            errors.push(apiKey.substring(0, 8) + '...: ' + (data.error.message || 'error'));
-                            // Add to pool as failed
-                            var exists = _keyPool.some(function (k) { return k.key === apiKey; });
-                            if (!exists) _keyPool.push({ key: apiKey, status: 'failed', lastError: data.error.message || 'test failed', failedAt: Date.now() });
-                            else _keyPool.forEach(function (k) { if (k.key === apiKey) { k.status = 'failed'; k.lastError = data.error.message || 'test failed'; k.failedAt = Date.now(); } });
+                            failedKeys.push(apiKey.substring(0, 8) + '...: ' + (data.error.message || 'error').substring(0, 40));
                         } else {
                             okCount++;
-                            if (!firstOkData) firstOkData = data;
-                            // Add to pool as ok
-                            var exists2 = _keyPool.some(function (k) { return k.key === apiKey; });
-                            if (!exists2) _keyPool.push({ key: apiKey, status: 'ok', lastError: '', failedAt: 0 });
-                            else _keyPool.forEach(function (k) { if (k.key === apiKey) { k.status = 'ok'; k.lastError = ''; k.failedAt = 0; } });
                         }
-                        if (tested >= inputKeys.length) finishTest();
+                        if (tested >= keys.length) finishTest();
                     })
-                    .catch(function (e) {
+                    .catch(function(e) {
                         tested++;
-                        errors.push(apiKey.substring(0, 8) + '...: ' + e.message);
-                        if (tested >= inputKeys.length) finishTest();
+                        failedKeys.push(apiKey.substring(0, 8) + '...: ' + e.message);
+                        if (tested >= keys.length) finishTest();
                     });
             });
 
             function finishTest() {
-                btn.textContent = 'Test & Connect';
+                btn.textContent = '🔑 Test Keys';
                 btn.disabled = false;
-                saveKeyPool();
+
+                _statsTestedOk = okCount;
+                _statsTestedTotal = keys.length;
+
+                // Update stats dot in status bar
+                var dot = document.getElementById('statusDotStats');
+                var txt = document.getElementById('statusTextStats');
 
                 if (okCount === 0) {
-                    errEl.style.display = 'block';
-                    errEl.textContent = 'No valid keys found. Errors: ' + errors.join(' | ');
-                    loadKeysList();
-                    return;
+                    result.innerHTML = '✗ 0/' + keys.length + ' keys valid. ' + failedKeys.join(' | ');
+                    result.style.color = '#ff4444';
+                    if (dot) { dot.classList.remove('online'); dot.classList.add('warning'); }
+                    if (txt) { txt.textContent = 'API: 0/' + keys.length; txt.style.color = '#ff4444'; }
+                } else if (okCount < keys.length) {
+                    result.innerHTML = '⚠ ' + okCount + '/' + keys.length + ' keys OK. Failed: ' + failedKeys.join(' | ');
+                    result.style.color = '#ffaa00';
+                    if (dot) { dot.classList.remove('warning'); dot.classList.add('online'); }
+                    if (txt) { txt.textContent = 'API: ' + okCount + '/' + keys.length; txt.style.color = '#ffaa00'; }
+                } else {
+                    result.innerHTML = '✓ ' + okCount + '/' + keys.length + ' keys OK!';
+                    result.style.color = '#00ff88';
+                    if (dot) { dot.classList.remove('warning'); dot.classList.add('online'); }
+                    if (txt) { txt.textContent = okCount > 1 ? 'API: ' + okCount + ' keys' : 'API: OK'; txt.style.color = '#00ff88'; }
                 }
-
-                // Auto-detect owner from first OK response
-                if (firstOkData && firstOkData.items && firstOkData.items[0]) {
-                    var snippet = firstOkData.items[0].snippet;
-                    var channelTitle = snippet.title || '';
-                    var detectedOwner = snippet.customUrl || ('@' + snippet.title);
-                    if (detectedOwner && detectedOwner[0] !== '@') detectedOwner = '@' + detectedOwner;
-                    ownerName = detectedOwner;
-                    pick.userName = ownerName;
-                    var cfg = JSON.parse(localStorage.getItem('pd_config') || '{}');
-                    cfg.owner_name = ownerName;
-                    cfg.channel_title = channelTitle;
-                    localStorage.setItem('pd_config', JSON.stringify(cfg));
-                    if (!persistentScores[ownerName]) persistentScores[ownerName] = { score: 0, avatar: '', color: '#ffdd44' };
-                    var chAvatar = snippet.thumbnails && snippet.thumbnails.default ? snippet.thumbnails.default.url : '';
-                    if (chAvatar) {
-                        pick.userAvatarUrl = chAvatar;
-                        persistentScores[ownerName].avatar = chAvatar;
-                        if (!avatarCache[chAvatar]) {
-                            loadAvatar(chAvatar);
-                        }
-                    }
-                }
-
-                _keyPoolIndex = 0;
-                getCurrentApiKey();
-                _liveChatId = '';
-                localStorage.removeItem('pd_live_chat_' + channelId);
-                _apiConnected = true;
-                _gameStarted = true;
-
-                sucEl.style.display = 'block';
-                sucEl.textContent = okCount + '/' + inputKeys.length + ' keys OK! Pool active with round-robin.' + (errors.length > 0 ? ' (' + errors.length + ' failed)' : '');
-
-                var flBtn = document.getElementById('apiFindLiveBtn');
-                if (flBtn) flBtn.style.display = 'inline-block';
-                loadKeysList();
-                if (errors.length > 0) startKeyRetest();
-
-                setTimeout(function () {
-                    hideApiSetup();
-                    var liveInput = document.getElementById('apiLiveIdInput').value.trim();
-                    if (liveInput) {
-                        apiConnectLiveById();
-                    } else {
-                        startApiPolling();
-                    }
-                }, 1500);
             }
+        }
+
+        function wsConnect() {
+            var btn = document.getElementById('apiTestBtn');
+            var errEl = document.getElementById('apiSetupError');
+            var sucEl = document.getElementById('apiSetupSuccess');
+            errEl.style.display = 'none';
+            sucEl.style.display = 'none';
+
+            var channelId = document.getElementById('apiChannelInput').value.trim();
+            var liveInput = document.getElementById('apiLiveIdInput').value.trim();
+            var statsKeysRaw = document.getElementById('statsKeyInput').value.trim();
+
+            if (!channelId && !liveInput) {
+                errEl.style.display = 'block';
+                errEl.textContent = 'Enter a Channel ID or Live Video URL/ID.';
+                return;
+            }
+
+            // Extract video ID from URL
+            var liveId = '';
+            if (liveInput) {
+                var urlMatch = liveInput.match(/[?&]v=([a-zA-Z0-9_-]{11})/) || liveInput.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/) || liveInput.match(/\/live\/([a-zA-Z0-9_-]{11})/) || liveInput.match(/^([a-zA-Z0-9_-]{11})$/);
+                liveId = urlMatch ? urlMatch[1] : liveInput.replace(/[^a-zA-Z0-9_-]/g, '');
+            }
+
+            // Save config
+            _userChannelId = channelId;
+            localStorage.setItem('pd_channel_id', channelId);
+            if (liveId) localStorage.setItem('pd_live_id', liveId);
+            // Save stats API keys
+            var statsKeys = statsKeysRaw ? statsKeysRaw.split(',').map(function(k) { return k.trim(); }).filter(function(k) { return k.length > 10; }) : [];
+            if (statsKeys.length > 0) localStorage.setItem('pd_stats_keys', JSON.stringify(statsKeys));
+
+            btn.textContent = 'Connecting...';
+            btn.disabled = true;
+            _userClickedConnect = true;
+
+            // Connect WebSocket and send connect command
+            if (_ws && _ws.readyState === 1) {
+                _ws.send(JSON.stringify({ type: 'connect', channelId: channelId, liveId: liveId }));
+            } else {
+                connectWebSocket();
+                // Wait for WS to open, then send
+                var waitInterval = setInterval(function() {
+                    if (_ws && _ws.readyState === 1) {
+                        clearInterval(waitInterval);
+                        _ws.send(JSON.stringify({ type: 'connect', channelId: channelId, liveId: liveId }));
+                    }
+                }, 200);
+                setTimeout(function() { clearInterval(waitInterval); }, 10000);
+            }
+
+            // Timeout for UI feedback
+            setTimeout(function() {
+                btn.textContent = '▶ Connect';
+                btn.disabled = false;
+                if (!_apiConnected) {
+                    sucEl.style.display = 'block';
+                    sucEl.textContent = 'Request sent. Waiting for live stream...';
+                }
+            }, 3000);
+        }
+
+        function wsReconnect() {
+            dismissApiBanner();
+            connectWebSocket();
         }
 
         function apiSetupSkip() {
             hideApiSetup();
             _apiConnected = false;
             _gameStarted = true;
-            var dotApi = document.getElementById('statusDotApi');
-            var txtApi = document.getElementById('statusTextApi');
-            var dotLive = document.getElementById('statusDotLive');
-            var txtLive = document.getElementById('statusTextLive');
-            if (dotApi) dotApi.classList.remove('online');
-            if (txtApi) { txtApi.textContent = 'API: Off'; txtApi.style.color = '#ffaa00'; }
-            if (dotLive) dotLive.classList.remove('online');
-            if (txtLive) { txtLive.textContent = 'Live: Off'; txtLive.style.color = '#888'; }
+            updateStatusUI(false);
         }
 
         function apiResetAll() {
-            if (!confirm('Clear all saved API keys, channel data and live chat? You will need to reconfigure.')) return;
-            if (_apiCheckInterval) { clearInterval(_apiCheckInterval); _apiCheckInterval = null; }
-            if (_keyRetestTimer) { clearInterval(_keyRetestTimer); _keyRetestTimer = null; }
-            if (_statsTimer) { clearInterval(_statsTimer); _statsTimer = null; }
-            _lastLikeCount = -1; _lastSubCount = -1; _liveVideoId = '';
-            var chId = _userChannelId || localStorage.getItem('pd_channel_id') || '';
-            if (chId) {
-                localStorage.removeItem('pd_api_keys_' + chId);
-                localStorage.removeItem('pd_active_key_' + chId);
-                localStorage.removeItem('pd_live_chat_' + chId);
+            if (!confirm('Clear all saved data? You will need to reconfigure.')) return;
+            if (_ws && _ws.readyState === 1) {
+                _ws.send(JSON.stringify({ type: 'disconnect' }));
             }
             localStorage.removeItem('pd_channel_id');
+            localStorage.removeItem('pd_live_id');
             localStorage.removeItem('pd_config');
+            localStorage.removeItem('pd_stats_keys');
             _userChannelId = '';
-            _activeApiKey = '';
-            _liveChatId = '';
             _apiConnected = false;
-            _keyPool = [];
-            _keyPoolIndex = 0;
-            _nextPageToken = '';
-            _firstFetchDone = false;
             ownerName = '';
             pick.userName = '';
             pick.userAvatarUrl = '';
             document.getElementById('apiChannelInput').value = '';
-            document.getElementById('apiKeyInput').value = '';
             document.getElementById('apiLiveIdInput').value = '';
+            document.getElementById('statsKeyInput').value = '';
             var sucEl = document.getElementById('apiSetupSuccess');
             var errEl = document.getElementById('apiSetupError');
             if (sucEl) sucEl.style.display = 'none';
-            if (errEl) { errEl.style.display = 'none'; }
-            var flBtn = document.getElementById('apiFindLiveBtn');
-            if (flBtn) flBtn.style.display = 'none';
-            var kl = document.getElementById('apiKeysList');
-            if (kl) kl.style.display = 'none';
-            showApiSetup('Data cleared. Enter your API key(s) and Channel ID.');
+            if (errEl) errEl.style.display = 'none';
+            showApiSetup('Data cleared. Enter your Channel ID to reconnect.');
         }
 
-        function apiSetupFindLive() {
-            var btn = document.getElementById('apiFindLiveBtn');
-            var sucEl = document.getElementById('apiSetupSuccess');
-            var errEl = document.getElementById('apiSetupError');
-            if (!_apiConnected || !_activeApiKey || !_userChannelId) {
-                if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'Connect an API key first.'; }
-                return;
-            }
-            btn.textContent = '🔍 Searching...';
-            btn.disabled = true;
-            resolveLive(function (found) {
-                btn.textContent = '🔍 Find Live';
-                btn.disabled = false;
-                if (found) {
-                    if (sucEl) { sucEl.style.display = 'block'; sucEl.textContent = 'Live found! Chat connected.'; }
-                    if (errEl) errEl.style.display = 'none';
-                } else {
-                    if (errEl) { errEl.style.display = 'block'; errEl.textContent = 'No active live found on this channel.'; }
-                    if (sucEl) sucEl.style.display = 'none';
-                }
-            });
-        }
+        // ── Initialize ──
+        // Initialize — owner will be detected from youtube-chat isOwner flag
+        var _savedCfg = JSON.parse(localStorage.getItem('pd_config') || '{}');
 
-        function apiConnectLiveById() {
-            var input = document.getElementById('apiLiveIdInput').value.trim();
-            var btn = document.getElementById('apiLiveIdBtn');
-            var sucEl = document.getElementById('apiSetupSuccess');
-            var errEl = document.getElementById('apiSetupError');
-            errEl.style.display = 'none'; sucEl.style.display = 'none';
-            var apiKey = getCurrentApiKey();
-            if (!apiKey) { errEl.style.display = 'block'; errEl.textContent = 'Connect an API key first (Test & Connect).'; return; }
-            if (!input) { errEl.style.display = 'block'; errEl.textContent = 'Enter a live video URL or ID.'; return; }
-            // Extract video ID from various URL formats
-            var videoId = input;
-            var urlMatch = input.match(/[?&]v=([a-zA-Z0-9_-]{11})/) || input.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/) || input.match(/\/live\/([a-zA-Z0-9_-]{11})/) || input.match(/^([a-zA-Z0-9_-]{11})$/);
-            if (urlMatch) videoId = urlMatch[1];
-            videoId = videoId.replace(/[^a-zA-Z0-9_-]/g, '');
-            console.log('[ConnectLive] Input:', input, '→ videoId:', videoId, 'apiKey:', apiKey ? 'set' : 'EMPTY', 'channelId:', _userChannelId);
-            if (!videoId || videoId.length < 8) { errEl.style.display = 'block'; errEl.textContent = 'Invalid video ID or URL.'; return; }
-            btn.textContent = 'Connecting...'; btn.disabled = true;
-            fetch('https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails&id=' + encodeURIComponent(videoId) + '&key=' + encodeURIComponent(apiKey))
-                .then(function (r) { return r.json().catch(function () { throw new Error('Network error: ' + r.status); }); })
-                .then(function (data) {
-                    console.log('[ConnectLive] API response:', JSON.stringify(data).substring(0, 300));
-                    btn.textContent = '▶ Connect Live'; btn.disabled = false;
-                    if (data.error) { errEl.style.display = 'block'; errEl.textContent = data.error.message || 'API error.'; return; }
-                    if (data.items && data.items[0] && data.items[0].liveStreamingDetails && data.items[0].liveStreamingDetails.activeLiveChatId) {
-                        _liveChatId = data.items[0].liveStreamingDetails.activeLiveChatId;
-                        _liveVideoId = videoId;
-                        localStorage.setItem('pd_live_chat_' + _userChannelId, _liveChatId);
-                        var dotLive = document.getElementById('statusDotLive');
-                        var txtLive = document.getElementById('statusTextLive');
-                        if (dotLive) { dotLive.classList.remove('warning'); dotLive.classList.add('online'); }
-                        if (txtLive) { txtLive.textContent = 'Live: ON'; txtLive.style.color = '#00ff88'; }
-                        sucEl.style.display = 'block'; sucEl.textContent = 'Live connected! Chat ID obtained from video ' + videoId;
-                        _gameStarted = true;
-                        setTimeout(function () { hideApiSetup(); startApiPolling(); }, 1200);
-                    } else {
-                        var details = (data.items && data.items[0]) ? JSON.stringify(data.items[0].liveStreamingDetails || {}) : 'no items';
-                        console.log('[ConnectLive] No activeLiveChatId. Details:', details);
-                        errEl.style.display = 'block'; errEl.textContent = 'This video has no active live chat. Make sure the stream is live NOW (not scheduled/ended).';
-                    }
-                })
-                .catch(function (e) {
-                    btn.textContent = '▶ Connect Live'; btn.disabled = false;
-                    errEl.style.display = 'block'; errEl.textContent = 'Error: ' + e.message;
-                });
-        }
-
-        function tryLoadActiveKey(callback) {
-            if (!_userChannelId) { callback(false); return; }
-            try {
-                loadKeyPool();
-                var savedChat = localStorage.getItem('pd_live_chat_' + _userChannelId);
-                _liveChatId = savedChat || '';
-
-                if (getOkKeyCount() > 0) {
-                    getCurrentApiKey();
-                    _apiConnected = true;
-                    // Auto-detect owner from channel on reconnect using first OK key
-                    fetch('https://www.googleapis.com/youtube/v3/channels?part=snippet&id=' + encodeURIComponent(_userChannelId) + '&key=' + encodeURIComponent(_activeApiKey))
-                        .then(function (r) { return r.json().catch(function () { throw new Error('Network error: ' + r.status); }); })
-                        .then(function (data) {
-                            if (data.items && data.items[0]) {
-                                var snippet = data.items[0].snippet;
-                                var detectedOwner = snippet.customUrl || ('@' + snippet.title);
-                                if (detectedOwner && detectedOwner[0] !== '@') detectedOwner = '@' + detectedOwner;
-                                ownerName = detectedOwner;
-                                pick.userName = ownerName;
-                                var chAvatar = snippet.thumbnails && snippet.thumbnails.default ? snippet.thumbnails.default.url : '';
-                                if (chAvatar) {
-                                    pick.userAvatarUrl = chAvatar;
-                                    if (typeof loadAvatar === 'function') loadAvatar(chAvatar);
-                                    if (!persistentScores[ownerName]) persistentScores[ownerName] = { score: 0, avatar: chAvatar, color: '#ffdd44' };
-                                    else persistentScores[ownerName].avatar = chAvatar;
-                                }
-                                var cfg = JSON.parse(localStorage.getItem('pd_config') || '{}');
-                                cfg.owner_name = ownerName;
-                                cfg.channel_title = snippet.title;
-                                localStorage.setItem('pd_config', JSON.stringify(cfg));
-                            }
-                            callback(true);
-                        })
-                        .catch(function () { callback(true); });
-                } else {
-                    callback(false);
-                }
-            } catch (e) { callback(false); }
-        }
-
-        function rotateApiKey(failedKey, errorMsg) {
-            markKeyFailed(failedKey, errorMsg);
-            // If we still have OK keys, restart polling
-            if (getOkKeyCount() > 0) {
-                startApiPolling();
-            }
-        }
-
-        function startApiPolling() {
-            if (_apiCheckInterval) clearInterval(_apiCheckInterval);
-            // Rotate key before each poll cycle
-            if (getOkKeyCount() > 0) {
-                getNextApiKey();
-                _apiConnected = true;
-            }
-            // Auto-resolve liveChatId on first connect if not persisted
-            if (!_liveChatId && _apiConnected) {
-                resolveLive(function () { checkConnection(); });
-            } else {
-                checkConnection();
-            }
-            // Poll every 2s, rotate key each call, errors auto-remove key
-            _apiCheckInterval = setInterval(function () {
-                if (getOkKeyCount() > 0) getNextApiKey();
-                checkConnection();
-            }, 2000);
-            // Start statistics polling for likes/subscribers
-            startStatsPolling();
-        }
-
-        // ── Like & Subscribe Detection ──────────────────────────────────────────
-        function startStatsPolling() {
-            if (_statsTimer) clearInterval(_statsTimer);
-            _statsTimer = setInterval(pollVideoStats, _statsInterval);
-            // First poll after 5s to get baseline
-            setTimeout(pollVideoStats, 5000);
-        }
-
-        function pollVideoStats() {
-            if (!_liveVideoId || !_apiConnected) return;
-            var apiKey = getCurrentApiKey();
-            if (!apiKey) return;
-            // videos.list with statistics costs only 1 unit
-            fetch('https://www.googleapis.com/youtube/v3/videos?part=statistics&id=' + encodeURIComponent(_liveVideoId) + '&key=' + encodeURIComponent(apiKey))
-                .then(function(r) { return r.json(); })
-                .then(function(data) {
-                    if (!data.items || !data.items[0] || !data.items[0].statistics) return;
-                    var stats = data.items[0].statistics;
-                    var likes = parseInt(stats.likeCount) || 0;
-
-                    // First fetch = baseline only
-                    if (_lastLikeCount < 0) {
-                        _lastLikeCount = likes;
-                        return;
-                    }
-
-                    // Detect new likes
-                    if (likes > _lastLikeCount) {
-                        var newLikes = likes - _lastLikeCount;
-                        _lastLikeCount = likes;
-                        onNewLikes(newLikes);
-                    }
-                })
-                .catch(function() {});
-
-            // Check subscriber count via channels.list (1 unit)
-            if (_userChannelId) {
-                fetch('https://www.googleapis.com/youtube/v3/channels?part=statistics&id=' + encodeURIComponent(_userChannelId) + '&key=' + encodeURIComponent(apiKey))
-                    .then(function(r) { return r.json(); })
-                    .then(function(data) {
-                        if (!data.items || !data.items[0] || !data.items[0].statistics) return;
-                        var subs = parseInt(data.items[0].statistics.subscriberCount) || 0;
-                        if (_lastSubCount < 0) {
-                            _lastSubCount = subs;
-                            return;
-                        }
-                        if (subs > _lastSubCount) {
-                            var newSubs = subs - _lastSubCount;
-                            _lastSubCount = subs;
-                            onNewSubscribers(newSubs);
-                        }
-                    })
-                    .catch(function() {});
-            }
-        }
-
-        function onNewLikes(count) {
-            // 10 TNT per like event
-            var ox = pick ? pick.x : canvas.width / 2;
-            var oy = pick ? pick.y : camY + canvas.height / 2;
-            var who = pick ? pick.userName : ownerName || '@Player';
-            for (var i = 0; i < Math.min(count * 10, 50); i++) {
-                setTimeout(function() {
-                    activateTNT(ox + (Math.random()-0.5)*200, oy + (Math.random()-0.5)*200, who);
-                }, i * 80);
-            }
-            // Big popup — like icon
-            _showBigPopup('👍', '#4488ff', count > 1 ? count + ' LIKES!' : 'NEW LIKE!');
-        }
-
-        function onNewSubscribers(count) {
-            // 10 TNT + 5 Mega TNT per subscribe event
-            var ox = pick ? pick.x : canvas.width / 2;
-            var oy = pick ? pick.y : camY + canvas.height / 2;
-            var who = pick ? pick.userName : ownerName || '@Player';
-            for (var i = 0; i < Math.min(count * 10, 50); i++) {
-                setTimeout(function() {
-                    activateTNT(ox + (Math.random()-0.5)*200, oy + (Math.random()-0.5)*200, who);
-                }, i * 80);
-            }
-            for (var j = 0; j < Math.min(count * 5, 25); j++) {
-                setTimeout(function() {
-                    activateMegaTNT(ox + (Math.random()-0.5)*300, oy + (Math.random()-0.5)*300, who);
-                }, 800 + j * 150);
-            }
-            // Big popup — bell icon
-            _showBigPopup('🔔', '#ff4444', count > 1 ? count + ' SUBS!' : 'NEW SUB!');
-        }
+        // Connect WebSocket (for receiving chat if server already has a session)
+        connectWebSocket();
+        // Always show setup overlay so user can review/edit before starting
+        showApiSetup('');
 
         // ── Big Popup (no background, just icon + text) ──
         var _bigPopup = null;
@@ -8016,59 +7951,6 @@
             ctx.restore();
         }
 
-        // ── Initial API setup flow ──
-        // Click on "Live: OFF" to manually search for live
-        document.getElementById('statusTextLive').addEventListener('click', function () {
-            if (_apiConnected && !_liveChatId) {
-                var url = prompt('Live not found automatically.\nPaste your live URL or video ID (or leave empty to search again):');
-                if (url === null) return; // cancelled
-                if (url.trim()) {
-                    // Extract video ID
-                    var videoId = url.trim();
-                    var urlMatch = videoId.match(/[?&]v=([a-zA-Z0-9_-]{11})/) || videoId.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/) || videoId.match(/\/live\/([a-zA-Z0-9_-]{11})/);
-                    if (urlMatch) videoId = urlMatch[1];
-                    videoId = videoId.replace(/[^a-zA-Z0-9_-]/g, '');
-                    if (videoId.length >= 8) {
-                        var txtLive = document.getElementById('statusTextLive');
-                        if (txtLive) { txtLive.textContent = 'Live: ...'; txtLive.style.color = '#ffaa00'; }
-                        fetch('https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails&id=' + encodeURIComponent(videoId) + '&key=' + encodeURIComponent(_activeApiKey))
-                            .then(function (r) { return r.json().catch(function () { throw new Error('Network error'); }); })
-                            .then(function (data) {
-                                if (data.items && data.items[0] && data.items[0].liveStreamingDetails && data.items[0].liveStreamingDetails.activeLiveChatId) {
-                                    _liveChatId = data.items[0].liveStreamingDetails.activeLiveChatId;
-                                    _liveVideoId = videoId;
-                                    localStorage.setItem('pd_live_chat_' + _userChannelId, _liveChatId);
-                                    var dotLive = document.getElementById('statusDotLive');
-                                    if (dotLive) { dotLive.classList.remove('warning'); dotLive.classList.add('online'); }
-                                    if (txtLive) { txtLive.textContent = 'Live: ON'; txtLive.style.color = '#00ff88'; }
-                                    _nextPageToken = '';
-                                    _firstFetchDone = false;
-                                    checkConnection();
-                                } else {
-                                    if (txtLive) { txtLive.textContent = 'Live: no chat found'; txtLive.style.color = '#ff4444'; }
-                                }
-                            })
-                            .catch(function () { if (txtLive) { txtLive.textContent = 'Live: error'; txtLive.style.color = '#ff4444'; } });
-                    }
-                } else {
-                    resolveLive();
-                }
-            }
-        });
-        document.getElementById('statusDotLive').addEventListener('click', function () {
-            if (_apiConnected && !_liveChatId) resolveLive();
-        });
-
-        tryLoadActiveKey(function (success, errorMsg) {
-            if (success) {
-                _gameStarted = true;
-                hideApiSetup();
-                startApiPolling();
-            } else {
-                showApiSetup(errorMsg || '');
-            }
-        });
-
         // ── Monitor de Conexão e Chat ────────────────────────────────────────────────
         var processedComments = new Set();
         var avatarCache = {};
@@ -8083,10 +7965,10 @@
 
         function _saveAvatarDataCache() {
             try {
-                // Keep max 50 entries to avoid localStorage bloat
+                // Keep max 200 entries to avoid localStorage bloat
                 var keys = Object.keys(_avatarDataCache);
-                if (keys.length > 50) {
-                    keys.slice(0, keys.length - 50).forEach(function(k) { delete _avatarDataCache[k]; });
+                if (keys.length > 200) {
+                    keys.slice(0, keys.length - 200).forEach(function(k) { delete _avatarDataCache[k]; });
                 }
                 localStorage.setItem('pd_avatar_data', JSON.stringify(_avatarDataCache));
             } catch(e) {}
@@ -8094,8 +7976,6 @@
 
         function loadAvatar(url) {
             if (!url || avatarCache[url] || _avatarLoading[url]) return;
-            // Only load YouTube avatar URLs (ggpht.com) — skip everything else
-            if (url.indexOf('ggpht.com') === -1 && !_avatarDataCache[url]) return;
 
             // Try cached data URL first (instant, no network)
             if (_avatarDataCache[url]) {
@@ -8107,11 +7987,13 @@
             }
 
             _avatarLoading[url] = true;
-            fetch(url, { mode: 'cors' }).then(function(r) {
+
+            // Use server proxy to bypass CORS
+            var proxyUrl = '/avatar-proxy?url=' + encodeURIComponent(url);
+            fetch(proxyUrl).then(function(r) {
                 if (!r.ok) throw new Error(r.status);
                 return r.blob();
             }).then(function(blob) {
-                // Convert to data URL for localStorage persistence
                 var reader = new FileReader();
                 reader.onloadend = function() {
                     var dataUrl = reader.result;
@@ -8123,8 +8005,22 @@
                 };
                 reader.readAsDataURL(blob);
             }).catch(function() {
+                // Fallback: try direct load (works for same-origin or permissive CORS)
                 var img = new Image();
-                img.onload = function() { if (img.naturalWidth > 0) avatarCache[url] = img; };
+                img.crossOrigin = 'anonymous';
+                img.onload = function() {
+                    if (img.naturalWidth > 0) {
+                        avatarCache[url] = img;
+                        // Try to persist via canvas
+                        try {
+                            var c = document.createElement('canvas');
+                            c.width = img.naturalWidth; c.height = img.naturalHeight;
+                            c.getContext('2d').drawImage(img, 0, 0);
+                            _avatarDataCache[url] = c.toDataURL('image/png');
+                            _saveAvatarDataCache();
+                        } catch(e) {}
+                    }
+                };
                 img.src = url;
             });
         }
@@ -8621,7 +8517,7 @@
             var submergedEnemies = [];
             if (inWater) {
                 // Collect ALL enemies in water (not dead, in view)
-                var allEnemies = [].concat(bats, zombies);
+                var allEnemies = [].concat(bats, zombies, spiders);
                 for (var ei = 0; ei < allEnemies.length; ei++) {
                     var e = allEnemies[ei];
                     if (!e || e.state === 'dead' || e.y < camY - 100 || e.y > camY + canvas.height + 100) continue;
@@ -8630,10 +8526,11 @@
             }
 
             var hasTarget = false;
-            for (var i = 0; i < bats.length; i++) {
-                var b = bats[i];
-                if (b.state === 'dead' || b.y < camY - 200 || b.y > camY + canvas.height + 200) continue;
-                var dist = Math.sqrt((b.x - startX) * (b.x - startX) + (b.y - startY) * (b.y - startY));
+            var allCreatures = [].concat(bats, zombies, spiders);
+            for (var i = 0; i < allCreatures.length; i++) {
+                var c = allCreatures[i];
+                if (c.state === 'dead' || c.y < camY - 200 || c.y > camY + canvas.height + 200) continue;
+                var dist = Math.sqrt((c.x - startX) * (c.x - startX) + (c.y - startY) * (c.y - startY));
                 if (dist <= 800) { hasTarget = true; break; }
             }
 
@@ -8767,10 +8664,10 @@
                     var chargeProgress = 1 - (s.timer / s.totalTimer);
                     p.spin = s.origSpin + chargeProgress * 2.5;
                     p.vx *= 0.85; p.vy *= 0.85;
-                    if (s.timer % 3 === 0) {
+                    if (s.timer % 6 === 0) {
                         var pa = Math.random() * Math.PI * 2;
                         var pr = 20 + Math.random() * 20;
-                        parts.push({ x: p.x + Math.cos(pa) * pr, y: p.y + Math.sin(pa) * pr, vx: -Math.cos(pa) * 2, vy: -Math.sin(pa) * 2, life: 15, color: s.color, r: 3 + Math.random() * 3 });
+                        parts.push({ x: p.x + Math.cos(pa) * pr, y: p.y + Math.sin(pa) * pr, vx: -Math.cos(pa) * 2, vy: -Math.sin(pa) * 2, life: 12, color: s.color, r: 2 + Math.random() * 2 });
                     }
                     s.timer--;
                     if (s.timer <= 0) {
@@ -8814,20 +8711,17 @@
                             }
                         }
                     }
-                    if (s.timer % 2 === 0) {
-                        // Sparks flying outward
-                        for (var sp = 0; sp < 2; sp++) {
-                            var sparkAng = Math.atan2(s.dir.y, s.dir.x) + Math.PI + (Math.random() - 0.5) * 1.5;
-                            parts.push({
-                                x: p.x + (Math.random() - 0.5) * 16,
-                                y: p.y + (Math.random() - 0.5) * 16,
-                                vx: Math.cos(sparkAng) * (3 + Math.random() * 4),
-                                vy: Math.sin(sparkAng) * (3 + Math.random() * 4),
-                                life: 8 + Math.random() * 6,
-                                color: Math.random() < 0.5 ? '#ffaa00' : s.color,
-                                r: 1.5 + Math.random() * 2
-                            });
-                        }
+                    if (s.timer % 3 === 0) {
+                        var sparkAng = Math.atan2(s.dir.y, s.dir.x) + Math.PI + (Math.random() - 0.5) * 1.5;
+                        parts.push({
+                            x: p.x + (Math.random() - 0.5) * 16,
+                            y: p.y + (Math.random() - 0.5) * 16,
+                            vx: Math.cos(sparkAng) * (3 + Math.random() * 3),
+                            vy: Math.sin(sparkAng) * (3 + Math.random() * 3),
+                            life: 6 + Math.random() * 4,
+                            color: Math.random() < 0.5 ? '#ffaa00' : s.color,
+                            r: 1.5 + Math.random() * 1.5
+                        });
                     }
                     if (p.x < PICK_HALF) { p.x = PICK_HALF; s.timer = 0; }
                     if (p.x > COLS * TILE - PICK_HALF) { p.x = COLS * TILE - PICK_HALF; s.timer = 0; }
@@ -8859,52 +8753,36 @@
                 ctx.globalAlpha = 0.3 + prog * 0.4;
                 ctx.strokeStyle = sc;
                 ctx.lineWidth = 2 + prog * 3;
-                ctx.shadowBlur = 10 + prog * 15;
-                ctx.shadowColor = sc;
                 ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.stroke();
                 // Inner spinning ring
                 ctx.globalAlpha = 0.3 + prog * 0.5;
                 ctx.strokeStyle = '#fff';
                 ctx.lineWidth = 1.5;
-                ctx.shadowBlur = 8;
-                ctx.shadowColor = sc;
                 var ringAng = Date.now() * 0.015;
                 ctx.beginPath();
                 ctx.arc(p.x, p.y, r * 0.6, ringAng, ringAng + Math.PI * 1.2);
                 ctx.stroke();
-                // Bright center glow
-                ctx.shadowBlur = 0;
-                ctx.globalAlpha = prog * 0.4;
-                ctx.fillStyle = 'rgba(255,255,255,' + (prog * 0.3) + ')';
-                ctx.beginPath(); ctx.arc(p.x, p.y, r * 0.4, 0, Math.PI * 2); ctx.fill();
             } else {
-                // Dash: speed lines in player color
-                var trailLen = 45;
+                // Dash: speed lines
+                var trailLen = 40;
                 var perpX = -spin.dir.y, perpY = spin.dir.x;
-                for (var li = 0; li < 5; li++) {
-                    var offset = (li - 2) * 10;
+                for (var li = 0; li < 3; li++) {
+                    var offset = (li - 1) * 12;
                     var sx = p.x - spin.dir.x * trailLen + perpX * offset;
                     var sy = p.y - spin.dir.y * trailLen + perpY * offset;
-                    ctx.globalAlpha = 0.15 + (2 - Math.abs(li - 2)) * 0.1;
+                    ctx.globalAlpha = 0.2 + (1 - Math.abs(li - 1)) * 0.15;
                     ctx.strokeStyle = sc;
-                    ctx.lineWidth = 3 - Math.abs(li - 2) * 0.5;
-                    ctx.shadowBlur = 6;
-                    ctx.shadowColor = sc;
+                    ctx.lineWidth = 2.5 - Math.abs(li - 1) * 0.5;
                     ctx.beginPath();
                     ctx.moveTo(sx, sy);
                     ctx.lineTo(p.x + perpX * offset, p.y + perpY * offset);
                     ctx.stroke();
                 }
-                // Bright glow around pick
-                ctx.shadowBlur = 0;
+                // Simple glow
                 var pulse = 0.7 + Math.sin(spin.timer * 0.6) * 0.3;
-                var gr = 32 * pulse;
-                var grd = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, gr);
-                grd.addColorStop(0, 'rgba(255,255,255,0.25)');
-                grd.addColorStop(0.4, 'rgba(255,255,255,0.12)');
-                grd.addColorStop(1, 'rgba(0,0,0,0)');
-                ctx.globalAlpha = 0.7;
-                ctx.fillStyle = grd;
+                var gr = 28 * pulse;
+                ctx.globalAlpha = 0.25;
+                ctx.fillStyle = sc;
                 ctx.beginPath(); ctx.arc(p.x, p.y, gr, 0, Math.PI * 2); ctx.fill();
             }
             ctx.restore();
@@ -9107,329 +8985,6 @@
                 for (var i = 0; i < 8; i++) activateTNT(cx + (Math.random() - 0.5) * TILE * 8, cy, name, '');
                 shakeAmt = Math.max(shakeAmt, 22);
             }
-        }
-
-        function clearLiveChatId() {
-            _liveChatId = '';
-            if (_userChannelId) {
-                localStorage.removeItem('pd_live_chat_' + _userChannelId);
-            }
-        }
-
-        var _resolvingLive = false;
-        function resolveLive(callback) {
-            var apiKey = getCurrentApiKey();
-            if (_resolvingLive || !_apiConnected || !apiKey || !_userChannelId) {
-                if (callback) callback(false);
-                return;
-            }
-            _resolvingLive = true;
-            var txtLive = document.getElementById('statusTextLive');
-            var dotLive = document.getElementById('statusDotLive');
-            if (txtLive) { txtLive.textContent = 'Live: ...'; txtLive.style.color = '#ffaa00'; }
-            if (dotLive) { dotLive.classList.remove('online'); dotLive.classList.add('warning'); }
-
-            // Search for active live stream directly via YouTube API
-            fetch('https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=' + encodeURIComponent(_userChannelId) + '&type=video&eventType=live&key=' + encodeURIComponent(apiKey))
-                .then(function (r) { return r.json().catch(function () { throw new Error('Network error: ' + r.status); }); })
-                .then(function (data) {
-                    console.log('[resolveLive] search response:', JSON.stringify(data).substring(0, 300));
-                    if (data.error) {
-                        console.warn('[resolveLive] API error:', data.error.message, 'code:', data.error.code);
-                        _resolvingLive = false;
-                        // Only mark key failed on quota/403
-                        if (data.error.code === 403) {
-                            markKeyFailed(apiKey, 'quota/403 on search');
-                        } else {
-                            getNextApiKey(); // rotate, don't remove
-                        }
-                        if (dotLive) { dotLive.classList.remove('online'); dotLive.classList.add('warning'); }
-                        if (txtLive) { txtLive.textContent = 'Live: Error ' + (data.error.code || ''); txtLive.style.color = '#ff4444'; }
-                        if (callback) callback(false);
-                        return;
-                    }
-                    if (!data.items || data.items.length === 0) {
-                        console.log('[resolveLive] No active live found for channel', _userChannelId);
-                        _resolvingLive = false;
-                        _liveChatId = '';
-                        if (dotLive) { dotLive.classList.remove('online'); dotLive.classList.add('warning'); }
-                        if (txtLive) { txtLive.textContent = 'Live: OFF (not found)'; txtLive.style.color = '#ffaa00'; }
-                        if (callback) callback(false);
-                        return;
-                    }
-                    var videoId = data.items[0].id.videoId;
-                    console.log('[resolveLive] Found live video:', videoId);
-                    var apiKey2 = getCurrentApiKey(); // get fresh key for second call
-                    return fetch('https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails&id=' + encodeURIComponent(videoId) + '&key=' + encodeURIComponent(apiKey2))
-                        .then(function (r) { return r.json().catch(function () { throw new Error('Network error: ' + r.status); }); })
-                        .then(function (vdata) {
-                            _resolvingLive = false;
-                            if (vdata.items && vdata.items[0] && vdata.items[0].liveStreamingDetails && vdata.items[0].liveStreamingDetails.activeLiveChatId) {
-                                _liveChatId = vdata.items[0].liveStreamingDetails.activeLiveChatId;
-                                _liveVideoId = videoId;
-                                localStorage.setItem('pd_live_chat_' + _userChannelId, _liveChatId);
-                                if (dotLive) { dotLive.classList.remove('warning'); dotLive.classList.add('online'); }
-                                if (txtLive) { txtLive.textContent = 'Live: ON'; txtLive.style.color = '#00ff88'; }
-                                if (callback) callback(true);
-                            } else {
-                                _liveChatId = '';
-                                if (dotLive) { dotLive.classList.remove('online'); dotLive.classList.add('warning'); }
-                                if (txtLive) { txtLive.textContent = 'Live: OFF'; txtLive.style.color = '#ffaa00'; }
-                                if (callback) callback(false);
-                            }
-                        });
-                })
-                .catch(function () {
-                    _resolvingLive = false;
-                    if (callback) callback(false);
-                });
-        }
-
-        var _nextPageToken = '';
-        var _lastResolveTry = 0;
-        function checkConnection() {
-            if (!_apiConnected || !_userChannelId) return;
-            var apiKey = getCurrentApiKey();
-            if (!apiKey) return;
-
-            // If no liveChatId, try to auto-resolve every 60s
-            if (!_liveChatId) {
-                var dotApi = document.getElementById('statusDotApi');
-                var txtApi = document.getElementById('statusTextApi');
-                var dotLive = document.getElementById('statusDotLive');
-                var txtLive = document.getElementById('statusTextLive');
-                if (dotApi) dotApi.classList.add('online');
-                if (txtApi) { txtApi.textContent = apiStatusText(); txtApi.style.color = '#00ff88'; }
-                if (dotLive) { dotLive.classList.remove('online'); dotLive.classList.add('warning'); }
-                if (txtLive) { txtLive.textContent = 'Live: OFF'; txtLive.style.color = '#ffaa00'; txtLive.style.cursor = 'pointer'; txtLive.title = 'Click to search for live'; }
-                var now = Date.now();
-                if (now - _lastResolveTry > 60000) {
-                    _lastResolveTry = now;
-                    resolveLive();
-                }
-                return;
-            }
-
-            // Fetch live chat messages directly from YouTube API
-            var chatUrl = 'https://www.googleapis.com/youtube/v3/liveChat/messages?liveChatId=' + encodeURIComponent(_liveChatId) + '&part=snippet,authorDetails&maxResults=200&key=' + encodeURIComponent(apiKey);
-            if (_nextPageToken) chatUrl += '&pageToken=' + encodeURIComponent(_nextPageToken);
-
-            fetch(chatUrl)
-                .then(function (r) { return r.json().catch(function () { throw new Error('Network error: ' + r.status); }); })
-                .then(function (data) {
-                    var dotApi = document.getElementById('statusDotApi');
-                    var txtApi = document.getElementById('statusTextApi');
-                    var dotLive = document.getElementById('statusDotLive');
-                    var txtLive = document.getElementById('statusTextLive');
-
-                    if (data.error) {
-                        var errMsg = data.error.message || '';
-                        var errCode = data.error.code || 0;
-                        var usedKey = apiKey; // capture before rotation
-                        // Quota exceeded or forbidden — remove this key, keep polling with others
-                        if (errCode === 403 || errMsg.toLowerCase().indexOf('quota') !== -1) {
-                            console.warn('[checkConnection] Key quota/403, removing:', usedKey.substring(0, 8) + '...', errMsg);
-                            rotateApiKey(usedKey, 'quota/' + errCode);
-                            // DON'T stop polling — other keys may still work
-                            if (getOkKeyCount() === 0) {
-                                if (_apiCheckInterval) { clearInterval(_apiCheckInterval); _apiCheckInterval = null; }
-                                if (dotApi) dotApi.classList.remove('online');
-                                if (txtApi) { txtApi.textContent = 'API: no keys'; txtApi.style.color = '#ff4444'; }
-                                if (dotLive) dotLive.classList.remove('online');
-                                if (txtLive) { txtLive.textContent = 'Live: paused'; txtLive.style.color = '#888'; }
-                            }
-                            return;
-                        }
-                        // Live ended or invalid chat — not a key problem, just rotate and retry
-                        if (errCode === 404 || errCode === 400) {
-                            console.log('[checkConnection] Live error ' + errCode + ', clearing chat ID');
-                            clearLiveChatId();
-                            getNextApiKey(); // rotate but don't remove
-                            if (dotApi) dotApi.classList.add('online');
-                            if (txtApi) { txtApi.textContent = apiStatusText(); txtApi.style.color = '#00ff88'; }
-                            if (dotLive) { dotLive.classList.remove('online'); dotLive.classList.add('warning'); }
-                            if (txtLive) { txtLive.textContent = 'Live: reconnecting...'; txtLive.style.color = '#ffaa00'; }
-                            resolveLive();
-                            return;
-                        }
-                        // Any other error — just rotate to next key, don't remove
-                        console.warn('[checkConnection] Error ' + errCode + ', rotating key:', usedKey.substring(0, 8) + '...');
-                        getNextApiKey();
-                        return;
-                    }
-
-                    // Success
-                    if (data.nextPageToken) _nextPageToken = data.nextPageToken;
-                    if (dotApi) dotApi.classList.add('online');
-                    if (txtApi) { txtApi.textContent = apiStatusText(); txtApi.style.color = '#00ff88'; }
-                    if (dotLive) { dotLive.classList.remove('warning'); dotLive.classList.add('online'); }
-                    if (txtLive) { txtLive.textContent = 'Live: ON'; txtLive.style.color = '#00ff88'; }
-
-                    // Process chat messages
-                    if (data.items && data.items.length > 0) {
-                        if (!_firstFetchDone) {
-                            // First fetch: skip commands but cache avatars and detect owner
-                            data.items.forEach(function (item) {
-                                processedComments.add(item.id);
-                                var fUser = (item.authorDetails.displayName || '').replace(/^@@+/, '@');
-                                if (fUser && fUser[0] !== '@') fUser = '@' + fUser;
-                                var fAvatar = item.authorDetails.profileImageUrl || '';
-                                if (fAvatar && !avatarCache[fAvatar]) {
-                                    loadAvatar(fAvatar);
-                                }
-                                if (fAvatar) {
-                                    if (!persistentScores[fUser]) persistentScores[fUser] = { score: 0, avatar: fAvatar, color: '' };
-                                    else if (!persistentScores[fUser].avatar) persistentScores[fUser].avatar = fAvatar;
-                                }
-                                // Detect owner on first fetch too
-                                var fIsOwner = _userChannelId && item.authorDetails.channelId === _userChannelId;
-                                if (fIsOwner) {
-                                    ownerName = fUser;
-                                    pick.userName = ownerName;
-                                    if (fAvatar) pick.userAvatarUrl = fAvatar;
-                                }
-                            });
-                            _firstFetchDone = true;
-                        } else {
-                            data.items.forEach(function (item) {
-                                if (processedComments.has(item.id)) return;
-                                processedComments.add(item.id);
-                                var cUser = (item.authorDetails.displayName || '').replace(/^@@+/, '@');
-                                if (cUser && cUser[0] !== '@') cUser = '@' + cUser;
-                                var cAvatarUrl = item.authorDetails.profileImageUrl || '';
-                                var cText = item.snippet.displayMessage || '';
-                                lastActivity[cUser] = Date.now();
-
-                                // Cache avatar for all users
-                                if (cAvatarUrl && !avatarCache[cAvatarUrl]) {
-                                    loadAvatar(cAvatarUrl);
-                                }
-
-                                var isOwner = _userChannelId && item.authorDetails.channelId === _userChannelId;
-                                if (isOwner) {
-                                    ownerName = cUser;
-                                    pick.userName = ownerName;
-                                    if (cAvatarUrl) pick.userAvatarUrl = cAvatarUrl;
-                                    if (!persistentScores[ownerName]) persistentScores[ownerName] = { score: 0, avatar: cAvatarUrl || '', color: '#ffdd44' };
-                                    else if (cAvatarUrl) persistentScores[ownerName].avatar = cAvatarUrl;
-                                }
-
-                                // Update avatar in persistentScores for any user
-                                if (cAvatarUrl) {
-                                    if (!persistentScores[cUser]) persistentScores[cUser] = { score: 0, avatar: cAvatarUrl, color: '' };
-                                    else if (!persistentScores[cUser].avatar) persistentScores[cUser].avatar = cAvatarUrl;
-                                }
-
-                                // Update avatar on existing userPick if missing
-                                var existingPick = userPicks.find(function(up) { return up.userName === cUser; });
-                                if (existingPick && cAvatarUrl && !existingPick.userAvatarUrl) {
-                                    existingPick.userAvatarUrl = cAvatarUrl;
-                                }
-
-                                if (!isOwner && persistentScores[cUser] && !userPicks.some(function (up) { return up.userName === cUser; })) {
-                                    spawnUserPickaxe(cUser, cAvatarUrl);
-                                }
-                                var msg = cText.toLowerCase();
-                                if (!isOwner && (msg.includes("join") || msg.includes("play"))) {
-                                    spawnUserPickaxe(cUser, cAvatarUrl);
-                                }
-                                var userPick = isOwner ? pick : userPicks.find(function (up) { return up.userName === cUser; });
-                                var tx = userPick ? userPick.x : undefined;
-                                var ty = userPick ? userPick.y : undefined;
-
-                                if (msg.includes("mega") || msg.includes("power tnt") || msg.includes("powertnt")) {
-                                    activateMegaTNT(tx, ty, cUser, cAvatarUrl);
-                                } else if (msg.includes("tnt")) {
-                                    activateTNT(tx, ty, cUser, cAvatarUrl);
-                                }
-
-                                if (msg.includes("thor")) {
-                                    activateThor(tx, ty, cUser);
-                                } else if (msg.includes("nuke")) {
-                                    activateNuke(tx, ty, cUser);
-                                } else if (msg.includes("clone")) {
-                                    spawnClone(cUser, cAvatarUrl);
-                                } else if (msg.includes("black hole") || msg.includes("blackhole") || msg.includes("bh")) {
-                                    activateBlackHole(tx, ty, cUser);
-                                } else if (msg.includes("big")) {
-                                    activateBig(cUser);
-                                } else if (msg.includes("ping pong") || msg.includes("pingpong") || msg.includes(" pp") || msg === "pp") {
-                                    // Auto-spawn pickaxe if user hasn't joined yet
-                                    if (!isOwner && !userPick) {
-                                        spawnUserPickaxe(cUser, cAvatarUrl);
-                                        userPick = userPicks.find(function (up) { return up.userName === cUser; });
-                                    }
-                                    activateStorm(userPick);
-                                }
-
-                                // Spin skill: spin right/left/down/up or shortcuts sr/sl/sd/su
-                                var spinMatch = msg.match(/spin\s+(right|left|down|up)/);
-                                if (!spinMatch) {
-                                    var shortcut = msg.match(/\b(sr|sl|sd|su)\b/);
-                                    if (shortcut) {
-                                        var sMap = { sr: 'right', sl: 'left', sd: 'down', su: 'up' };
-                                        spinMatch = [null, sMap[shortcut[1]]];
-                                    }
-                                }
-                                if (spinMatch) {
-                                    activateSpin(cUser, spinMatch[1]);
-                                }
-
-                                if (msg.includes("bot20ok")) {
-                                    for (var bi = 0; bi < 20; bi++) {
-                                        var botName = '@Bot_' + (1 + Math.floor(Math.random() * 9999));
-                                        spawnUserPickaxe(botName, '');
-                                    }
-                                    spawnText(canvas.width / 2, camY + 100, '20 BOTS ADDED!', '#ffff00');
-                                }
-
-                                // ── Eventos do Botrix ──
-                                var rawMsg = cText;
-                                var botrixName = null;
-                                var botrixAvatar = null;
-
-                                var followMatch = rawMsg.match(/thank you for the follow @?(\S+)/i);
-                                if (followMatch) {
-                                    botrixName = followMatch[1];
-                                    var fp = userPicks.find(function (u) { return u.userName === botrixName; });
-                                    botrixAvatar = fp ? fp.userAvatarUrl : null;
-                                    triggerBotrixEvent('follow', botrixName, botrixAvatar);
-                                }
-                                var scMatch = rawMsg.match(/thanks @?(\S+) for the superchat/i);
-                                if (scMatch) {
-                                    botrixName = scMatch[1];
-                                    var sp = userPicks.find(function (u) { return u.userName === botrixName; });
-                                    botrixAvatar = sp ? sp.userAvatarUrl : null;
-                                    triggerBotrixEvent('superchat', botrixName, botrixAvatar);
-                                }
-                                var memberMatch = rawMsg.match(/thank you for the member @?(\S+)/i);
-                                if (memberMatch) {
-                                    botrixName = memberMatch[1];
-                                    var mp = userPicks.find(function (u) { return u.userName === botrixName; });
-                                    botrixAvatar = mp ? mp.userAvatarUrl : null;
-                                    triggerBotrixEvent('member', botrixName, botrixAvatar);
-                                }
-                                var giftMatch = rawMsg.match(/thank you for gifting a member @?(\S+)/i);
-                                if (giftMatch) {
-                                    botrixName = giftMatch[1];
-                                    var gp = userPicks.find(function (u) { return u.userName === botrixName; });
-                                    botrixAvatar = gp ? gp.userAvatarUrl : null;
-                                    triggerBotrixEvent('gift', botrixName, botrixAvatar);
-                                }
-                            });
-                        }
-                    }
-                })
-                .catch(function () {
-                    var dotApi = document.getElementById('statusDotApi');
-                    var txtApi = document.getElementById('statusTextApi');
-                    var dotLive = document.getElementById('statusDotLive');
-                    var txtLive = document.getElementById('statusTextLive');
-                    if (dotApi) dotApi.classList.remove('online');
-                    if (txtApi) { txtApi.textContent = 'API: Offline'; txtApi.style.color = '#ff4444'; }
-                    if (dotLive) dotLive.classList.remove('online');
-                    if (txtLive) { txtLive.textContent = 'Live: —'; txtLive.style.color = '#888'; }
-                });
         }
 
     </script>
