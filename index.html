@@ -5394,36 +5394,51 @@
             // Gravity flip visual
             if (_gravityFlipped) {
                 ctx.save();
-                var gAlpha = Math.min(0.15, _gravityFlipTimer / 60 * 0.15);
-                ctx.fillStyle = 'rgba(255, 0, 255, ' + gAlpha + ')';
+                // Purple tint overlay
+                ctx.globalAlpha = 0.12;
+                ctx.fillStyle = '#ff00ff';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.globalAlpha = 0.3 + Math.sin(Date.now() * 0.005) * 0.15;
+                // Floating arrows
+                ctx.globalAlpha = 0.5;
                 ctx.fillStyle = '#ff44ff';
-                ctx.font = 'bold 24px Arial';
+                ctx.font = 'bold 28px Arial';
                 ctx.textAlign = 'center';
                 for (var gi = 0; gi < 5; gi++) {
                     var gx = canvas.width * (gi + 0.5) / 5;
-                    var gy = (Date.now() * 0.05 + gi * 80) % canvas.height;
+                    var gy = (Date.now() * 0.06 + gi * 80) % canvas.height;
                     ctx.fillText('⬆', gx, canvas.height - gy);
                 }
-                ctx.globalAlpha = 0.8;
-                ctx.font = 'bold 16px Arial';
+                // Timer (centered, bigger)
+                ctx.globalAlpha = 1;
+                ctx.font = 'bold 22px Arial';
                 ctx.fillStyle = '#ff44ff';
-                ctx.fillText('🔄 GRAVITY ' + Math.ceil(_gravityFlipTimer / 60) + 's', canvas.width / 2, 30);
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 3;
+                ctx.lineJoin = 'round';
+                var gravText = '🔄 GRAVITY ' + Math.ceil(_gravityFlipTimer / 60) + 's';
+                ctx.strokeText(gravText, canvas.width / 2, 50);
+                ctx.fillText(gravText, canvas.width / 2, 50);
                 ctx.restore();
             }
-            // Gravity rings
+            // Gravity rings (screen space)
             for (var gri = _gravityRings.length - 1; gri >= 0; gri--) {
                 var ring = _gravityRings[gri];
-                ring.radius += 6;
+                ring.radius += 5;
                 ring.alpha = 1 - (ring.radius / ring.maxRadius);
                 if (ring.alpha <= 0) { _gravityRings.splice(gri, 1); continue; }
                 ctx.save();
-                ctx.globalAlpha = ring.alpha * 0.6;
+                ctx.globalAlpha = ring.alpha * 0.7;
                 ctx.strokeStyle = '#ff44ff';
-                ctx.lineWidth = 3;
+                ctx.lineWidth = 3 + ring.alpha * 3;
                 ctx.beginPath();
                 ctx.arc(ring.x, ring.y - camY, ring.radius, 0, Math.PI * 2);
+                ctx.stroke();
+                // Inner ring
+                ctx.globalAlpha = ring.alpha * 0.3;
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.arc(ring.x, ring.y - camY, ring.radius * 0.8, 0, Math.PI * 2);
                 ctx.stroke();
                 ctx.restore();
             }
