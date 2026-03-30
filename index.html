@@ -2615,8 +2615,23 @@
                 p.vx = 0; p.vy = 0;
             }
 
-            // Boss Gate barrier is handled by bedrock blocks in worldMap
-            // (no invisible barrier needed)
+            // ── Hard barrier: absolute failsafe for boss gate bedrock ──
+            // If pickaxe somehow passed through bedrock, push it back
+            var pRow = Math.floor(p.y / TILE);
+            if (isMegaClearingRow(pRow)) {
+                var gMz = getMegaZone(pRow);
+                if (gMz >= 0 && megaClearedZones[gMz] && !megaClearedZones[gMz + '_gateOpen']) {
+                    var floorRow = megaClearedZones[gMz + '_zbFloorRow'];
+                    if (floorRow !== undefined) {
+                        var barrierY = floorRow * TILE;
+                        if (p.y + r > barrierY) {
+                            p.y = barrierY - r - 1;
+                            p.vy = -Math.abs(p.vy) * 0.5 - 2;
+                            p.vx += (Math.random() - 0.5) * 3;
+                        }
+                    }
+                }
+            }
 
             p.ang += p.spin;
             if (hitAny) p.spin = p.spin * 0.9 + (Math.random() - 0.5) * 0.12; else p.spin *= 0.995;
@@ -6018,6 +6033,14 @@
                 if (b.x > b.boundsMaxX) { b.x = b.boundsMaxX; b.vx = -Math.abs(b.vx); }
                 if (b.y < b.boundsMinY) { b.y = b.boundsMinY; b.vy = Math.abs(b.vy); }
                 if (b.y > b.boundsMaxY) { b.y = b.boundsMaxY; b.vy = -Math.abs(b.vy); }
+                // Hard barrier: prevent passing through bedrock floor
+                if (b.isQueen && b.zone !== undefined) {
+                    var _bfRow = megaClearedZones[b.zone + '_zbFloorRow'];
+                    if (_bfRow !== undefined) {
+                        var _bfY = _bfRow * TILE - BUBBLE_SIZE * 0.5;
+                        if (b.y > _bfY) { b.y = _bfY; b.vy = -Math.abs(b.vy) * 0.5; }
+                    }
+                }
                 }
 
                 // Direction based on velocity
@@ -6653,8 +6676,18 @@
                         slimes.splice(i, 1); continue;
                     }
                 }
-                // Also prevent bosses from falling below the arena
+                // Hard barrier: prevent bosses from passing through bedrock floor
                 if (z.isSlimeBoss && z.zone !== undefined) {
+                    var _bFloor = megaClearedZones[z.zone + '_zbFloorRow'];
+                    if (_bFloor !== undefined) {
+                        var _bBarrierY = _bFloor * TILE - SLIME_SIZE * (z.bossScale || SLIME_BOSS_SCALE) * 0.5;
+                        if (z.y > _bBarrierY) {
+                            z.y = _bBarrierY;
+                            z.vy = 0;
+                            z.grounded = true;
+                        }
+                    }
+                    // Also clamp to arena bottom
                     var maxY = (getMegaStart(z.zone) + MEGA_CLEARING_HEIGHT) * TILE;
                     if (z.y > maxY) {
                         z.y = maxY - SLIME_SIZE * (z.bossScale || SLIME_BOSS_SCALE) * 0.5;
@@ -9443,6 +9476,19 @@
                     var stepY = s.dir.y * SPIN_SPEED;
                     p.x += stepX;
                     p.y += stepY;
+                    // Hard barrier clamp during spin
+                    var _spRow = Math.floor(p.y / TILE);
+                    if (isMegaClearingRow(_spRow)) {
+                        var _spMz = getMegaZone(_spRow);
+                        if (_spMz >= 0 && megaClearedZones[_spMz] && !megaClearedZones[_spMz + '_gateOpen']) {
+                            var _spFloor = megaClearedZones[_spMz + '_zbFloorRow'];
+                            if (_spFloor !== undefined && p.y + PICK_HALF > _spFloor * TILE) {
+                                p.y = _spFloor * TILE - PICK_HALF - 1;
+                                s.timer = 0;
+                                p.vy = -3;
+                            }
+                        }
+                    }
                     // Lock velocity to spin direction only
                     p.vx = stepX;
                     p.vy = stepY;
