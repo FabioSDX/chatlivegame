@@ -7247,10 +7247,25 @@
         // ── Integração com o jogo ─────────────────────────────────────────────────────
         // inicia música no primeiro input do usuário
         var _audioStarted = false;
+
+        // ── Screen Wake Lock (prevent screen dimming on mobile) ──
+        var _wakeLock = null;
+        async function requestWakeLock() {
+            if (!('wakeLock' in navigator)) return;
+            try {
+                _wakeLock = await navigator.wakeLock.request('screen');
+                _wakeLock.addEventListener('release', function() { _wakeLock = null; });
+            } catch (e) {}
+        }
+        document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState === 'visible' && !_wakeLock) requestWakeLock();
+        });
+
         function ensureAudio() {
             if (_audioStarted) return;
             _audioStarted = true;
             startMusic();
+            requestWakeLock();
         }
         window.addEventListener('keydown', ensureAudio, { once: false });
         window.addEventListener('pointerdown', ensureAudio, { once: false });
