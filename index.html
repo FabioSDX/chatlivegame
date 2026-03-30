@@ -6574,6 +6574,14 @@
                         p.y += ny * overlap * 0.5;
                         z.x -= nx * overlap * 0.5;
                         z.y -= ny * overlap * 0.5;
+                        // Prevent boss from being pushed below bedrock floor
+                        if (z.isZBoss && z.zone !== undefined) {
+                            var _floorRow = megaClearedZones[z.zone + '_zbFloorRow'];
+                            if (_floorRow !== undefined) {
+                                var _maxBossY = _floorRow * TILE - ZOMBIE_SIZE * (z.bossScale || ZBOSS_SCALE) * 0.5;
+                                if (z.y > _maxBossY) { z.y = _maxBossY; z.vy = Math.min(z.vy, 0); }
+                            }
+                        }
                         // Ping-pong momentum transfer
                         var relVx = p.vx - (z.vx || 0), relVy = p.vy - (z.vy || 0);
                         var dot = relVx * (-nx) + relVy * (-ny);
@@ -9296,12 +9304,19 @@
                         for (var col = c0; col <= c1; col++) {
                             if (col < 0 || col >= COLS) continue;
                             var cell = worldMap[row] ? worldMap[row][col] : null;
-                            if (cell && cell.t !== E && cell.t !== BEDROCK) {
+                            if (cell && cell.t !== E) {
+                                if (cell.t === BEDROCK || isBossFloorProtected(row)) {
+                                    // Stop spin on bedrock/boss floor
+                                    s.timer = 0;
+                                    p.vx = -s.dir.x * 3; p.vy = -s.dir.y * 3 - 2;
+                                    break;
+                                }
                                 var pPick = p.pickaxe || currentPickaxe;
                                 var dmg = Math.max(3, Math.floor(SPIN_DMG_MULT * (pPick ? pPick.damage : 1)));
                                 hitBlock(col, row, dmg, p);
                             }
                         }
+                        if (s.timer <= 0) break;
                     }
                     if (s.timer % 3 === 0) {
                         var sparkAng = Math.atan2(s.dir.y, s.dir.x) + Math.PI + (Math.random() - 0.5) * 1.5;
