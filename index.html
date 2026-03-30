@@ -6178,10 +6178,11 @@
                     if (bbdist < bbmin && bbdist > 0) {
                         var bbnx = bbdx / bbdist, bbny = bbdy / bbdist;
                         var bbov = (bbmin - bbdist) * 0.5;
-                        b.x += bbnx * bbov; b.y += bbny * bbov;
-                        o.x -= bbnx * bbov; o.y -= bbny * bbov;
-                        b.vx += bbnx * 1.2; b.vy += bbny * 1.2;
-                        o.vx -= bbnx * 1.2; o.vy -= bbny * 1.2;
+                        var bPush = (b.isQueen && o.isQueen) ? 3.0 : 1.0;
+                        b.x += bbnx * bbov * bPush; b.y += bbny * bbov * bPush;
+                        o.x -= bbnx * bbov * bPush; o.y -= bbny * bbov * bPush;
+                        b.vx += bbnx * 1.5 * bPush; b.vy += bbny * 1.5 * bPush;
+                        o.vx -= bbnx * 1.5 * bPush; o.vy -= bbny * 1.5 * bPush;
                     }
                 }
             }
@@ -6724,10 +6725,18 @@
                         p.spin += (Math.random() - 0.5) * 0.2;
                         // Damage
                         if (pSpeed > 1.5) {
-                            // Spin hit cooldown: max 1 hit per 20 frames per enemy during spin
+                            // Hit cooldown: bosses can only take 1 hit per second from each pickaxe
+                            if (z.isSlimeBoss) {
+                                if (!z._hitCooldowns) z._hitCooldowns = {};
+                                var pickId = pi; // use pick index as ID
+                                z._hitCooldowns[pickId] = z._hitCooldowns[pickId] || 0;
+                                if (z._hitCooldowns[pickId] > 0) break;
+                                z._hitCooldowns[pickId] = 60; // 1 second cooldown
+                            }
+                            // Spin hit cooldown
                             if (p._spinLock) {
                                 z._spinHitCD = z._spinHitCD || 0;
-                                if (z._spinHitCD > 0) break; // skip damage, still bounce
+                                if (z._spinHitCD > 0) break;
                                 z._spinHitCD = 60;
                             }
                             // Crystal Titan shield absorbs damage
@@ -6767,6 +6776,13 @@
             for (var i = slimes.length - 1; i >= 0; i--) {
                 var z = slimes[i];
                 if (z._spinHitCD > 0) z._spinHitCD--;
+                // Decrement boss hit cooldowns per pickaxe
+                if (z._hitCooldowns) {
+                    var hcKeys = Object.keys(z._hitCooldowns);
+                    for (var hci = 0; hci < hcKeys.length; hci++) {
+                        if (z._hitCooldowns[hcKeys[hci]] > 0) z._hitCooldowns[hcKeys[hci]]--;
+                    }
+                }
 
                 // Remove if too far above camera (but never remove bosses with active gate)
                 if (z.y < camY - 400) {
@@ -7242,11 +7258,12 @@
                     if (jdist < jmin && jdist > 0) {
                         var jnx = jdx / jdist, jny = jdy / jdist;
                         var jov = (jmin - jdist) * 0.5;
-                        z.x += jnx * jov; z.y += jny * jov;
-                        o.x -= jnx * jov; o.y -= jny * jov;
-                        // Bounce velocity
-                        z.vx += jnx * 1.0; z.vy += jny * 0.5;
-                        o.vx -= jnx * 1.0; o.vy -= jny * 0.5;
+                        // Stronger push for bosses
+                        var pushMult = (z.isSlimeBoss && o.isSlimeBoss) ? 3.0 : 1.0;
+                        z.x += jnx * jov * pushMult; z.y += jny * jov * pushMult;
+                        o.x -= jnx * jov * pushMult; o.y -= jny * jov * pushMult;
+                        z.vx += jnx * 1.5 * pushMult; z.vy += jny * 0.5;
+                        o.vx -= jnx * 1.5 * pushMult; o.vy -= jny * 0.5;
                     }
                 }
             }
