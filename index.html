@@ -2145,7 +2145,14 @@
             var players = Object.keys(_cycleScores).map(function(n) {
                 return { name: n, score: _cycleScores[n].score, kills: _cycleScores[n].kills, items: _cycleScores[n].items, balls: _cycleScores[n].balls || 0, avatar: _cycleScores[n].avatar };
             }).sort(function(a, b) { return b.score - a.score; }).slice(0, 3);
-            if (players.length === 0) return;
+            // Only show overlay if there are at least 2 players with score
+            var activePlayers = players.filter(function(p) { return p.score > 0 && p.name; });
+            if (activePlayers.length < 2) {
+                _cycleScores = {};
+                _currentCycle = cycle;
+                _saveCycleScores();
+                return;
+            }
             _cycleOverlay = { timer: 600, top3: players, cycle: cycle, confetti: [] };
             _cycleOverlayTimer = 0;
             // Reset balls in persistentScores
