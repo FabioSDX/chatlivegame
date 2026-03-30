@@ -1168,15 +1168,11 @@
 
         // Check if a row is a protected boss floor (indestructible while bosses alive)
         function isBossFloorProtected(row) {
-            var keys = Object.keys(megaClearedZones);
-            for (var ki = 0; ki < keys.length; ki++) {
-                var k = keys[ki];
-                if (k.indexOf('_zbFloorRow') === -1) continue;
-                var mz = parseInt(k);
-                if (isNaN(mz)) continue;
-                var floorRow = megaClearedZones[k];
+            // Check all zones for protected boss floors
+            for (var mz = 0; mz < 50; mz++) {
+                var floorRow = megaClearedZones[mz + '_zbFloorRow'];
+                if (floorRow === undefined) continue;
                 if (row >= floorRow && row <= floorRow + 1) {
-                    // Check if gate is still closed (bosses alive)
                     if (megaClearedZones[mz] && !megaClearedZones[mz + '_gateOpen']) {
                         return true;
                     }
@@ -2619,22 +2615,8 @@
                 p.vx = 0; p.vy = 0;
             }
 
-            // ── Boss Gate barrier: block passage until all bosses are dead ──
-            var pRow = Math.floor(p.y / TILE);
-            if (isMegaClearingRow(pRow)) {
-                var gMz = getMegaZone(pRow);
-                if (gMz >= 0 && megaClearedZones[gMz] && !megaClearedZones[gMz + '_gateOpen']) {
-                    // Gate row = bottom of mega-clearing minus 10 rows
-                    var gateRow = getMegaStart(gMz) + MEGA_CLEARING_HEIGHT - 10;
-                    var gateY = gateRow * TILE;
-                    if (p.y + r > gateY && p.vy > 0) {
-                        p.y = gateY - r - 1;
-                        p.vy = -Math.abs(p.vy) * 0.6 - 2;
-                        p.vx += (Math.random() - 0.5) * 3;
-                        hitAny = true;
-                    }
-                }
-            }
+            // Boss Gate barrier is handled by bedrock blocks in worldMap
+            // (no invisible barrier needed)
 
             p.ang += p.spin;
             if (hitAny) p.spin = p.spin * 0.9 + (Math.random() - 0.5) * 0.12; else p.spin *= 0.995;
@@ -3898,6 +3880,16 @@
 
                         if (tier.type === 'flyer') {
                             // Flying boss — spawn as queens
+                            // Create bedrock floor for gate
+                            var fRow = mStart + MEGA_CLEARING_HEIGHT - 10;
+                            ensureRows(fRow, fRow + 2);
+                            for (var fr = fRow; fr < fRow + 2; fr++) {
+                                if (!worldMap[fr]) worldMap[fr] = genRow(fr);
+                                for (var fc = 0; fc < COLS; fc++) {
+                                    worldMap[fr][fc] = { t: BEDROCK, hp: 999, cr: 0 };
+                                }
+                            }
+                            megaClearedZones[mz + '_zbFloorRow'] = fRow;
                             var queenRow = mStart + MEGA_CLEARING_HEIGHT - 15;
                             var queenY = queenRow * TILE + TILE / 2;
                             var spacing = ((COLS - 2) * TILE) / (tier.count + 1);
@@ -3948,14 +3940,14 @@
                         if (aliveBosses === 0 && (megaClearedZones[mz + '_noBossFrames'] || 0) > 60) {
                             // No bosses for 1+ second — open gate
                             megaClearedZones[mz + '_gateOpen'] = true;
-                            console.log('[boss] Zone ' + mz + ': gate force-opened (no bosses found)');
+                            console.log('[boss] Zone ' + mz + ': gate opened');
                             spawnText(canvas.width / 2, pick.y - 80, '🎉 PASSAGE OPEN!', '#44ff44');
                             shakeAmt = 25;
                             var gateRow = getMegaStart(mz) + MEGA_CLEARING_HEIGHT - 10;
                             for (var gr = gateRow - 2; gr <= gateRow + 2; gr++) {
                                 if (!worldMap[gr]) continue;
                                 for (var gc = 1; gc < COLS - 1; gc++) {
-                                    if (worldMap[gr][gc] && worldMap[gr][gc].t !== E && worldMap[gr][gc].t !== BEDROCK) {
+                                    if (worldMap[gr][gc] && worldMap[gr][gc].t !== E) {
                                         worldMap[gr][gc].t = E; worldMap[gr][gc].hp = 0; worldMap[gr][gc].cr = 0;
                                     }
                                 }
