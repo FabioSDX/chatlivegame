@@ -836,6 +836,10 @@
                     <span class="cmd-icon">🔷</span>
                     <span class="cmd-badge badge-cyan">big</span>
                 </div>
+                <div class="cmd-row" onclick="ensureAudio();activateGravity(pick.userName||'@Player')">
+                    <span class="cmd-icon">🔄</span>
+                    <span class="cmd-badge badge-pink">grav</span>
+                </div>
                 <div class="cmd-row" style="opacity:0.7;cursor:default">
                     <span class="cmd-icon">👍</span>
                     <span class="cmd-badge" style="background:rgba(68,136,255,0.2);color:#4488ff;">10💥</span>
@@ -2404,6 +2408,12 @@
         var bigCooldown = 1800;     // 30 seconds at 60fps
         var BIG_DURATION = 900;     // 15 seconds at 60fps
         var BIG_SCALE = 2.5;
+
+        // Gravity flip skill
+        var gravityCooldown = 1200;   // 20 seconds at 60fps
+        var GRAVITY_FLIP_DURATION = 300; // 5 seconds at 60fps
+        var _gravityFlipped = false;
+        var _gravityFlipTimer = 0;
         var BLACKHOLE_RADIUS = 800;   // suction radius in pixels
         var BLACKHOLE_DURATION = 720; // 12 seconds at 60fps
         var activeBlackHoles = [];    // { x, y, timer, userName }
@@ -2449,6 +2459,7 @@
             tormentaActive = false; tormentaTimer = 0; tormentaPick = null;
             activeSpins = []; spinCooldowns = {}; spinQueues = {};
             activeWebs = []; activeFireTrails = [];
+            _gravityFlipped = false; _gravityFlipTimer = 0;
             bgChunks = {}; bgTick = 0;
             document.getElementById('depthDisplay').textContent = 'Depth: 0m';
             document.getElementById('scoreDisplay').textContent = '⛏ 0';
@@ -2497,7 +2508,6 @@
             userName = (userName || '').replace(/^@@+/, '@');
             var cdKey = userName + '_big';
             if (skillCooldowns[cdKey] && skillCooldowns[cdKey] > 0) return;
-            // Find the pick
             var p = null;
             if (pick && pick.userName === userName) p = pick;
             if (!p) p = userPicks.find(function(u) { return u.userName === userName; });
@@ -2507,6 +2517,19 @@
             p.bigTimer = BIG_DURATION;
             spawnText(p.x, p.y - 40, '🔷 BIG MODE!', '#44aaff');
             if (_audioStarted) sfxSkillActivate();
+
+        function activateGravity(userName) {
+            userName = (userName || '').replace(/^@@+/, '@');
+            var cdKey = userName + '_gravity';
+            if (skillCooldowns[cdKey] && skillCooldowns[cdKey] > 0) return;
+            if (_gravityFlipped) return; // already active
+            skillCooldowns[cdKey] = gravityCooldown;
+            _gravityFlipped = true;
+            _gravityFlipTimer = GRAVITY_FLIP_DURATION;
+            shakeAmt = Math.max(shakeAmt, 15);
+            spawnText(canvas.width / 2, camY + canvas.height / 2, '🔄 GRAVITY FLIP!', '#ff44ff');
+            if (_audioStarted) sfxSkillActivate();
+        }
         }
 
         function applyPhysics(p, r) {
@@ -2518,7 +2541,7 @@
             // Fire Storm Ping-Pong Mode - Skill OR Combo 25
             var hasPingPong = ((p.stormTimer || 0) > 0);
 
-            p.vy += GRAVITY;
+            p.vy += _gravityFlipped ? -GRAVITY : GRAVITY;
             // Splash effect when entering water (no drag/buoyancy — pickaxe passes through)
             var _inWater = isInWater(p.x, p.y);
             if (_inWater && !p._wasInWater) {
@@ -3775,6 +3798,15 @@
             var skKeys = Object.keys(skillCooldowns);
             for (var ki = 0; ki < skKeys.length; ki++) {
                 if (skillCooldowns[skKeys[ki]] > 0) skillCooldowns[skKeys[ki]]--;
+            }
+            // Gravity flip timer
+            if (_gravityFlipTimer > 0) {
+                _gravityFlipTimer--;
+                if (_gravityFlipTimer <= 0) {
+                    _gravityFlipped = false;
+                    spawnText(canvas.width / 2, camY + canvas.height / 2, '🔄 GRAVITY NORMAL!', '#44ff44');
+                    shakeAmt = Math.max(shakeAmt, 8);
+                }
             }
             // Process Chain Lightning Core
             for (var ati = activeThorAttacks.length - 1; ati >= 0; ati--) {
@@ -5339,6 +5371,29 @@
             // Cycle scoring overlay (screen space)
             drawCycleOverlay();
             _drawBigPopup();
+            // Gravity flip visual
+            if (_gravityFlipped) {
+                ctx.save();
+                var gAlpha = Math.min(0.15, _gravityFlipTimer / 60 * 0.15);
+                ctx.fillStyle = 'rgba(255, 0, 255, ' + gAlpha + ')';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                // Floating arrows
+                ctx.globalAlpha = 0.3 + Math.sin(Date.now() * 0.005) * 0.15;
+                ctx.fillStyle = '#ff44ff';
+                ctx.font = 'bold 24px Arial';
+                ctx.textAlign = 'center';
+                for (var gi = 0; gi < 5; gi++) {
+                    var gx = canvas.width * (gi + 0.5) / 5;
+                    var gy = (Date.now() * 0.05 + gi * 80) % canvas.height;
+                    ctx.fillText('⬆', gx, canvas.height - gy);
+                }
+                // Timer
+                ctx.globalAlpha = 0.8;
+                ctx.font = 'bold 16px Arial';
+                ctx.fillStyle = '#ff44ff';
+                ctx.fillText('🔄 GRAVITY ' + Math.ceil(_gravityFlipTimer / 60) + 's', canvas.width / 2, 30);
+                ctx.restore();
+            }
 
         }
 
@@ -8004,6 +8059,7 @@
             if (e.key === '7') activateBlackHole(pick ? pick.x : undefined, pick ? pick.y : undefined, me);
             if (e.key === '8') activateTormenta(pick);
             if (e.key === '9') activateBig(pick ? pick.userName : ownerName || '@Player');
+            if (e.key === '0') activateGravity(pick ? pick.userName : ownerName || '@Player');
             if (e.key === 'u' || e.key === 'U') triggerBotrixEvent('follow', '@fabiosdx');
             if (e.key === 'i' || e.key === 'I') triggerBotrixEvent('superchat', '@fabiosdx');
             if (e.key === 'p' || e.key === 'P') triggerBotrixEvent('gift', '@fabiosdx');
@@ -8342,7 +8398,8 @@
                 { re: /\b(sr|sl|sd|su)\b|\bspin\s+(right|left|down|up)\b/gi, fn: function() {
                     // Handled separately below for chained spins with delay
                 }, id: 'spin', skipLoop: true },
-                { re: /\bbig\b/gi, fn: function() { activateBig(cUser); }, id: 'big' }
+                { re: /\bbig\b/gi, fn: function() { activateBig(cUser); }, id: 'big' },
+                { re: /\bgravity\b|\bgrav\b/gi, fn: function() { activateGravity(cUser); }, id: 'gravity' }
             ];
 
             var cmdCount = 0;
