@@ -6732,19 +6732,19 @@
                             z.animTimer += ZOMBIE_ANIMS.run.speed;
                             if (z.animTimer >= ZOMBIE_ANIMS.run.count) z.animTimer = 0;
                             // Jump toward pick if it's above or randomly
-                            if (nearPick.y < z.y - TILE || Math.random() < 0.03) {
-                                z.vy = -6 - Math.random() * 3;
+                            if (nearPick.y < z.y - TILE * 2 && Math.random() < 0.01) {
+                                z.vy = -3 - Math.random() * 2;
                                 z.grounded = false;
                                 z.state = 'jump'; z.animTimer = 0;
                             }
                         } else {
-                            // Patrol — walk with frequent jumps
+                            // Patrol — walk with small hops
                             z.state = 'walk';
                             z.vx = z.dir * moveSpeed;
                             z.animTimer += ZOMBIE_ANIMS.walk.speed;
                             if (z.animTimer >= ZOMBIE_ANIMS.walk.count) z.animTimer = 0;
-                            if (Math.random() < 0.03) {
-                                z.vy = -5 - Math.random() * 3;
+                            if (Math.random() < 0.008) {
+                                z.vy = -2 - Math.random() * 1.5;
                                 z.grounded = false;
                                 z.state = 'jump'; z.animTimer = 0;
                             }
