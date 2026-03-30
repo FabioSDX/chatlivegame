@@ -975,8 +975,8 @@
         var TNT_TEX = new Image(); TNT_TEX.src = 'block/tnt.png';
         var MEGA_TNT_TEX = new Image(); MEGA_TNT_TEX.src = 'block/mega_tnt.png';
 
-        var TNT_RADIUS = 3;
-        var MEGA_TNT_RADIUS = 6;
+        var TNT_RADIUS = 6;
+        var MEGA_TNT_RADIUS = 12;
 
         var BOUNCE = 0.82;
         var FRICTION = 0.995;
@@ -2404,8 +2404,8 @@
         var bigCooldown = 1800;     // 30 seconds at 60fps
         var BIG_DURATION = 900;     // 15 seconds at 60fps
         var BIG_SCALE = 2.5;
-        var BLACKHOLE_RADIUS = 400;   // suction radius in pixels
-        var BLACKHOLE_DURATION = 360; // 6 seconds at 60fps
+        var BLACKHOLE_RADIUS = 800;   // suction radius in pixels
+        var BLACKHOLE_DURATION = 720; // 12 seconds at 60fps
         var activeBlackHoles = [];    // { x, y, timer, userName }
 
         var skillCooldowns = {};    // { userName_skillName: framesLeft }
@@ -3774,19 +3774,19 @@
                         var b = bats[b_i];
                         if (b.state === 'dead' || b.y < camY - 200 || b.y > camY + canvas.height + 200) continue;
                         var dist = Math.sqrt((b.x - atk.x) * (b.x - atk.x) + (b.y - atk.y) * (b.y - atk.y));
-                        if (dist <= 800) targets.push({ bat: b, dist: dist });
+                        if (dist <= 1600) targets.push({ bat: b, dist: dist });
                     }
                     for (var z_i = 0; z_i < zombies.length; z_i++) {
                         var z = zombies[z_i];
                         if (z.state === 'dead' || z.y < camY - 200 || z.y > camY + canvas.height + 200) continue;
                         var zDist = Math.sqrt((z.x - atk.x) * (z.x - atk.x) + (z.y - atk.y) * (z.y - atk.y));
-                        if (zDist <= 800) targets.push({ bat: z, dist: zDist });
+                        if (zDist <= 1600) targets.push({ bat: z, dist: zDist });
                     }
                     for (var sp_i = 0; sp_i < spiders.length; sp_i++) {
                         var sp = spiders[sp_i];
                         if (sp.state === 'dead' || sp.y < camY - 200 || sp.y > camY + canvas.height + 200) continue;
                         var spDist = Math.sqrt((sp.x - atk.x) * (sp.x - atk.x) + (sp.y - atk.y) * (sp.y - atk.y));
-                        if (spDist <= 800) targets.push({ bat: sp, dist: spDist });
+                        if (spDist <= 1600) targets.push({ bat: sp, dist: spDist });
                     }
 
                     if (targets.length > 0) {
@@ -3808,12 +3808,12 @@
                             if (typeof sfxTNT === 'function' && _audioStarted) sfxTNT();
                             spawnParts(bestTarget.x, bestTarget.y, '#00ffff', 5);
 
-                            // Damage (1 hit like pickaxe) & Combo
-                            bestTarget.hp -= 1;
+                            // Damage (2 hits per strike) & Combo
+                            bestTarget.hp -= 2;
                             bestTarget.hurtTimer = 10;
                             bestTarget.anim = 0;
                             if (player) registerComboHit(player, bestTarget.x, bestTarget.y);
-                            spawnText(bestTarget.x, bestTarget.y - 40, '-1 ⚡', '#00ffff');
+                            spawnText(bestTarget.x, bestTarget.y - 40, '-2 ⚡', '#00ffff');
 
                             if (bestTarget.hp <= 0) {
                                 bestTarget.state = 'dead'; bestTarget.anim = 0; bestTarget.deadTimer = 0;
@@ -9131,7 +9131,7 @@
                 var c = allCreatures[i];
                 if (c.state === 'dead' || c.y < camY - 200 || c.y > camY + canvas.height + 200) continue;
                 var dist = Math.sqrt((c.x - startX) * (c.x - startX) + (c.y - startY) * (c.y - startY));
-                if (dist <= 800) { hasTarget = true; break; }
+                if (dist <= 1600) { hasTarget = true; break; }
             }
 
             if (!hasTarget && submergedEnemies.length === 0) {
@@ -9181,7 +9181,7 @@
                     userName: userName,
                     x: startX,
                     y: startY,
-                    hitsLeft: 5,
+                    hitsLeft: 10,
                     timer: 0,
                     lastBat: null
                 });
