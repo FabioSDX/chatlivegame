@@ -1533,7 +1533,7 @@
         // ── Mega Clearings (every 400 rows, 200 rows tall, wall-to-wall) ──
         var MEGA_CLEARING_INTERVAL = 400; // space between mega-clearing starts
         var MEGA_CLEARING_HEIGHT = 200;
-        var MEGA_CLEARING_FIRST = 200;    // first mega-clearing starts at row 200
+        var MEGA_CLEARING_FIRST = 200;    // first mega-clearing starts at row 200 (boss at ~400m)
         var megaClearedZones = {};
         var MAX_BATS_MEGA = 120;
 
@@ -3856,11 +3856,18 @@
             // ── Mega-clearing: spawn flyers when pick enters the zone ──
             if (pick) {
                 var pickRow = Math.floor(pick.y / TILE);
+                // Debug: log position every 2 seconds
+                if (typeof _lastMegaLog === 'undefined') _lastMegaLog = 0;
+                if (Date.now() - _lastMegaLog > 2000 && pickRow > 150) {
+                    _lastMegaLog = Date.now();
+                    console.log('[pos] row=' + pickRow + ' isMega=' + isMegaClearingRow(pickRow) + ' zone=' + getMegaZone(pickRow) + ' cleared=' + !!megaClearedZones[getMegaZone(pickRow)]);
+                }
                 if (isMegaClearingRow(pickRow)) {
                     var mz = getMegaZone(pickRow);
                     var mStart = getMegaStart(mz >= 0 ? mz : 0);
                     // Initial big spawn
                     if (mz >= 0 && !megaClearedZones[mz]) {
+                        console.log('[mega] Entering zone ' + mz + ' at row ' + pickRow + ' (mStart=' + mStart + ')');
                         megaClearedZones[mz] = true;
                         megaClearedZones[mz + '_tick'] = 0;
 
