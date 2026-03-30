@@ -3897,7 +3897,7 @@
                                 }
                             }
                             megaClearedZones[mz + '_zbFloorRow'] = fRow;
-                            var queenRow = mStart + MEGA_CLEARING_HEIGHT - 15;
+                            var queenRow = mStart + MEGA_CLEARING_HEIGHT - 20;
                             var queenY = queenRow * TILE + TILE / 2;
                             var spacing = ((COLS - 2) * TILE) / (tier.count + 1);
                             for (var qi = 0; qi < tier.count; qi++) {
@@ -6352,8 +6352,8 @@
                     isMother: true, isQueen: true,
                     lastSpawnTime: Date.now(),
                     boundsMinX: TILE, boundsMaxX: (COLS - 1) * TILE,
-                    boundsMinY: megaStart * TILE + TILE * 5,
-                    boundsMaxY: (megaStart + MEGA_CLEARING_HEIGHT - 20) * TILE,
+                    boundsMinY: (megaStart + MEGA_CLEARING_HEIGHT - 30) * TILE,
+                    boundsMaxY: (megaStart + MEGA_CLEARING_HEIGHT - 12) * TILE,
                     flyPhase: Math.random() * Math.PI * 2,
                     flyFreq: 0.01 * (tier.speed || 1),
                     targetX: wx, targetY: wy,
