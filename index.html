@@ -6645,12 +6645,6 @@
                         zombies.splice(i, 1); continue;
                     }
                 }
-                        z.y = (bStart + MEGA_CLEARING_HEIGHT - 12) * TILE;
-                        z.vy = 0;
-                    } else {
-                        zombies.splice(i, 1); continue;
-                    }
-                }
                 // Also prevent bosses from falling below the arena
                 if (z.isZBoss && z.zone !== undefined) {
                     var maxY = (getMegaStart(z.zone) + MEGA_CLEARING_HEIGHT) * TILE;
