@@ -6377,9 +6377,9 @@
                     hp: bossHp, maxHp: bossHp,
                     speed: bossSpeed,
                     dir: Math.random() < 0.5 ? -1 : 1,
-                    state: 'idle', anim: 0, animTimer: 0,
+                    state: 'walk', anim: 0, animTimer: 0,
                     hurtTimer: 0, attackTimer: 0, deadTimer: 0,
-                    grounded: false, fallFrames: 0,
+                    grounded: true, fallFrames: 0,
                     idleTimer: 0, sleepTimer: 0, sleepZzz: 0,
                     returnToSleep: false,
                     isZBoss: true,
@@ -6636,8 +6636,15 @@
                 // Remove if too far above camera (but never remove bosses with active gate)
                 if (z.y < camY - 400) {
                     if (z.isZBoss && z.zone !== undefined && megaClearedZones[z.zone] && !megaClearedZones[z.zone + '_gateOpen']) {
-                        // Boss with closed gate — don't remove, teleport back to arena
                         var bStart = getMegaStart(z.zone);
+                        z.y = (bStart + MEGA_CLEARING_HEIGHT - 12) * TILE;
+                        z.vy = 0;
+                        console.log('[boss] Boss teleported back (was above camera) zone=' + z.zone);
+                    } else {
+                        if (z.isZBoss) console.log('[boss] Boss REMOVED (above camera) zone=' + z.zone + ' y=' + Math.floor(z.y) + ' camY=' + Math.floor(camY));
+                        zombies.splice(i, 1); continue;
+                    }
+                }
                         z.y = (bStart + MEGA_CLEARING_HEIGHT - 12) * TILE;
                         z.vy = 0;
                     } else {
@@ -6666,7 +6673,10 @@
                     var dFootRow = Math.floor((z.y + ZOMBIE_SIZE * 0.5) / TILE);
                     var dGround = getCell(dFootRow, Math.floor(z.x / TILE));
                     if (dGround && dGround.t !== E) { z.y = dFootRow * TILE - ZOMBIE_SIZE * 0.5; z.vy = 0; }
-                    if (z.deadTimer > 120) { zombies.splice(i, 1); }
+                    if (z.deadTimer > 120) {
+                        if (z.isZBoss) console.log('[boss] Boss corpse removed zone=' + z.zone);
+                        zombies.splice(i, 1);
+                    }
                     continue;
                 }
 
