@@ -3944,7 +3944,11 @@
                         } else {
                             megaClearedZones[mz + '_noBossFrames'] = 0;
                         }
-                        if (aliveBosses === 0 && (megaClearedZones[mz + '_noBossFrames'] || 0) > 60) {
+                        // Log boss count periodically
+                        if ((megaClearedZones[mz + '_noBossFrames'] || 0) % 60 === 1) {
+                            console.log('[boss] Zone ' + mz + ': aliveBosses=' + aliveBosses + ' noBossFrames=' + megaClearedZones[mz + '_noBossFrames'] + ' zombies.total=' + zombies.length + ' bats.total=' + bats.length);
+                        }
+                        if (aliveBosses === 0 && (megaClearedZones[mz + '_noBossFrames'] || 0) > 600) {
                             // No bosses for 1+ second — open gate
                             megaClearedZones[mz + '_gateOpen'] = true;
                             console.log('[boss] Zone ' + mz + ': gate opened');
