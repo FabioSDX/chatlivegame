@@ -180,8 +180,8 @@
         }
 
         .announce-avatar {
-            width: 32px;
-            height: 32px;
+            width: 64px;
+            height: 64px;
             border-radius: 50%;
             border: 2px solid #fff;
             object-fit: cover;
@@ -190,8 +190,8 @@
         }
 
         .announce-avatar-placeholder {
-            width: 32px;
-            height: 32px;
+            width: 64px;
+            height: 64px;
             border-radius: 50%;
             border: 2px solid #fff;
             margin: 0 auto 4px;
@@ -5132,7 +5132,7 @@
                 if (b.userName) {
                     ctx.save();
                     var avImg = avatarCache[b.avatarUrl];
-                    var avSize = 32;
+                    var avSize = 42;
                     var avY = b.y - drawSize / 2 - 28;
                     if (avImg && avImg.complete && avImg.naturalWidth > 0) {
                         ctx.save();
@@ -5315,7 +5315,7 @@
                         loadAvatar(pick.userAvatarUrl);
                     }
                     var ownerAvImg = (pick.userAvatarUrl && avatarCache[pick.userAvatarUrl]) || null;
-                    var oAvSize = isMobile ? 32 : 48;
+                    var oAvSize = isMobile ? 42 : 62;
                     var oAvY = pick.y - PICK_HALF - (isMobile ? 30 : 44);
                     if (ownerAvImg && ownerAvImg.complete && ownerAvImg.naturalWidth > 0) {
                         ctx.save();
@@ -5371,7 +5371,7 @@
                     }
                     ctx.restore();
                     // Draw clone avatar and name (same size as original picks)
-                    var cloneAvSize = isMobile ? 32 : 48;
+                    var cloneAvSize = isMobile ? 42 : 62;
                     var cloneAvY = ep.y - PICK_HALF - (isMobile ? 30 : 44);
                     if (ep.cloneAvatar && avatarCache[ep.cloneAvatar]) {
                         var avImg = avatarCache[ep.cloneAvatar];
@@ -5441,7 +5441,7 @@
                     loadAvatar(up.userAvatarUrl);
                 }
                 var avImg = (up.userAvatarUrl && avatarCache[up.userAvatarUrl]) || null;
-                var avSize = isMobile ? 32 : 48;
+                var avSize = isMobile ? 42 : 62;
                 var avY = up.y - PICK_HALF - (isMobile ? 30 : 44);
                 if (avImg && avImg.complete && avImg.naturalWidth > 0) {
                     ctx.save();
