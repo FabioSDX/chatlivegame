@@ -857,6 +857,10 @@
                     <span class="cmd-icon">😘</span>
                     <span class="cmd-badge badge-pink">me</span>
                 </div>
+                <div class="cmd-row" onclick="ensureAudio();activateMG(pick.userName||'@Player')">
+                    <span class="cmd-icon">🔫</span>
+                    <span class="cmd-badge badge-orange">mg</span>
+                </div>
                 <div class="cmd-row" style="opacity:0.7;cursor:default">
                     <span class="cmd-icon">👍</span>
                     <span class="cmd-badge badge-orange">tnt</span>
@@ -2491,6 +2495,7 @@
             _gravityFlipped = false; _gravityFlipTimer = 0; _gravityRings = [];
             _kissEffect = null;
             _megaTntCounts = {}; _megaTntCooldowns = {};
+            _activeMGs = []; _mgBullets = [];
             // Reset leaderboard
             persistentScores = {};
             savePersistentScores();
@@ -2612,6 +2617,161 @@
                 playNote(800 + i * 100, 'sine', 0.08, 0.01, 0.1, t + i * 0.08);
             }
             playNote(1200, 'triangle', 0.06, 0.01, 0.3, t + 0.1);
+        }
+
+        // ── Machine Gun Powerup ──────────────────────────────────────────────
+        var MG_SPRITES = [];
+        var MG_SPRITE_COUNT = 40;
+        for (var _mgi = 1; _mgi <= MG_SPRITE_COUNT; _mgi++) {
+            var _mgImg = new Image();
+            _mgImg.src = 'machine guns/Icon29_' + String(_mgi).padStart(2, '0') + '.png';
+            MG_SPRITES.push(_mgImg);
+        }
+
+        var mgCooldown = 1800; // 30s cooldown
+        var MG_DURATION = 300; // 5 seconds at 60fps
+        var _activeMGs = []; // { pick, sprite, timer, fireTimer, userName }
+        var _mgBullets = []; // { x, y, vx, vy, life }
+
+        function activateMG(userName) {
+            userName = (userName || '').replace(/^@@+/, '@');
+            var cdKey = userName + '_mg';
+            if (skillCooldowns[cdKey] && skillCooldowns[cdKey] > 0) return;
+            var p = null;
+            if (pick && pick.userName === userName) p = pick;
+            if (!p) p = userPicks.find(function(u) { return u.userName === userName; });
+            if (!p) p = pick;
+            if (!p) return;
+            skillCooldowns[cdKey] = mgCooldown;
+            var sprite = MG_SPRITES[Math.floor(Math.random() * MG_SPRITES.length)];
+            _activeMGs.push({ pick: p, sprite: sprite, timer: MG_DURATION, fireTimer: 0, userName: userName });
+            spawnText(p.x, p.y - 50, '🔫 MACHINE GUN!', '#ff8800');
+            if (_audioStarted) sfxSkillActivate();
+        }
+
+        function sfxMGShot() {
+            var ac = getAC(); if (!ac) return;
+            var t = ac.currentTime;
+            // Short sharp burst
+            var nLen = Math.ceil(ac.sampleRate * 0.04);
+            var buf = ac.createBuffer(1, nLen, ac.sampleRate);
+            var d = buf.getChannelData(0);
+            for (var i = 0; i < nLen; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / nLen, 0.5);
+            var src = ac.createBufferSource(); src.buffer = buf;
+            var g = ac.createGain();
+            g.gain.setValueAtTime(0.12, t);
+            g.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+            var filt = ac.createBiquadFilter();
+            filt.type = 'highpass'; filt.frequency.value = 800;
+            src.connect(filt); filt.connect(g); g.connect(ac.destination);
+            src.start(t);
+        }
+
+        function updateMGs() {
+            // Update active machine guns
+            for (var i = _activeMGs.length - 1; i >= 0; i--) {
+                var mg = _activeMGs[i];
+                mg.timer--;
+                if (mg.timer <= 0) { _activeMGs.splice(i, 1); continue; }
+                mg.fireTimer++;
+                // Fire every 3 frames (~20 shots/sec)
+                if (mg.fireTimer >= 3) {
+                    mg.fireTimer = 0;
+                    var p = mg.pick;
+                    if (!p) continue;
+                    // Shoot downward with spread
+                    var angle = Math.PI / 2 + (Math.random() - 0.5) * 0.6; // mostly down with spread
+                    var speed = 12 + Math.random() * 4;
+                    _mgBullets.push({
+                        x: p.x + (Math.random() - 0.5) * 20,
+                        y: p.y + 10,
+                        vx: Math.cos(angle) * speed,
+                        vy: Math.sin(angle) * speed,
+                        life: 30,
+                        userName: mg.userName
+                    });
+                    if (_audioStarted && mg.fireTimer === 0) sfxMGShot();
+                }
+            }
+            // Update bullets
+            for (var j = _mgBullets.length - 1; j >= 0; j--) {
+                var b = _mgBullets[j];
+                b.x += b.vx;
+                b.y += b.vy;
+                b.life--;
+                if (b.life <= 0 || b.x < 0 || b.x > COLS * TILE || b.y < camY - 200) {
+                    _mgBullets.splice(j, 1); continue;
+                }
+                // Hit blocks
+                var bCol = Math.floor(b.x / TILE);
+                var bRow = Math.floor(b.y / TILE);
+                var cell = getCell(bRow, bCol);
+                if (cell && cell.t !== E && cell.t !== BEDROCK) {
+                    hitBlock(bCol, bRow, 2, null);
+                    _mgBullets.splice(j, 1); continue;
+                }
+                // Hit enemies (slimes)
+                for (var si = 0; si < slimes.length; si++) {
+                    var s = slimes[si];
+                    if (s.state === 'dead') continue;
+                    var sdx = b.x - s.x, sdy = b.y - s.y;
+                    var sr = SLIME_SIZE * 0.4 * (s.isSlimeBoss ? (s.bossScale || SLIME_BOSS_SCALE) : 1);
+                    if (sdx * sdx + sdy * sdy < sr * sr) {
+                        s.hp -= 1; s.hurtTimer = 8; s.state = 'hurt';
+                        spawnText(s.x, s.y - 20, '-1', '#ff8800');
+                        _mgBullets.splice(j, 1); break;
+                    }
+                }
+                // Hit enemies (bubbles)
+                for (var bi = 0; bi < bubbles.length; bi++) {
+                    var bb = bubbles[bi];
+                    if (bb.state === 'dead') continue;
+                    var bdx = b.x - bb.x, bdy = b.y - bb.y;
+                    var br = BUBBLE_SIZE * 0.4 * (bb.isQueen ? QUEEN_SCALE : (bb.isMother ? MOTHER_SCALE : 1));
+                    if (bdx * bdx + bdy * bdy < br * br) {
+                        bb.hp -= 1; bb.hurtTimer = 8;
+                        spawnText(bb.x, bb.y - 20, '-1', '#ff8800');
+                        _mgBullets.splice(j, 1); break;
+                    }
+                }
+            }
+        }
+
+        function drawMGs() {
+            // Draw gun sprite on active picks
+            for (var i = 0; i < _activeMGs.length; i++) {
+                var mg = _activeMGs[i];
+                var p = mg.pick;
+                if (!p || !mg.sprite) continue;
+                ctx.save();
+                ctx.translate(p.x + 15, p.y + 5);
+                // Slight recoil shake
+                if (mg.fireTimer === 0) ctx.translate((Math.random() - 0.5) * 3, (Math.random() - 0.5) * 3);
+                var gunSize = 40;
+                if (mg.sprite.complete && mg.sprite.naturalWidth > 0) {
+                    ctx.drawImage(mg.sprite, -gunSize / 2, -gunSize / 2, gunSize, gunSize);
+                }
+                ctx.restore();
+            }
+            // Draw bullets
+            for (var j = 0; j < _mgBullets.length; j++) {
+                var b = _mgBullets[j];
+                ctx.save();
+                ctx.fillStyle = '#ffcc00';
+                ctx.globalAlpha = Math.min(1, b.life / 10);
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, 2.5, 0, Math.PI * 2);
+                ctx.fill();
+                // Trail
+                ctx.strokeStyle = '#ff8800';
+                ctx.lineWidth = 1.5;
+                ctx.globalAlpha *= 0.5;
+                ctx.beginPath();
+                ctx.moveTo(b.x, b.y);
+                ctx.lineTo(b.x - b.vx * 0.4, b.y - b.vy * 0.4);
+                ctx.stroke();
+                ctx.restore();
+            }
         }
 
         function activateGravity(userName) {
@@ -4125,6 +4285,7 @@
             checkPickSpiderCollisions();
             updateBubbles();
             updateBossAbilities();
+            updateMGs();
             // ── Mega-clearing: spawn flyers when any player enters the zone ──
             var _megaPick = _aiHidden ? (_trackPick || pick) : pick;
             if (_megaPick) {
@@ -4827,9 +4988,10 @@
                 { id: '_clone', color: '#44ffaa', label: '👥', maxKey: 'clone' },
                 { id: '_storm', color: '#ff88ff', label: '🏓', maxKey: 'storm' },
                 { id: '_blackhole', color: '#8800ff', label: '🕳️', maxKey: 'blackhole' },
-                { id: '_gravity', color: '#ff44ff', label: '🔄', maxKey: 'gravity' }
+                { id: '_gravity', color: '#ff44ff', label: '🔄', maxKey: 'gravity' },
+                { id: '_mg', color: '#ff8800', label: '🔫', maxKey: 'mg' }
             ];
-            var maxMap = { nuke: nukeCooldown, thor: thorCooldown, clone: cloneCooldown, storm: stormCooldown, blackhole: blackholeCooldown, gravity: gravityCooldown };
+            var maxMap = { nuke: nukeCooldown, thor: thorCooldown, clone: cloneCooldown, storm: stormCooldown, blackhole: blackholeCooldown, gravity: gravityCooldown, mg: mgCooldown };
 
             context.save();
             var anyActive = false;
@@ -5321,6 +5483,7 @@
             // slimes
             drawSlimes();
             drawBossEffects();
+            drawMGs();
             // Spider webs
             if (spiderWebs.length > 0) {
                 var wvTop = camY - TILE * 2, wvBot = camY + canvas.height + TILE * 2;
@@ -8373,6 +8536,7 @@
             if (e.key === '9') activateBig(pick ? pick.userName : ownerName || '@Player');
             if (e.key === '0') activateGravity(pick ? pick.userName : ownerName || '@Player');
             if (e.key === 'm' || e.key === 'M') activateKiss(pick ? pick.userName : ownerName || '@Player', pick ? pick.userAvatarUrl : '');
+            if (e.key === 'g' || e.key === 'G') activateMG(pick ? pick.userName : ownerName || '@Player');
             if (e.key === 'u' || e.key === 'U') triggerBotrixEvent('follow', '@fabiosdx');
             if (e.key === 'i' || e.key === 'I') triggerBotrixEvent('superchat', '@fabiosdx');
             if (e.key === 'p' || e.key === 'P') triggerBotrixEvent('gift', '@fabiosdx');
@@ -8713,7 +8877,8 @@
                 }, id: 'spin', skipLoop: true },
                 { re: /\bbig\b/gi, fn: function() { activateBig(cUser); }, id: 'big' },
                 { re: /\bgravity\b|\bgrav\b/gi, fn: function() { activateGravity(cUser); }, id: 'gravity' },
-                { re: /\bme\b|\bbeijinho\b|\bkiss\b/gi, fn: function() { activateKiss(cUser, cAvatarUrl); }, id: 'kiss' }
+                { re: /\bme\b|\bbeijinho\b|\bkiss\b/gi, fn: function() { activateKiss(cUser, cAvatarUrl); }, id: 'kiss' },
+                { re: /\bmg\b|\bgun\b|\bmetralhadora\b/gi, fn: function() { activateMG(cUser); }, id: 'mg' }
             ];
 
             var cmdCount = 0;
