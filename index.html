@@ -4178,20 +4178,26 @@
                 _aiSkillTimer = 0;
                 var me = pick.userName || '@Player';
                 var skill = Math.random();
-                if (skill < 0.25) {
+                if (skill < 0.18) {
                     activateTNT(pick.x, pick.y, me);
-                } else if (skill < 0.4) {
+                } else if (skill < 0.30) {
                     activateMegaTNT(pick.x, pick.y, me);
-                } else if (skill < 0.55) {
+                } else if (skill < 0.42) {
                     activateThor(pick.x, pick.y, me);
-                } else if (skill < 0.65) {
+                } else if (skill < 0.50) {
+                    activateNuke(pick.x, pick.y, me);
+                } else if (skill < 0.58) {
                     spawnClone(me, pick.userAvatarUrl || '');
-                } else if (skill < 0.75) {
+                } else if (skill < 0.66) {
                     activateBlackHole(pick.x, pick.y, me);
-                } else if (skill < 0.85) {
+                } else if (skill < 0.74) {
                     activateGravity(me);
-                } else {
+                } else if (skill < 0.82) {
+                    activateMG(me);
+                } else if (skill < 0.91) {
                     activateBig(me);
+                } else {
+                    activateStorm(pick);
                 }
             }
 
