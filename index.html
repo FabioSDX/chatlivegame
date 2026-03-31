@@ -6890,8 +6890,8 @@
                         p.y += ny * overlap * 0.5;
                         z.x -= nx * overlap * 0.5;
                         z.y -= ny * overlap * 0.5;
-                        // Prevent boss from being pushed below bedrock floor
-                        if (z.isSlimeBoss && z.zone !== undefined) {
+                        // Prevent boss from being pushed below bedrock floor (skip if black hole captured)
+                        if (z.isSlimeBoss && z.zone !== undefined && !z._bhCaptured) {
                             var _floorRow = megaClearedZones[z.zone + '_zbFloorRow'];
                             if (_floorRow !== undefined) {
                                 var _maxBossY = _floorRow * TILE - SLIME_SIZE * (z.bossScale || SLIME_BOSS_SCALE) * 0.5;
@@ -6985,7 +6985,8 @@
                     }
                 }
                 // Hard barrier: prevent bosses from passing through bedrock floor
-                if (z.isSlimeBoss && z.zone !== undefined) {
+                // (skip if captured by black hole — let them be sucked in)
+                if (z.isSlimeBoss && z.zone !== undefined && !z._bhCaptured) {
                     var _bFloor = megaClearedZones[z.zone + '_zbFloorRow'];
                     if (_bFloor !== undefined) {
                         var _bBarrierY = _bFloor * TILE - SLIME_SIZE * (z.bossScale || SLIME_BOSS_SCALE) * 0.5;
@@ -6995,7 +6996,6 @@
                             z.grounded = true;
                         }
                     }
-                    // Also clamp to arena bottom
                     var maxY = (getMegaStart(z.zone) + MEGA_CLEARING_HEIGHT) * TILE;
                     if (z.y > maxY) {
                         z.y = maxY - SLIME_SIZE * (z.bossScale || SLIME_BOSS_SCALE) * 0.5;
@@ -9393,17 +9393,20 @@
                         z._bhCaptured = true;
                         var znx = zdx / (zdist || 1), zny = zdy / (zdist || 1);
                         var zclose = 1 - Math.min(zdist, R) / R;
-                        var ztSpeed = 1.5 + zclose * 3.5;
+                        // Stronger suction for bosses
+                        var zSuctionMult = z.isSlimeBoss ? 2.5 : 1.0;
+                        var ztSpeed = (1.5 + zclose * 3.5) * zSuctionMult;
                         var zorbitR = Math.max(0.1, 0.5 - zclose * 0.4);
                         var ztvx = znx * ztSpeed * (1 - zorbitR) + zny * ztSpeed * zorbitR;
                         var ztvy = zny * ztSpeed * (1 - zorbitR) - znx * ztSpeed * zorbitR;
-                        var zblend = 0.07 + zclose * 0.12;
+                        var zblend = z.isSlimeBoss ? (0.15 + zclose * 0.25) : (0.07 + zclose * 0.12);
                         z.vx = z.vx * (1 - zblend) + ztvx * zblend;
                         z.vy = z.vy * (1 - zblend) + ztvy * zblend;
                         z._bhScale = Math.max(0.05, zdist / R);
                         z._bhCaptured = true;
                         z._bhSpin = (z._bhSpin || 0) + 0.15 * zclose;
-                        if (zdist < 25) {
+                        var devourDist = z.isSlimeBoss ? 50 : 25;
+                        if (zdist < devourDist) {
                             z.hp = 0; z.state = 'dead'; z.animTimer = 0; z.deadTimer = 80;
                             z._bhScale = 0;
                             score += z.pts;
