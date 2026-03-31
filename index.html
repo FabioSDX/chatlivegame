@@ -2527,18 +2527,18 @@
         function activateKiss(userName, avatarUrl) {
             userName = (userName || '').replace(/^@@+/, '@');
             var kisses = [];
-            for (var i = 0; i < 120; i++) {
+            for (var i = 0; i < 12; i++) {
                 var ang = Math.random() * Math.PI * 2;
-                var spd = 2 + Math.random() * 6;
+                var spd = 1.5 + Math.random() * 3;
                 kisses.push({
-                    x: canvas.width / 2 + (Math.random() - 0.5) * 100,
-                    y: canvas.height / 2 + (Math.random() - 0.5) * 100,
+                    x: canvas.width / 2 + (Math.random() - 0.5) * 200,
+                    y: canvas.height / 2 + (Math.random() - 0.5) * 150,
                     vx: Math.cos(ang) * spd,
-                    vy: Math.sin(ang) * spd - 2,
-                    size: 14 + Math.random() * 18,
-                    rot: (Math.random() - 0.5) * 0.5,
+                    vy: Math.sin(ang) * spd - 1,
+                    size: 28 + Math.random() * 36,
+                    rot: (Math.random() - 0.5) * 0.3,
                     alpha: 1,
-                    delay: Math.floor(Math.random() * 30)
+                    delay: Math.floor(Math.random() * 20)
                 });
             }
             _kissEffect = { timer: 180, maxTimer: 180, userName: userName, avatarUrl: avatarUrl, kisses: kisses, pulse: 0 };
@@ -5581,57 +5581,39 @@
                 var ke = _kissEffect;
                 ke.timer--;
                 ke.pulse += 0.15;
-                var fadeIn = Math.min(1, (ke.maxTimer - ke.timer) / 15);
-                var fadeOut = Math.min(1, ke.timer / 30);
+                var fadeIn = Math.min(1, (ke.maxTimer - ke.timer) / 10);
+                var fadeOut = Math.min(1, ke.timer / 20);
                 var kAlpha = Math.min(fadeIn, fadeOut);
 
                 ctx.save();
 
-                // Dim background
-                ctx.globalAlpha = kAlpha * 0.3;
-                ctx.fillStyle = '#ff88aa';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-                // Draw kisses
-                ctx.font = '20px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
+                // Draw kisses (12 big emojis)
                 var emojis = ['😘', '💋', '💕', '❤️', '💖', '😍'];
                 for (var ki = 0; ki < ke.kisses.length; ki++) {
                     var k = ke.kisses[ki];
                     if (k.delay > 0) { k.delay--; continue; }
                     k.x += k.vx;
                     k.y += k.vy;
-                    k.vy += 0.05;
+                    k.vy += 0.03;
                     k.vx *= 0.99;
-                    k.rot += 0.02;
-                    k.alpha = Math.max(0, k.alpha - 0.004);
+                    k.alpha = Math.max(0, k.alpha - 0.005);
                     if (k.alpha <= 0) continue;
-                    ctx.save();
                     ctx.globalAlpha = k.alpha * kAlpha;
-                    ctx.translate(k.x, k.y);
-                    ctx.rotate(k.rot);
                     ctx.font = Math.floor(k.size) + 'px sans-serif';
-                    ctx.fillText(emojis[ki % emojis.length], 0, 0);
-                    ctx.restore();
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(emojis[ki % emojis.length], k.x, k.y);
                 }
 
                 // Pulsing avatar in center
                 var avUrl = ke.avatarUrl;
                 var avImg = avUrl ? avatarCache[avUrl] : null;
-                var avPulse = 1 + Math.sin(ke.pulse) * 0.15;
-                var avR = 50 * avPulse;
+                var avPulse = 1 + Math.sin(ke.pulse) * 0.12;
+                var avR = 45 * avPulse;
                 var cx = canvas.width / 2;
                 var cy = canvas.height / 2 - 20;
 
                 ctx.globalAlpha = kAlpha;
-                // Glow behind avatar
-                ctx.fillStyle = 'rgba(255, 100, 150, 0.3)';
-                ctx.beginPath();
-                ctx.arc(cx, cy, avR + 15, 0, Math.PI * 2);
-                ctx.fill();
-
-                // Avatar
                 ctx.save();
                 ctx.beginPath();
                 ctx.arc(cx, cy, avR, 0, Math.PI * 2);
@@ -5642,29 +5624,23 @@
                     ctx.fillStyle = '#ff6699';
                     ctx.fill();
                     ctx.fillStyle = '#fff';
-                    ctx.font = 'bold 36px Arial';
+                    ctx.font = 'bold 32px Arial';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillText((ke.userName || '?').replace('@','').charAt(0).toUpperCase(), cx, cy);
                 }
                 ctx.restore();
 
-                // Avatar ring
-                ctx.strokeStyle = '#ff4488';
-                ctx.lineWidth = 3;
-                ctx.beginPath();
-                ctx.arc(cx, cy, avR + 2, 0, Math.PI * 2);
-                ctx.stroke();
-
-                // Name below
+                // Name
+                ctx.globalAlpha = kAlpha;
                 ctx.fillStyle = '#fff';
-                ctx.font = 'bold 20px Arial';
+                ctx.font = 'bold 18px Arial';
                 ctx.textAlign = 'center';
                 ctx.strokeStyle = '#000';
                 ctx.lineWidth = 3;
                 ctx.lineJoin = 'round';
-                ctx.strokeText(ke.userName, cx, cy + avR + 25);
-                ctx.fillText(ke.userName, cx, cy + avR + 25);
+                ctx.strokeText(ke.userName, cx, cy + avR + 20);
+                ctx.fillText(ke.userName, cx, cy + avR + 20);
 
                 ctx.restore();
                 if (ke.timer <= 0) _kissEffect = null;
