@@ -770,12 +770,9 @@
     </div>
 
     <div id="ui">
-        <div id="fullscreenBtn" onclick="goFullscreen()" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:99999;background:rgba(0,0,0,0.85);border:2px solid #00ff88;border-radius:16px;padding:24px 40px;color:#fff;font-family:Arial,sans-serif;text-align:center;cursor:pointer;">
-            <div style="font-size:48px;margin-bottom:8px;">⛏️</div>
-            <div style="font-size:18px;font-weight:bold;color:#00ff88;">TAP TO PLAY</div>
-        </div>
         <div id="fpsCounter">FPS: 0</div>
         <span id="aiToggle" onclick="toggleAI()" style="position:fixed;top:4px;left:80px;font-size:10px;cursor:pointer;color:#888;padding:2px 6px;border:1px solid #444;border-radius:4px;user-select:none;z-index:100;" title="Toggle AI player">AI</span>
+        <span id="fullscreenBtn" onclick="goFullscreen()" style="position:fixed;top:4px;left:110px;font-size:10px;cursor:pointer;color:#888;padding:2px 6px;border:1px solid #444;border-radius:4px;user-select:none;z-index:100;" title="Fullscreen">⛶</span>
         <div id="apiStatus">
             <div class="status-dot" id="statusDotApi"></div>
             <span id="statusTextApi" style="font-size:11px;">WS: —</span>
@@ -8675,14 +8672,9 @@
             var el = document.documentElement;
             var rfs = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
             if (rfs) rfs.call(el).catch(function() {});
-            document.getElementById('fullscreenBtn').style.display = 'none';
             ensureAudio();
         }
 
-        // Show fullscreen button on mobile
-        if (isMobile) {
-            document.getElementById('fullscreenBtn').style.display = 'block';
-        }
         window.addEventListener('keydown', ensureAudio, { once: false });
         window.addEventListener('pointerdown', ensureAudio, { once: false });
 
