@@ -862,6 +862,10 @@
                     <span class="cmd-badge badge-orange">mg</span>
                 </div>
                 <div class="cmd-row" style="opacity:0.7;cursor:default">
+                    <span class="cmd-icon">🏳️</span>
+                    <span class="cmd-badge badge-green">flag</span>
+                </div>
+                <div class="cmd-row" style="opacity:0.7;cursor:default">
                     <span class="cmd-icon">👍</span>
                     <span class="cmd-badge badge-orange">tnt</span>
                 </div>
@@ -2215,12 +2219,25 @@
 
         function detectFlag(userName, message) {
             var msg = message.toLowerCase().trim();
+            // Support "flag brazil" or "flag br" format
+            var flagMatch = msg.match(/\bflag\s+(\S+)/);
+            var search = flagMatch ? flagMatch[1] : msg;
             var keys = Object.keys(_countryMap);
             for (var i = 0; i < keys.length; i++) {
-                if (msg === keys[i] || msg.indexOf(keys[i]) !== -1) {
+                if (search === keys[i] || (flagMatch && search.indexOf(keys[i]) !== -1)) {
                     _playerFlags[userName] = _countryMap[keys[i]];
                     spawnText(canvas.width / 2, camY + canvas.height / 2, _countryMap[keys[i]] + ' ' + userName, '#ffffff');
                     return true;
+                }
+            }
+            // Also match without flag prefix for standalone country names
+            if (!flagMatch) {
+                for (var j = 0; j < keys.length; j++) {
+                    if (msg === keys[j]) {
+                        _playerFlags[userName] = _countryMap[keys[j]];
+                        spawnText(canvas.width / 2, camY + canvas.height / 2, _countryMap[keys[j]] + ' ' + userName, '#ffffff');
+                        return true;
+                    }
                 }
             }
             return false;
@@ -5702,10 +5719,26 @@
                     ctx.strokeText(pick.userName, pick.x + 10, oAvY);
                     if (SHADOW_ENABLED) { ctx.shadowBlur = 8; ctx.shadowColor = '#000'; }
                     ctx.fillText(pick.userName, pick.x + 10, oAvY);
-                    // Flag
+                    // Flag with pole
                     if (_playerFlags[pick.userName]) {
-                        ctx.font = '14px sans-serif';
-                        ctx.fillText(_playerFlags[pick.userName], pick.x - 10 - oAvSize / 2, oAvY - oAvSize / 2 - 2);
+                        ctx.save();
+                        var flagX = pick.x - 10 - oAvSize / 2 - 8;
+                        var flagY = oAvY - oAvSize / 2 - 20;
+                        // Pole
+                        ctx.strokeStyle = '#888';
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.moveTo(flagX, flagY + 30);
+                        ctx.lineTo(flagX, flagY - 5);
+                        ctx.stroke();
+                        // Flag (diagonal)
+                        ctx.translate(flagX + 2, flagY - 2);
+                        ctx.rotate(-0.2);
+                        ctx.font = '28px sans-serif';
+                        ctx.textAlign = 'left';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(_playerFlags[pick.userName], 0, 0);
+                        ctx.restore();
                     }
 
                     drawPlayerCooldowns(ctx, pick.x - 10 - oAvSize / 2, oAvY, pick.userName);
@@ -5833,10 +5866,24 @@
                 ctx.strokeText(up.userName, up.x + 10, avY);
                 if (SHADOW_ENABLED) { ctx.shadowBlur = 8; ctx.shadowColor = '#000'; }
                 ctx.fillText(up.userName, up.x + 10, avY);
-                // Flag
+                // Flag with pole
                 if (_playerFlags[up.userName]) {
-                    ctx.font = '14px sans-serif';
-                    ctx.fillText(_playerFlags[up.userName], up.x - 10 - avSize / 2, avY - avSize / 2 - 2);
+                    ctx.save();
+                    var flagX = up.x - 10 - avSize / 2 - 8;
+                    var flagY = avY - avSize / 2 - 20;
+                    ctx.strokeStyle = '#888';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(flagX, flagY + 30);
+                    ctx.lineTo(flagX, flagY - 5);
+                    ctx.stroke();
+                    ctx.translate(flagX + 2, flagY - 2);
+                    ctx.rotate(-0.2);
+                    ctx.font = '28px sans-serif';
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(_playerFlags[up.userName], 0, 0);
+                    ctx.restore();
                 }
 
                 drawPlayerCooldowns(ctx, up.x - 10 - avSize / 2, avY, up.userName);
