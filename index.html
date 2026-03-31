@@ -2225,25 +2225,21 @@
             ctx.fillRect(0, 0, W, H);
             ctx.globalAlpha = alpha;
 
-            // ── Confetti system ──
+            // ── Confetti (lightweight) ──
             var conf = _cycleOverlay.confetti;
-            if (_cycleOverlayTimer % 2 === 0 && _cycleOverlay.timer > 80 && conf.length < 80) {
-                var cc = ['#ff4466','#44dd66','#4488ff','#ffdd44','#ff44ff','#44ffdd','#ff8844','#88ff44'];
-                conf.push({ x: Math.random() * W, y: -10, vx: (Math.random()-0.5)*2, vy: 1.5+Math.random()*2, r: 0, w: 4+Math.random()*6, h: 6+Math.random()*8, c: cc[Math.floor(Math.random()*cc.length)], spin: Math.random()*0.2-0.1, life: 1 });
+            if (_cycleOverlayTimer % 6 === 0 && _cycleOverlay.timer > 80 && conf.length < 20) {
+                var cc = ['#ff4466','#44dd66','#4488ff','#ffdd44','#ff44ff','#44ffdd'];
+                conf.push({ x: Math.random() * W, y: -10, vx: (Math.random()-0.5)*2, vy: 1.5+Math.random()*2, w: 4+Math.random()*5, h: 6+Math.random()*6, c: cc[Math.floor(Math.random()*cc.length)], life: 1 });
             }
             for (var ci = conf.length - 1; ci >= 0; ci--) {
                 var c = conf[ci];
-                c.x += c.vx; c.y += c.vy; c.r += c.spin;
-                c.vx += (Math.random()-0.5)*0.1;
+                c.x += c.vx; c.y += c.vy;
                 c.vy += 0.02;
-                c.life -= 0.003;
+                c.life -= 0.005;
                 if (c.life <= 0 || c.y > H + 20) { conf.splice(ci, 1); continue; }
-                ctx.save();
-                ctx.translate(c.x, c.y); ctx.rotate(c.r);
                 ctx.globalAlpha = alpha * c.life;
                 ctx.fillStyle = c.c;
-                ctx.fillRect(-c.w/2, -c.h/2, c.w, c.h);
-                ctx.restore();
+                ctx.fillRect(c.x, c.y, c.w, c.h);
             }
 
             // ── Title banner ──
@@ -2287,12 +2283,9 @@
                 ctx.globalAlpha = alpha * ease;
                 ctx.translate(offX, 0);
 
-                // Card background with gradient
-                var grad = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY);
-                if (i === 0) { grad.addColorStop(0, 'rgba(255,215,0,0.3)'); grad.addColorStop(1, 'rgba(255,215,0,0.08)'); }
-                else if (i === 1) { grad.addColorStop(0, 'rgba(192,192,192,0.25)'); grad.addColorStop(1, 'rgba(192,192,192,0.06)'); }
-                else { grad.addColorStop(0, 'rgba(205,127,50,0.25)'); grad.addColorStop(1, 'rgba(205,127,50,0.06)'); }
-                ctx.fillStyle = grad;
+                // Card background (solid, no gradient for performance)
+                var cardColors = ['rgba(255,215,0,0.2)', 'rgba(192,192,192,0.15)', 'rgba(205,127,50,0.15)'];
+                ctx.fillStyle = cardColors[i] || cardColors[2];
                 _roundRect(ctx, cardX, cardY, cardW, cardH, 18);
                 ctx.fill();
                 // Border
@@ -2374,14 +2367,7 @@
             }
 
             // ── 1st place spotlight effect ──
-            if (top3.length > 0 && _cycleOverlayTimer > 20) {
-                var spotAlpha = Math.sin(_cycleOverlayTimer * 0.03) * 0.08 + 0.08;
-                var spotGrad = ctx.createRadialGradient(W / 2, podiumH[0], 0, W / 2, podiumH[0], W * 0.4);
-                spotGrad.addColorStop(0, 'rgba(255,215,0,' + spotAlpha + ')');
-                spotGrad.addColorStop(1, 'rgba(255,215,0,0)');
-                ctx.fillStyle = spotGrad;
-                ctx.fillRect(0, 0, W, H);
-            }
+            // Spotlight removed for performance
 
             ctx.restore();
         }
@@ -2652,32 +2638,40 @@
         function sfxMGShot() {
             var ac = getAC(); if (!ac) return;
             var t = ac.currentTime;
-            // Realistic gunshot: sharp attack + low thump + noise burst
-            var nLen = Math.ceil(ac.sampleRate * 0.08);
+            // Heavy gunshot: loud crack + bass punch + shell casing
+            var nLen = Math.ceil(ac.sampleRate * 0.1);
             var buf = ac.createBuffer(1, nLen, ac.sampleRate);
             var d = buf.getChannelData(0);
             for (var i = 0; i < nLen; i++) {
-                var env = Math.pow(1 - i / nLen, 3);
+                var env = i < nLen * 0.05 ? (i / (nLen * 0.05)) : Math.pow(1 - (i - nLen * 0.05) / (nLen * 0.95), 2);
                 d[i] = (Math.random() * 2 - 1) * env;
             }
             var src = ac.createBufferSource(); src.buffer = buf;
             var g = ac.createGain();
-            g.gain.setValueAtTime(0.18, t);
-            g.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
-            // Bandpass for metallic crack
+            g.gain.setValueAtTime(0.25, t);
+            g.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
             var filt = ac.createBiquadFilter();
-            filt.type = 'bandpass'; filt.frequency.value = 2000 + Math.random() * 1000; filt.Q.value = 1.5;
+            filt.type = 'bandpass'; filt.frequency.value = 1500 + Math.random() * 2000; filt.Q.value = 2;
             src.connect(filt); filt.connect(g); g.connect(ac.destination);
             src.start(t);
-            // Low thump
+            // Heavy bass punch
             var osc = ac.createOscillator(), og = ac.createGain();
             osc.type = 'sine';
-            osc.frequency.setValueAtTime(80, t);
-            osc.frequency.exponentialRampToValueAtTime(30, t + 0.06);
-            og.gain.setValueAtTime(0.15, t);
-            og.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
+            osc.frequency.setValueAtTime(120, t);
+            osc.frequency.exponentialRampToValueAtTime(25, t + 0.08);
+            og.gain.setValueAtTime(0.25, t);
+            og.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
             osc.connect(og); og.connect(ac.destination);
-            osc.start(t); osc.stop(t + 0.08);
+            osc.start(t); osc.stop(t + 0.1);
+            // High click (shell casing)
+            var osc2 = ac.createOscillator(), og2 = ac.createGain();
+            osc2.type = 'square';
+            osc2.frequency.setValueAtTime(4000, t);
+            osc2.frequency.exponentialRampToValueAtTime(1000, t + 0.02);
+            og2.gain.setValueAtTime(0.06, t);
+            og2.gain.exponentialRampToValueAtTime(0.001, t + 0.03);
+            osc2.connect(og2); og2.connect(ac.destination);
+            osc2.start(t); osc2.stop(t + 0.04);
         }
 
         function updateMGs() {
@@ -2696,7 +2690,7 @@
                     var gunAngle = (mg.timer * Math.PI * 2) / 78;
                     var spread = (Math.random() - 0.5) * 0.15;
                     var speed = 25 + Math.random() * 6;
-                    var muzzleDist = 80; // tip of the gun sprite
+                    var muzzleDist = 56; // tip of the gun sprite
                     _mgBullets.push({
                         x: p.x + Math.cos(gunAngle) * muzzleDist,
                         y: p.y + Math.sin(gunAngle) * muzzleDist,
@@ -2722,7 +2716,7 @@
                 var bRow = Math.floor(b.y / TILE);
                 var cell = getCell(bRow, bCol);
                 if (cell && cell.t !== E && cell.t !== BEDROCK) {
-                    hitBlock(bCol, bRow, 2, null);
+                    hitBlock(bCol, bRow, 4, null);
                     _mgBullets.splice(j, 1); continue;
                 }
                 // Hit enemies (slimes)
@@ -2732,8 +2726,8 @@
                     var sdx = b.x - s.x, sdy = b.y - s.y;
                     var sr = SLIME_SIZE * 0.4 * (s.isSlimeBoss ? (s.bossScale || SLIME_BOSS_SCALE) : 1);
                     if (sdx * sdx + sdy * sdy < sr * sr) {
-                        s.hp -= 1; s.hurtTimer = 8; s.state = 'hurt';
-                        spawnText(s.x, s.y - 20, '-1', '#ff8800');
+                        s.hp -= 2; s.hurtTimer = 8; s.state = 'hurt';
+                        spawnText(s.x, s.y - 20, '-2', '#ff8800');
                         _mgBullets.splice(j, 1); break;
                     }
                 }
@@ -2744,8 +2738,8 @@
                     var bdx = b.x - bb.x, bdy = b.y - bb.y;
                     var br = BUBBLE_SIZE * 0.4 * (bb.isQueen ? QUEEN_SCALE : (bb.isMother ? MOTHER_SCALE : 1));
                     if (bdx * bdx + bdy * bdy < br * br) {
-                        bb.hp -= 1; bb.hurtTimer = 8;
-                        spawnText(bb.x, bb.y - 20, '-1', '#ff8800');
+                        bb.hp -= 2; bb.hurtTimer = 8;
+                        spawnText(bb.x, bb.y - 20, '-2', '#ff8800');
                         _mgBullets.splice(j, 1); break;
                     }
                 }
@@ -2765,7 +2759,7 @@
                 ctx.rotate(gunAngle);
                 // Recoil shake when firing
                 if (mg.fireTimer === 0) ctx.translate(3 + Math.random() * 2, (Math.random() - 0.5) * 3);
-                var gunSize = 160;
+                var gunSize = 112;
                 if (mg.sprite.complete && mg.sprite.naturalWidth > 0) {
                     ctx.drawImage(mg.sprite, -gunSize * 0.3, -gunSize / 2, gunSize, gunSize);
                 }
