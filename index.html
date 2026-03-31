@@ -2828,6 +2828,12 @@
                     hitBlock(bCol, bRow, 4, null);
                     _mgBullets.splice(j, 1); continue;
                 }
+                // Find owner pick for combo
+                var _mgOwnerPick = null;
+                if (b.userName) {
+                    if (pick && pick.userName === b.userName) _mgOwnerPick = pick;
+                    else _mgOwnerPick = userPicks.find(function(u) { return u.userName === b.userName; });
+                }
                 // Hit enemies (slimes)
                 for (var si = 0; si < slimes.length; si++) {
                     var s = slimes[si];
@@ -2837,6 +2843,7 @@
                     if (sdx * sdx + sdy * sdy < sr * sr) {
                         s.hp -= 2; s.hurtTimer = 8; s.state = 'hurt';
                         spawnText(s.x, s.y - 20, '-2', '#ff8800');
+                        if (_mgOwnerPick) registerComboHit(_mgOwnerPick, s.x, s.y);
                         _mgBullets.splice(j, 1); break;
                     }
                 }
@@ -2849,6 +2856,7 @@
                     if (bdx * bdx + bdy * bdy < br * br) {
                         bb.hp -= 2; bb.hurtTimer = 8;
                         spawnText(bb.x, bb.y - 20, '-2', '#ff8800');
+                        if (_mgOwnerPick) registerComboHit(_mgOwnerPick, bb.x, bb.y);
                         _mgBullets.splice(j, 1); break;
                     }
                 }
