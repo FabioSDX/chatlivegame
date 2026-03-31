@@ -782,8 +782,6 @@
             <div style="width:1px;height:14px;background:rgba(255,255,255,0.15);margin:0 2px;"></div>
             <div class="status-dot" id="statusDotStats"></div>
             <span id="statusTextStats" style="font-size:11px;">API: —</span>
-            <div style="width:1px;height:14px;background:rgba(255,255,255,0.15);margin:0 2px;"></div>
-            <span id="lqToggle" onclick="toggleLowQuality()" style="font-size:10px;cursor:pointer;color:#888;padding:2px 5px;border:1px solid #444;border-radius:4px;user-select:none;" title="Toggle low quality mode">LQ</span>
         </div>
         <div class="depth" id="depthDisplay">Depth: 0m</div>
         <div class="score-display" id="scoreDisplay" style="display:none">⛏ 0</div>
@@ -8890,41 +8888,6 @@
         function dismissApiBanner() {
             var b = document.getElementById('apiBanner');
             if (b) b.remove();
-        }
-
-        var _lowQuality = false;
-        function toggleLowQuality() {
-            _lowQuality = !_lowQuality;
-            var btn = document.getElementById('lqToggle');
-            if (_lowQuality) {
-                // Apply mobile-like settings
-                SHADOW_ENABLED = false;
-                SHIMMER_ENABLED = false;
-                BG_DETAIL = 0;
-                BLOCKS_3D = false;
-                MAX_PARTS = 10;
-                MAX_DEBRIS = 8;
-                MAX_TEXTS = 3;
-                MAX_BUBBLES_VISIBLE = 15;
-                MAX_SLIMES_VISIBLE = 8;
-                MAX_SPIDERS_VISIBLE = 8;
-                btn.style.color = '#00ff88';
-                btn.style.borderColor = '#00ff88';
-            } else {
-                // Restore default settings
-                SHADOW_ENABLED = false;
-                SHIMMER_ENABLED = false;
-                BG_DETAIL = 0;
-                BLOCKS_3D = false;
-                MAX_PARTS = 10;
-                MAX_DEBRIS = 8;
-                MAX_TEXTS = 3;
-                MAX_BUBBLES_VISIBLE = 15;
-                MAX_SLIMES_VISIBLE = 8;
-                MAX_SPIDERS_VISIBLE = 8;
-                btn.style.color = '#888';
-                btn.style.borderColor = '#444';
-            }
         }
 
         function updateStatusUI(connected) {
