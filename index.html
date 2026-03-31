@@ -1409,8 +1409,20 @@
             tntBlocks.push(b);
         }
 
+        var _megaTntCounts = {}; // { userName: count }
+        var _megaTntCooldowns = {}; // { userName: framesLeft }
+
         function activateMegaTNT(tx, ty, userName, avatarUrl) {
             if (tntBlocks.length > 20) return;
+            // Cooldown: 30s after every 4 mega TNTs
+            if (userName) {
+                if (_megaTntCooldowns[userName] && _megaTntCooldowns[userName] > 0) return;
+                _megaTntCounts[userName] = (_megaTntCounts[userName] || 0) + 1;
+                if (_megaTntCounts[userName] >= 4) {
+                    _megaTntCounts[userName] = 0;
+                    _megaTntCooldowns[userName] = 1800; // 30 seconds at 60fps
+                }
+            }
             var sx = tx !== undefined ? tx : pick.x;
             var sy = ty !== undefined ? ty : pick.y;
             var bx = sx + (Math.random() - 0.5) * TILE * 2;
@@ -2478,6 +2490,7 @@
             activeWebs = []; activeFireTrails = [];
             _gravityFlipped = false; _gravityFlipTimer = 0; _gravityRings = [];
             _kissEffect = null;
+            _megaTntCounts = {}; _megaTntCooldowns = {};
             // Reset leaderboard
             persistentScores = {};
             savePersistentScores();
@@ -4002,6 +4015,11 @@
             var skKeys = Object.keys(skillCooldowns);
             for (var ki = 0; ki < skKeys.length; ki++) {
                 if (skillCooldowns[skKeys[ki]] > 0) skillCooldowns[skKeys[ki]]--;
+            }
+            // Mega TNT cooldowns
+            var _mtKeys = Object.keys(_megaTntCooldowns);
+            for (var _mti = 0; _mti < _mtKeys.length; _mti++) {
+                if (_megaTntCooldowns[_mtKeys[_mti]] > 0) _megaTntCooldowns[_mtKeys[_mti]]--;
             }
             // Gravity flip timer
             if (_gravityFlipTimer > 0) {
