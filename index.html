@@ -3523,6 +3523,7 @@
                 for (var bi = bubbles.length - 1; bi >= 0; bi--) {
                     var b = bubbles[bi];
                     if (b.state === 'dead') continue;
+                    if (b.isQueen) continue; // bosses immune to storm
                     var dx = p.x - b.x, dy = p.y - b.y;
                     if (dx * dx + dy * dy < killR * killR) {
                         b.hp = 0; b.state = 'dead'; b.anim = 0; b.deadTimer = 0;
@@ -3551,6 +3552,7 @@
                 for (var zi = slimes.length - 1; zi >= 0; zi--) {
                     var z = slimes[zi];
                     if (z.state === 'dead') continue;
+                    if (z.isSlimeBoss) continue; // bosses immune to storm
                     var zdx = p.x - z.x, zdy = p.y - z.y;
                     if (zdx * zdx + zdy * zdy < killR * killR) {
                         z.hp = 0; z.state = 'dead'; z.animTimer = 0; z.deadTimer = 0;
