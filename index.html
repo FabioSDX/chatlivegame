@@ -801,9 +801,13 @@
             <div class="panel-title">⚡ Cmds</div>
 
             <div style="display: flex; flex-direction: column; gap: 1px;">
-                <div class="cmd-row" onclick="ensureAudio();var d=['right','left','up','down'][Math.floor(Math.random()*4)];activateSpin(pick.userName||'@Player',d)">
+                <div class="cmd-row" onclick="ensureAudio();var d=Math.random()<0.5?'right':'left';activateSpin(pick.userName||'@Player',d)">
                     <span class="cmd-icon" style="color:#00ddff;">✥</span>
-                    <span class="cmd-badge badge-cyan">sr sl su sd</span>
+                    <span class="cmd-badge badge-cyan">sr sl</span>
+                </div>
+                <div class="cmd-row" onclick="ensureAudio();var d=Math.random()<0.5?'up':'down';activateSpin(pick.userName||'@Player',d)">
+                    <span class="cmd-icon" style="color:#00ddff;">✥</span>
+                    <span class="cmd-badge badge-cyan">su sd</span>
                 </div>
                 <div class="cmd-row" onclick="ensureAudio();var m=pick.userName||'@Player';activateTNT(pick?pick.x:undefined,pick?pick.y:undefined,m)">
                     <span class="cmd-icon">💥</span>
@@ -847,11 +851,11 @@
                 </div>
                 <div class="cmd-row" style="opacity:0.7;cursor:default">
                     <span class="cmd-icon">👍</span>
-                    <span class="cmd-badge" style="background:rgba(68,136,255,0.2);color:#4488ff;">10💥</span>
+                    <span class="cmd-badge badge-orange">tnt</span>
                 </div>
                 <div class="cmd-row" style="opacity:0.7;cursor:default">
                     <span class="cmd-icon">🔔</span>
-                    <span class="cmd-badge" style="background:rgba(255,68,68,0.2);color:#ff4444;">10💥5🔥</span>
+                    <span class="cmd-badge badge-red">mega</span>
                 </div>
             </div>
         </div>
