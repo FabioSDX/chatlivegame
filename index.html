@@ -2323,17 +2323,26 @@
             _saveCycleScores();
         }
 
+        var _cycleUiHidden = false;
         function drawCycleOverlay() {
-            var cb = document.getElementById('commandBox');
-            var lb = document.getElementById('leaderboard');
             if (!_cycleOverlay || _cycleOverlay.timer <= 0) {
                 _cycleOverlay = null;
-                if (cb) cb.style.display = '';
-                if (lb) lb.style.display = '';
+                if (_cycleUiHidden) {
+                    _cycleUiHidden = false;
+                    var cb = document.getElementById('commandBox');
+                    var lb = document.getElementById('leaderboard');
+                    if (cb) cb.style.display = '';
+                    if (lb) lb.style.display = '';
+                }
                 return;
             }
-            if (cb) cb.style.display = 'none';
-            if (lb) lb.style.display = 'none';
+            if (!_cycleUiHidden) {
+                _cycleUiHidden = true;
+                var cb2 = document.getElementById('commandBox');
+                var lb2 = document.getElementById('leaderboard');
+                if (cb2) cb2.style.display = 'none';
+                if (lb2) lb2.style.display = 'none';
+            }
             _cycleOverlay.timer--;
             _cycleOverlayTimer++;
             var W = canvas.width, H = canvas.height;
