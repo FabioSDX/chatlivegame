@@ -1576,7 +1576,7 @@
         // ── Boss Tier System (cycles every 5 zones) ──────────────────────────
         var BOSS_TIERS = [
             {
-                name: 'Slime King',
+                name: 'Jelly King',
                 type: 'slime',       // ground boss (uses zombie system)
                 count: 2,
                 hp: 60,
@@ -1592,7 +1592,7 @@
                 splitScale: 2.5
             },
             {
-                name: 'Queen Bat',
+                name: 'Bubble Queen',
                 type: 'flyer',       // flying boss (uses bat system)
                 count: 3,
                 hp: 70,
@@ -1607,7 +1607,7 @@
                 minionCount: 3
             },
             {
-                name: 'Spider Empress',
+                name: 'Dark Jelly Empress',
                 type: 'ground',      // ground boss (uses zombie system)
                 count: 2,
                 hp: 90,
@@ -1622,7 +1622,7 @@
                 webSlowDuration: 180
             },
             {
-                name: 'Lava Golem',
+                name: 'Lava Jelly',
                 type: 'ground',
                 count: 2,
                 hp: 120,
@@ -1638,7 +1638,7 @@
                 fireRadius: 2
             },
             {
-                name: 'Crystal Titan',
+                name: 'Crystal Jelly',
                 type: 'ground',
                 count: 1,
                 hp: 200,
@@ -6078,7 +6078,7 @@
             requestAnimationFrame(loop);
         }
 
-        // ── SLIMES ────────────────────────────────────────────────────────────────
+        // ── JELLIES ────────────────────────────────────────────────────────────────
         var slimes = [];
         var MAX_SLIMES = 30;
         var SLIME_SIZE = TILE;
@@ -6115,7 +6115,7 @@
             });
         });
 
-        // ── SPIDER SYSTEM (mini-clearings) ──────────────────────────────────────
+        // ── DARK JELLY SYSTEM (mini-clearings) ──────────────────────────────────────
         var spiders = [];
         var MAX_SPIDERS = 20;
         var SPIDER_SIZE = TILE * 1.6;
@@ -7148,7 +7148,7 @@
 
         // ── Boss Special Abilities (called from update loops) ────────────────
         function updateBossAbilities() {
-            // Ground bosses (slimes with bossTier)
+            // Ground bosses (jellies with bossTier)
             for (var i = 0; i < slimes.length; i++) {
                 var z = slimes[i];
                 if (!z.isSlimeBoss || z.state === 'dead' || !z.bossTier) continue;
@@ -7856,7 +7856,7 @@
                 // Ground friction
                 if (z.grounded) z.vx *= 0.85;
 
-                // Slime-slime collision (push apart + bounce)
+                // Jelly-jelly collision (push apart + bounce)
                 var zR = SLIME_SIZE * 0.4 * (z.isSlimeBoss ? (z.bossScale || SLIME_BOSS_SCALE) : 1);
                 for (var j = i + 1; j < slimes.length; j++) {
                     var o = slimes[j];
@@ -7879,8 +7879,8 @@
             }
         }
 
-        // Slime colors — cycle per zombie type
-        var SLIME_COLORS = [
+        // Jelly colors — cycle per zombie type
+        var JELLY_COLORS = [
             { r: 50, g: 200, b: 80 },   // green
             { r: 200, g: 80, b: 180 },  // purple
             { r: 80, g: 150, b: 220 },  // blue
@@ -8144,8 +8144,8 @@
                 var w = baseW * squashX;
                 var h = baseH * squashY;
 
-                // Slime color
-                var jc = SLIME_COLORS[i % SLIME_COLORS.length];
+                // Jelly color
+                var jc = JELLY_COLORS[i % JELLY_COLORS.length];
                 if (z.isSlimeBoss) jc = z.bossColor || { r: 255, g: 60, b: 60 };
 
                 ctx.save();
@@ -9768,7 +9768,7 @@
                     }
                 }
 
-                // ── Suck slimes: orbit, shrink, spin, devour ──
+                // ── Suck jellies: orbit, shrink, spin, devour ──
                 for (var zi = slimes.length - 1; zi >= 0; zi--) {
                     var z = slimes[zi];
                     if (z.state === 'dead') continue;
