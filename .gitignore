@@ -4,6 +4,7 @@ config.txt
 
 # Node
 node_modules/
+fans.json
 
 # Arquivos temporários
 *.rar

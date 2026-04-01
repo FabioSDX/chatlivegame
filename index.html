@@ -2632,8 +2632,7 @@
             _kissEffect = null;
             _megaTntCounts = {}; _megaTntCooldowns = {};
             _activeMGs = []; _mgBullets = [];
-            _fanActivity = {}; updateTopFansUI();
-            _fanBannerTimer = 0; _fanBannerIndex = 0;
+            _fanBannerTimer = 0; _fanBannerIndex = 0; // fans data preserved across restarts
             // Reset leaderboard
             persistentScores = {};
             savePersistentScores();
@@ -8738,6 +8737,7 @@
 
         window.addEventListener('keydown', ensureAudio, { once: false });
         window.addEventListener('pointerdown', ensureAudio, { once: false });
+        window.addEventListener('beforeunload', syncFansToServer);
 
         // Atalhos de teclado (Skills e Reset)
         window.addEventListener('keydown', function (e) {
@@ -9006,7 +9006,27 @@
         // ── Top Fans System ──────────────────────────────────────────────────
         var _fanActivity = {}; // { userName: { msgs, cmds, superchats, members, avatar, flag } }
         var _fanBannerTimer = 0;
-        var _fanBannerInterval = 300; // show each fan for 5 seconds (300 frames)
+        var _fanBannerInterval = 300;
+        var _fanBannerIndex = 0;
+        var _fanBannerActive = null;
+        var _fanSyncTimer = 0;
+
+        // Load fans from server on start
+        fetch('/fans').then(function(r) { return r.json(); }).then(function(data) {
+            _fanActivity = data || {};
+            console.log('[fans] Loaded ' + Object.keys(_fanActivity).length + ' fans from server');
+        }).catch(function() {});
+
+        // Sync fans to server every 2 minutes
+        function syncFansToServer() {
+            if (Object.keys(_fanActivity).length === 0) return;
+            fetch('/fans', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(_fanActivity)
+            }).catch(function() {});
+        }
+        setInterval(syncFansToServer, 120000);
         var _fanBannerIndex = 0;
         var _fanBannerActive = null; // current banner DOM element
 
@@ -9029,6 +9049,7 @@
         }
 
         function getTopFans(n) {
+            if (!_fanActivity) return [];
             return Object.keys(_fanActivity).map(function(name) {
                 return { name: name, score: getFanScore(_fanActivity[name]), data: _fanActivity[name] };
             }).sort(function(a, b) { return b.score - a.score; }).slice(0, n || 10);
@@ -9073,6 +9094,7 @@
         }
 
         function updateFanBanners() {
+            if (!_fanActivity) return;
             // Only show when no visitors (solo or AI mode)
             if (userPicks.length > 0) return;
             _fanBannerTimer++;
