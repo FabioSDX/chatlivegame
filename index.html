@@ -884,11 +884,6 @@
         </div>
     </div>
 
-    <div id="topFansPanel" style="position:fixed;right:8px;top:50%;transform:translateY(-50%);z-index:100;background:rgba(0,0,0,0.75);border:1px solid rgba(255,170,0,0.4);border-radius:10px;padding:8px 10px;min-width:130px;max-width:150px;font-family:'Inter',Arial,sans-serif;font-size:11px;color:#fff;">
-        <div style="text-align:center;font-weight:bold;color:#ffaa00;margin-bottom:6px;font-size:12px;">🔥 Top Fans</div>
-        <div id="topFansList" style="display:flex;flex-direction:column;gap:3px;"></div>
-    </div>
-
     <div id="announceOverlay"></div>
 
     <div id="gameWrapper" style="position:relative;display:inline-block;max-width:100vw;max-height:100vh;">
@@ -2638,6 +2633,7 @@
             _megaTntCounts = {}; _megaTntCooldowns = {};
             _activeMGs = []; _mgBullets = [];
             _fanActivity = {}; updateTopFansUI();
+            _fanBannerTimer = 0; _fanBannerIndex = 0;
             // Reset leaderboard
             persistentScores = {};
             savePersistentScores();
@@ -6076,6 +6072,7 @@
 
             update();
             updateAI();
+            updateFanBanners();
             updateFX();
             updateWeatherParticles();
             try { draw(); } catch(e) { console.warn('draw error:', e.message); }
@@ -9008,6 +9005,10 @@
 
         // ── Top Fans System ──────────────────────────────────────────────────
         var _fanActivity = {}; // { userName: { msgs, cmds, superchats, members, avatar, flag } }
+        var _fanBannerTimer = 0;
+        var _fanBannerInterval = 300; // show each fan for 5 seconds (300 frames)
+        var _fanBannerIndex = 0;
+        var _fanBannerActive = null; // current banner DOM element
 
         function trackFanActivity(userName, avatarUrl, type) {
             if (!userName || /botrix|nightbot|streamelements|streamlabs|moobot/i.test(userName)) return;
@@ -9021,44 +9022,70 @@
             else if (type === 'cmd') f.cmds++;
             else if (type === 'superchat') f.superchats++;
             else if (type === 'member') f.members++;
-            updateTopFansUI();
         }
 
         function getFanScore(f) {
             return f.msgs + f.cmds * 3 + f.superchats * 10 + f.members * 8;
         }
 
-        function updateTopFansUI() {
-            var list = document.getElementById('topFansList');
-            if (!list) return;
-            var fans = Object.keys(_fanActivity).map(function(n) {
-                return { name: n, score: getFanScore(_fanActivity[n]), data: _fanActivity[n] };
-            }).sort(function(a, b) { return b.score - a.score; }).slice(0, 5);
-
-            if (fans.length === 0) {
-                list.innerHTML = '<div style="opacity:0.4;text-align:center;font-size:10px;">No activity yet</div>';
-                return;
-            }
-
-            var medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
-            list.innerHTML = fans.map(function(f, i) {
-                var name = f.name.replace('@', '');
-                if (name.length > 10) name = name.substring(0, 10) + '…';
-                var flagHtml = f.data.flag ? '<img src="https://flagcdn.com/w20/' + f.data.flag.toLowerCase() + '.png" style="width:14px;height:10px;vertical-align:middle;margin-right:2px;">' : '';
-                var avHtml = f.data.avatar ? '<img src="' + f.data.avatar + '" style="width:18px;height:18px;border-radius:50%;vertical-align:middle;margin-right:4px;object-fit:cover;">' : '';
-                var badges = '';
-                if (f.data.superchats > 0) badges += '<span style="color:#ffdd44;">💰</span>';
-                if (f.data.members > 0) badges += '<span style="color:#44ff88;">⭐</span>';
-                return '<div style="display:flex;align-items:center;gap:2px;padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.08);">' +
-                    '<span style="font-size:10px;min-width:16px;">' + medals[i] + '</span>' +
-                    avHtml +
-                    flagHtml +
-                    '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;">' + name + '</span>' +
-                    badges +
-                    '<span style="color:#ffaa00;font-size:9px;margin-left:2px;">' + f.score + '</span>' +
-                    '</div>';
-            }).join('');
+        function getTopFans(n) {
+            return Object.keys(_fanActivity).map(function(name) {
+                return { name: name, score: getFanScore(_fanActivity[name]), data: _fanActivity[name] };
+            }).sort(function(a, b) { return b.score - a.score; }).slice(0, n || 10);
         }
+
+        function showFanBanner(fan, rank) {
+            // Remove existing banner
+            if (_fanBannerActive && _fanBannerActive.parentNode) {
+                _fanBannerActive.parentNode.removeChild(_fanBannerActive);
+            }
+            var medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
+            var medal = medals[rank] || ('#' + (rank + 1));
+            var flagHtml = fan.data.flag ? '<img src="https://flagcdn.com/w20/' + fan.data.flag.toLowerCase() + '.png" style="width:18px;height:13px;vertical-align:middle;margin-right:4px;border-radius:2px;">' : '';
+            var avHtml = fan.data.avatar ? '<img src="' + fan.data.avatar + '" style="width:36px;height:36px;border-radius:50%;border:2px solid #ffaa00;object-fit:cover;flex-shrink:0;">' : '<div style="width:36px;height:36px;border-radius:50%;background:#ffaa00;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:16px;flex-shrink:0;">' + (fan.name || '?').replace('@','').charAt(0).toUpperCase() + '</div>';
+            var badges = '';
+            if (fan.data.superchats > 0) badges += '<span style="font-size:12px;">💰</span>';
+            if (fan.data.members > 0) badges += '<span style="font-size:12px;">⭐</span>';
+            var name = fan.name.replace('@', '');
+
+            var card = document.createElement('div');
+            card.className = 'announce-card';
+            card.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 14px;min-width:200px;';
+            card.innerHTML =
+                avHtml +
+                '<div style="display:flex;flex-direction:column;gap:2px;">' +
+                    '<div style="font-size:11px;color:#ffaa00;font-weight:bold;">' + medal + ' Top Fan</div>' +
+                    '<div style="font-size:14px;font-weight:bold;color:#fff;">' + flagHtml + name + ' ' + badges + '</div>' +
+                    '<div style="font-size:10px;color:#aaa;">Score: ' + fan.score + ' pts</div>' +
+                '</div>';
+
+            var overlay = document.getElementById('announceOverlay');
+            overlay.appendChild(card);
+            _fanBannerActive = card;
+
+            setTimeout(function() {
+                if (card.parentNode) {
+                    card.classList.add('fade-out');
+                    setTimeout(function() { if (card.parentNode) card.parentNode.removeChild(card); }, 400);
+                }
+                _fanBannerActive = null;
+            }, 4000);
+        }
+
+        function updateFanBanners() {
+            // Only show when no visitors (solo or AI mode)
+            if (userPicks.length > 0) return;
+            _fanBannerTimer++;
+            if (_fanBannerTimer < _fanBannerInterval) return;
+            _fanBannerTimer = 0;
+            var fans = getTopFans(10);
+            if (fans.length === 0) return;
+            _fanBannerIndex = _fanBannerIndex % fans.length;
+            showFanBanner(fans[_fanBannerIndex], _fanBannerIndex);
+            _fanBannerIndex++;
+        }
+
+        function updateTopFansUI() {} // kept for compatibility
 
         function processWsChat(data) {
             var cUser = (data.userName || '').replace(/^@@+/, '@');
