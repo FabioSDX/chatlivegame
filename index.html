@@ -2615,7 +2615,6 @@
             _fanBannerTimer = 0; _fanBannerIndex = 0;
             // Reload fans from server on restart
             fetch('/fans').then(function(r) { return r.json(); }).then(function(data) {
-                // Merge server data with current session (keep higher scores)
                 var serverData = data || {};
                 var keys = Object.keys(serverData);
                 for (var i = 0; i < keys.length; i++) {
@@ -2623,10 +2622,15 @@
                     if (!_fanActivity[k]) {
                         _fanActivity[k] = serverData[k];
                     } else {
-                        // Keep current session if higher
                         var serverScore = (serverData[k].msgs || 0) + (serverData[k].cmds || 0) * 3;
                         var currentScore = (_fanActivity[k].msgs || 0) + (_fanActivity[k].cmds || 0) * 3;
                         if (serverScore > currentScore) _fanActivity[k] = serverData[k];
+                    }
+                    // Enrich avatar from persistentScores
+                    if (!_fanActivity[k].avatar || _fanActivity[k].avatar === '') {
+                        if (persistentScores[k] && persistentScores[k].avatar) {
+                            _fanActivity[k].avatar = persistentScores[k].avatar;
+                        }
                     }
                 }
             }).catch(function() {});
@@ -9013,7 +9017,34 @@
         // Load fans from server on start
         fetch('/fans').then(function(r) { return r.json(); }).then(function(data) {
             _fanActivity = data || {};
-            console.log('[fans] Loaded ' + Object.keys(_fanActivity).length + ' fans from server:', Object.keys(_fanActivity).slice(0,3));
+            // Enrich with avatars from persistentScores cache
+            var keys = Object.keys(_fanActivity);
+            for (var i = 0; i < keys.length; i++) {
+                var name = keys[i];
+                if (!_fanActivity[name].avatar || _fanActivity[name].avatar === '') {
+                    // Try exact match
+                    if (persistentScores[name] && persistentScores[name].avatar) {
+                        _fanActivity[name].avatar = persistentScores[name].avatar;
+                    } else {
+                        // Try without @ prefix
+                        var nameNoAt = name.replace('@', '');
+                        var psKeys = Object.keys(persistentScores);
+                        for (var j = 0; j < psKeys.length; j++) {
+                            if (psKeys[j].replace('@', '').toLowerCase() === nameNoAt.toLowerCase()) {
+                                if (persistentScores[psKeys[j]].avatar) {
+                                    _fanActivity[name].avatar = persistentScores[psKeys[j]].avatar;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                // Also restore flag from persistentScores if available
+                if (!_fanActivity[name].flag && _playerFlags[name]) {
+                    _fanActivity[name].flag = _playerFlags[name];
+                }
+            }
+            console.log('[fans] Loaded ' + Object.keys(_fanActivity).length + ' fans, enriched with local cache');
         }).catch(function(e) { console.warn('[fans] Failed to load:', e); });
 
         // Sync fans to server every 2 minutes
@@ -9037,6 +9068,10 @@
             }
             var f = _fanActivity[userName];
             if (avatarUrl && !f.avatar) f.avatar = avatarUrl;
+            // Also check persistentScores for avatar
+            if (!f.avatar && persistentScores[userName] && persistentScores[userName].avatar) {
+                f.avatar = persistentScores[userName].avatar;
+            }
             if (_playerFlags[userName]) f.flag = _playerFlags[userName];
             if (type === 'msg') f.msgs++;
             else if (type === 'cmd') f.cmds++;
@@ -9062,8 +9097,22 @@
             var medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
             var medal = medals[rank] || ('#' + (rank + 1));
             var flagHtml = fan.data.flag ? '<img src="https://flagcdn.com/w40/' + fan.data.flag.toLowerCase() + '.png" style="width:36px;height:26px;vertical-align:middle;margin-right:6px;border-radius:3px;box-shadow:0 1px 4px rgba(0,0,0,0.5);">' : '';
-            var avHtml = fan.data.avatar
-                ? '<img src="' + fan.data.avatar + '" style="width:72px;height:72px;border-radius:50%;border:3px solid #ffaa00;object-fit:cover;flex-shrink:0;box-shadow:0 0 12px rgba(255,170,0,0.5);">'
+
+            // Resolve avatar: fan data → persistentScores → avatarCache → initial
+            var avatarUrl = fan.data.avatar || '';
+            if (!avatarUrl && persistentScores[fan.name] && persistentScores[fan.name].avatar) {
+                avatarUrl = persistentScores[fan.name].avatar;
+                // Save back to fanActivity for future use
+                if (_fanActivity[fan.name]) _fanActivity[fan.name].avatar = avatarUrl;
+            }
+            // Also update flag from playerFlags if available
+            if (!fan.data.flag && _playerFlags[fan.name]) {
+                fan.data.flag = _playerFlags[fan.name];
+                if (_fanActivity[fan.name]) _fanActivity[fan.name].flag = fan.data.flag;
+            }
+
+            var avHtml = avatarUrl
+                ? '<img src="' + avatarUrl + '" style="width:72px;height:72px;border-radius:50%;border:3px solid #ffaa00;object-fit:cover;flex-shrink:0;box-shadow:0 0 12px rgba(255,170,0,0.5);">'
                 : '<div style="width:72px;height:72px;border-radius:50%;background:#ffaa00;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:28px;flex-shrink:0;">' + (fan.name || '?').replace('@','').charAt(0).toUpperCase() + '</div>';
             var badges = '';
             if (fan.data.superchats > 0) badges += '<span style="font-size:20px;">💰</span>';
