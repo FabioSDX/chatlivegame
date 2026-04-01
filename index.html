@@ -4076,7 +4076,9 @@
                 ctx.fill(); ctx.globalAlpha = 1;
                 ctx.beginPath(); ctx.arc(0, 0, ball.r, 0, Math.PI * 2); ctx.closePath(); ctx.clip();
                 // Priority: flag > avatar > initial
-                var _ballFlag = ball.ownerName ? _playerFlags[ball.ownerName] : null;
+                // Only show flag for visitors, not for the main pick owner
+                var _isOwnerBall = (ownerName && ball.ownerName === ownerName);
+                var _ballFlag = (!_isOwnerBall && ball.ownerName) ? _playerFlags[ball.ownerName] : null;
                 var _ballFlagImg = _ballFlag ? getFlagImage(_ballFlag) : null;
                 var avImg = ball.ownerAvatar ? avatarCache[ball.ownerAvatar] : null;
                 if (_ballFlagImg && _ballFlagImg.complete && _ballFlagImg.naturalWidth > 0) {
@@ -7198,7 +7200,10 @@
                                 if (cell && cell.t !== E && cell.t !== BEDROCK) {
                                     cell.hp -= (z.bossTier.fireDamage || 2);
                                     if (cell.hp <= 0) {
-                                        if (cell.t === BONUS_BOX) spawnBonusBalls(fc * TILE + TILE / 2, fr * TILE + TILE / 2, pick);
+                                        if (cell.t === BONUS_BOX) {
+                                            var _fireOwnerPick = z.userName ? (pick && pick.userName === z.userName ? pick : userPicks.find(function(u) { return u.userName === z.userName; })) : pick;
+                                            spawnBonusBalls(fc * TILE + TILE / 2, fr * TILE + TILE / 2, _fireOwnerPick || pick);
+                                        }
                                         cell.t = E; cell.hp = 0; cell.cr = 0;
                                     }
                                     else cell.cr = Math.min(1, 1 - cell.hp / BDEF[cell.t].hp);
@@ -10047,7 +10052,8 @@
                                         }
                                         // Bonus box check before destroying
                                         if (cell.t === BONUS_BOX) {
-                                            spawnBonusBalls(dbx, dby, pick);
+                                            var _bhOwnerPick = bh.userName ? (pick && pick.userName === bh.userName ? pick : userPicks.find(function(u) { return u.userName === bh.userName; })) : pick;
+                                            spawnBonusBalls(dbx, dby, _bhOwnerPick || pick);
                                         }
                                         cell.t = E; cell.hp = 0; cell.cr = 0;
                                     }
