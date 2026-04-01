@@ -30,10 +30,6 @@ loadFans();
 // Auto-save every 60 seconds
 setInterval(saveFans, 60000);
 
-const app = express();
-const server = http.createServer(app);
-const wss = new WebSocketServer({ server });
-
 // Serve static files
 app.use(express.static(path.join(__dirname)));
 app.use(express.json());
