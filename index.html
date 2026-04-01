@@ -3468,8 +3468,7 @@
             var card = document.createElement('div');
             card.className = 'announce-card';
             card.innerHTML =
-                '<div class="announce-title" style="color:' + w.color + ';text-shadow:0 0 15px ' + w.color + ',0 1px 4px #000;font-size:clamp(16px,7vw,28px);">' + w.text + '</div>' +
-                '<div class="announce-pts" style="color:#ccc;text-shadow:0 1px 3px #000;">— ' + meters + ' meters deep —</div>';
+                '<div class="announce-title" style="color:' + w.color + ';text-shadow:0 0 15px ' + w.color + ',0 1px 4px #000;font-size:clamp(16px,7vw,28px);">' + w.text + '</div>';
             overlay.appendChild(card);
             shakeAmt = Math.max(shakeAmt, 12);
             setTimeout(function () {
