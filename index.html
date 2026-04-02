@@ -4209,55 +4209,77 @@
 
         function updateAI() {
             if (!_aiEnabled || !pick) return;
-            // Check visitor presence
             updateAIVisibility();
-            // If hidden, don't act
             if (_aiHidden) return;
 
             _aiTimer++;
 
-            // Random spin every 2-5 seconds
-            if (_aiTimer >= _aiNextAction) {
-                _aiNextAction = _aiTimer + 120 + Math.floor(Math.random() * 180);
-                var dirs = ['right', 'left', 'down', 'up'];
-                var dir = dirs[Math.floor(Math.random() * dirs.length)];
-                if (Math.random() < 0.4) dir = 'down';
-                else if (Math.random() < 0.3) dir = Math.random() < 0.5 ? 'right' : 'left';
-                activateSpin(pick.userName || '@Player', dir);
+            // Detect if bosses are visible on screen
+            var viewTop = camY - TILE * 2;
+            var viewBot = camY + canvas.height + TILE * 2;
+            var hasBoss = false;
+            for (var bi = 0; bi < bubbles.length; bi++) {
+                if (bubbles[bi].isQueen && bubbles[bi].state !== 'dead' && bubbles[bi].y > viewTop && bubbles[bi].y < viewBot) { hasBoss = true; break; }
             }
-
-            // Use skills periodically
-            _aiSkillTimer++;
-            if (_aiSkillTimer > 600 + Math.floor(Math.random() * 600)) {
-                _aiSkillTimer = 0;
-                var me = pick.userName || '@Player';
-                var skill = Math.random();
-                if (skill < 0.18) {
-                    activateTNT(pick.x, pick.y, me);
-                } else if (skill < 0.30) {
-                    activateMegaTNT(pick.x, pick.y, me);
-                } else if (skill < 0.42) {
-                    activateThor(pick.x, pick.y, me);
-                } else if (skill < 0.50) {
-                    activateNuke(pick.x, pick.y, me);
-                } else if (skill < 0.58) {
-                    spawnClone(me, pick.userAvatarUrl || '');
-                } else if (skill < 0.66) {
-                    activateBlackHole(pick.x, pick.y, me);
-                } else if (skill < 0.74) {
-                    activateGravity(me);
-                } else if (skill < 0.82) {
-                    activateMG(me);
-                } else if (skill < 0.88) {
-                    activateBig(me);
-                } else if (skill < 0.94) {
-                    activateStorm(pick);
-                } else {
-                    activateKiss(me, pick.userAvatarUrl || '');
+            if (!hasBoss) {
+                for (var si = 0; si < slimes.length; si++) {
+                    if (slimes[si].isSlimeBoss && slimes[si].state !== 'dead' && slimes[si].y > viewTop && slimes[si].y < viewBot) { hasBoss = true; break; }
                 }
             }
 
-            // Nudge pickaxe if stuck or too slow
+            // Spin: slow normally (8-15s), fast near bosses (2-4s)
+            var spinInterval = hasBoss
+                ? 120 + Math.floor(Math.random() * 120)   // 2-4s near bosses
+                : 480 + Math.floor(Math.random() * 420);  // 8-15s normally
+
+            if (_aiTimer >= _aiNextAction) {
+                _aiNextAction = _aiTimer + spinInterval;
+                var dirs = ['right', 'left', 'down', 'up'];
+                var dir = dirs[Math.floor(Math.random() * dirs.length)];
+                if (!hasBoss) {
+                    // Calm: mostly down
+                    if (Math.random() < 0.6) dir = 'down';
+                    else dir = Math.random() < 0.5 ? 'right' : 'left';
+                } else {
+                    // Aggressive: random directions
+                    if (Math.random() < 0.3) dir = 'down';
+                }
+                activateSpin(pick.userName || '@Player', dir);
+            }
+
+            // Skills: rare normally (30-60s), frequent near bosses (10-20s)
+            var skillInterval = hasBoss
+                ? 600 + Math.floor(Math.random() * 600)    // 10-20s near bosses
+                : 1800 + Math.floor(Math.random() * 1800); // 30-60s normally
+
+            _aiSkillTimer++;
+            if (_aiSkillTimer > skillInterval) {
+                _aiSkillTimer = 0;
+                var me = pick.userName || '@Player';
+                var skill = Math.random();
+                if (hasBoss) {
+                    // Boss mode: combat skills
+                    if (skill < 0.20) activateThor(pick.x, pick.y, me);
+                    else if (skill < 0.35) activateMegaTNT(pick.x, pick.y, me);
+                    else if (skill < 0.50) activateBlackHole(pick.x, pick.y, me);
+                    else if (skill < 0.62) activateNuke(pick.x, pick.y, me);
+                    else if (skill < 0.72) activateMG(me);
+                    else if (skill < 0.82) spawnClone(me, pick.userAvatarUrl || '');
+                    else if (skill < 0.90) activateBig(me);
+                    else activateStorm(pick);
+                } else {
+                    // Calm mode: lighter skills
+                    if (skill < 0.25) activateTNT(pick.x, pick.y, me);
+                    else if (skill < 0.40) activateGravity(me);
+                    else if (skill < 0.55) activateMG(me);
+                    else if (skill < 0.68) spawnClone(me, pick.userAvatarUrl || '');
+                    else if (skill < 0.80) activateBig(me);
+                    else if (skill < 0.90) activateStorm(pick);
+                    else activateKiss(me, pick.userAvatarUrl || '');
+                }
+            }
+
+            // Nudge if stuck
             var speed = Math.sqrt(pick.vx * pick.vx + pick.vy * pick.vy);
             if (speed < 1 && !pick._spinLock) {
                 pick.vx += (Math.random() - 0.5) * 3;
